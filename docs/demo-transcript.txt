@@ -1,0 +1,13 @@
+DEMO SCRIPT INPUT (must work):
+1) User types: “I have an interview at OpenAI next Thursday for SDE”
+2) App renders SprintSetupCard with parsed company/date/role
+3) User clicks Confirm
+4) App shows SprintPlannerView + TodayPlanPanel
+5) User types: “Add question: design URL shortener”
+6) App renders AddQuestionPanel, user confirms save
+7) User types: “What should I do today?”
+8) TodayPlanPanel shows tasks and checkbox updates persist
+
+
+Add “Demo Mode: set today = fixed date”
+This ensures the “next Thursday” parsing always behaves the same during judging.

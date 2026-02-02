@@ -1,0 +1,265 @@
+"use client";
+
+import { useStore } from "@/lib/store";
+import { generateSprint } from "@/lib/sprintGenerator";
+import { RoleType, Application } from "@/types";
+import { format, parseISO, addDays } from "date-fns";
+import { useTamboComponentState } from "@tambo-ai/react";
+import { Calendar, Briefcase, Building2, CheckCircle2 } from "lucide-react";
+import { z } from "zod";
+
+// Props schema for Tambo registration
+export const sprintSetupCardSchema = z.object({
+    company: z.string().describe("The company name for the interview"),
+    role: z
+        .enum(["SDE", "QA", "Data", "PM"])
+        .optional()
+        .describe("The role type being interviewed for"),
+    interviewDate: z
+        .string()
+        .optional()
+        .describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'"),
+});
+
+interface SprintSetupCardProps {
+    company: string;
+    role?: RoleType;
+    interviewDate?: string;
+}
+
+interface SprintSetupState {
+    company: string;
+    role: RoleType;
+    interviewDate: string;
+    isSubmitted: boolean;
+    isSubmitting: boolean;
+}
+
+export function SprintSetupCard({
+    company: initialCompany,
+    role: initialRole,
+    interviewDate: initialDate,
+}: SprintSetupCardProps) {
+    const [state, setState] = useTamboComponentState<SprintSetupState>(
+        "sprint-setup-card",
+        {
+            company: initialCompany || "",
+            role: (initialRole as RoleType) || "SDE",
+            interviewDate: initialDate || getDefaultDate(),
+            isSubmitted: false,
+            isSubmitting: false,
+        }
+    );
+
+    const addApplication = useStore((s) => s.addApplication);
+    const addSprint = useStore((s) => s.addSprint);
+
+    // Handle loading state
+    if (!state) {
+        return (
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-md animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="space-y-3">
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                </div>
+            </div>
+        );
+    }
+
+    const handleConfirm = async () => {
+        if (!state.company || !state.interviewDate) {
+            return;
+        }
+
+        setState({ ...state, isSubmitting: true });
+
+        try {
+            // Parse the date - handle both ISO format and relative dates
+            let parsedDate: Date;
+            try {
+                parsedDate = parseISO(state.interviewDate);
+                if (isNaN(parsedDate.getTime())) {
+                    parsedDate = parseRelativeDate(state.interviewDate);
+                }
+            } catch {
+                parsedDate = parseRelativeDate(state.interviewDate);
+            }
+
+            // Create application
+            const application: Application = {
+                id: Date.now().toString(),
+                company: state.company,
+                role: state.role,
+                status: "interview",
+                applicationDate: new Date().toISOString(),
+                interviewDate: parsedDate.toISOString(),
+                rounds: [],
+                notes: "",
+                createdAt: new Date().toISOString(),
+            };
+
+            addApplication(application);
+
+            // Generate sprint
+            const sprint = generateSprint(application.id, parsedDate, state.role);
+            addSprint(sprint);
+
+            setState({ ...state, isSubmitted: true, isSubmitting: false });
+        } catch (error) {
+            console.error("Error creating sprint:", error);
+            setState({ ...state, isSubmitting: false });
+        }
+    };
+
+    if (state.isSubmitted) {
+        return (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-md">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-green-100 rounded-full">
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-lg text-green-800">
+                            Sprint Created!
+                        </h3>
+                        <p className="text-sm text-green-600">
+                            Your interview prep plan for {state.company} is ready
+                        </p>
+                    </div>
+                </div>
+                <p className="text-sm text-gray-600">
+                    Ask me &ldquo;What should I do today?&rdquo; to see your daily tasks.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-md">
+            <div className="flex items-center gap-3 mb-5">
+                <div className="p-2 bg-blue-100 rounded-full">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                    <h3 className="font-semibold text-lg text-gray-800">
+                        Setup Interview Sprint
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                        Confirm your interview details
+                    </p>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                        <Building2 className="w-4 h-4" />
+                        Company
+                    </label>
+                    <input
+                        type="text"
+                        value={state.company}
+                        onChange={(e) => setState({ ...state, company: e.target.value })}
+                        placeholder="e.g., Google, Amazon, Microsoft"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                        <Briefcase className="w-4 h-4" />
+                        Role Type
+                    </label>
+                    <select
+                        value={state.role}
+                        onChange={(e) =>
+                            setState({ ...state, role: e.target.value as RoleType })
+                        }
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                    >
+                        <option value="SDE">Software Development Engineer</option>
+                        <option value="QA">Quality Assurance</option>
+                        <option value="Data">Data Analyst / Scientist</option>
+                        <option value="PM">Product Manager</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                        <Calendar className="w-4 h-4" />
+                        Interview Date
+                    </label>
+                    <input
+                        type="date"
+                        value={formatDateForInput(state.interviewDate)}
+                        onChange={(e) =>
+                            setState({ ...state, interviewDate: e.target.value })
+                        }
+                        min={format(new Date(), "yyyy-MM-dd")}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                <button
+                    onClick={handleConfirm}
+                    disabled={!state.company || !state.interviewDate || state.isSubmitting}
+                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                    {state.isSubmitting ? "Creating Sprint..." : "Create Sprint 🚀"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// Helper functions
+function getDefaultDate(): string {
+    return format(addDays(new Date(), 7), "yyyy-MM-dd");
+}
+
+function formatDateForInput(dateStr: string): string {
+    try {
+        const date = parseISO(dateStr);
+        if (!isNaN(date.getTime())) {
+            return format(date, "yyyy-MM-dd");
+        }
+    } catch {
+        // Fall through to relative date parsing
+    }
+
+    const parsed = parseRelativeDate(dateStr);
+    return format(parsed, "yyyy-MM-dd");
+}
+
+function parseRelativeDate(dateString: string): Date {
+    const today = new Date();
+    const lowered = dateString.toLowerCase().trim();
+
+    if (lowered === "today") return today;
+    if (lowered === "tomorrow") return addDays(today, 1);
+
+    // Handle "next thursday", "next monday", etc.
+    const daysOfWeek = [
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+    ];
+
+    for (let i = 0; i < daysOfWeek.length; i++) {
+        if (lowered.includes(daysOfWeek[i])) {
+            const currentDay = today.getDay();
+            let daysUntil = i - currentDay;
+            if (daysUntil <= 0) daysUntil += 7;
+            return addDays(today, daysUntil);
+        }
+    }
+
+    // Default to 7 days from now
+    return addDays(today, 7);
+}
