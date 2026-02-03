@@ -13,14 +13,7 @@ function mergeRoundFeedback(
     prev: InterviewRound['feedback'] | undefined,
     next: InterviewRound['feedback'] | undefined
 ): InterviewRound['feedback'] | undefined {
-    if (!next) return prev;
-    return {
-        rating: next.rating ?? prev?.rating ?? 0,
-        pros: next.pros ?? prev?.pros ?? [],
-        cons: next.cons ?? prev?.cons ?? [],
-        struggledTopics: next.struggledTopics ?? prev?.struggledTopics ?? [],
-        notes: next.notes ?? prev?.notes ?? '',
-    };
+    return next ?? prev;
 }
 
 interface AppState {
@@ -101,6 +94,15 @@ export const useStore = create<AppState>()(
                             );
 
                             if (idx === -1) {
+                                if (process.env.NODE_ENV !== 'production') {
+                                    console.warn(
+                                        'updateApplication: tried to update missing round',
+                                        {
+                                            applicationId: id,
+                                            roundNumber: roundUpdate.roundNumber,
+                                        }
+                                    );
+                                }
                                 continue;
                             }
 
