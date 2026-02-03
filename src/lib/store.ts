@@ -30,12 +30,12 @@ interface AppState {
     resetData: () => void;
 }
 
-const initialProgress: UserProgress = {
+const createInitialProgress = (): UserProgress => ({
     currentStreak: 0,
     longestStreak: 0,
     lastActiveDate: new Date().toISOString(),
     totalTasksCompleted: 0,
-};
+});
 
 export const useStore = create<AppState>()(
     persist(
@@ -44,7 +44,7 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             completedTopics: [],
-            progress: initialProgress,
+            progress: createInitialProgress(),
 
             addApplication: (app) =>
                 set((state) => ({
@@ -204,7 +204,7 @@ export const useStore = create<AppState>()(
                 sprints: [],
                 questions: [],
                 completedTopics: [],
-                progress: initialProgress
+                progress: createInitialProgress()
             }),
         }),
         {

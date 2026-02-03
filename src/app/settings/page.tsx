@@ -150,11 +150,11 @@ export default function SettingsPage() {
       return;
     }
 
-    if (
-      selectedFile.type &&
-      selectedFile.type !== "application/json" &&
-      !selectedFile.name.toLowerCase().endsWith(".json")
-    ) {
+    const nameIsJson = selectedFile.name.toLowerCase().endsWith(".json");
+    const typeIsJson = selectedFile.type
+      ? selectedFile.type.toLowerCase().includes("json")
+      : false;
+    if (selectedFile.type && !typeIsJson && !nameIsJson) {
       setStatus({
         kind: "error",
         message: "Invalid file type. Please upload a .json backup file.",

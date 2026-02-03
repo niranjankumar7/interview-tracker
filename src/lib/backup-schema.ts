@@ -11,6 +11,12 @@ import {
   SPRINT_STATUSES,
 } from "@/types";
 
+const dateStringSchema = z
+  .string()
+  .refine((value) => Number.isFinite(Date.parse(value)), {
+    message: "Invalid date",
+  });
+
 const applicationStatusSchema = z.enum(APPLICATION_STATUSES);
 
 const interviewRoundSchema = z.object({
@@ -83,7 +89,7 @@ const questionSchema = z.object({
 const userProgressSchema = z.object({
   currentStreak: z.number(),
   longestStreak: z.number(),
-  lastActiveDate: z.string(),
+  lastActiveDate: dateStringSchema,
   totalTasksCompleted: z.number(),
 });
 
