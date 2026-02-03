@@ -480,9 +480,7 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => {
-                      const scheduledDate = roundDraft.scheduledDate
-                        ? new Date(roundDraft.scheduledDate).toISOString()
-                        : undefined;
+                      const scheduledDate = roundDraft.scheduledDate || undefined;
 
                       const newRound: InterviewRound = {
                         roundNumber: roundDraft.roundNumber,

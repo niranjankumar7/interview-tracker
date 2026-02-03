@@ -2,6 +2,27 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, InterviewRound, Sprint, Question, UserProgress } from '@/types';
 
+type InterviewRoundPatch = Partial<InterviewRound> &
+    Pick<InterviewRound, 'roundNumber'>;
+
+type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
+    rounds?: InterviewRoundPatch[];
+};
+
+function mergeRoundFeedback(
+    prev: InterviewRound['feedback'] | undefined,
+    next: InterviewRound['feedback'] | undefined
+): InterviewRound['feedback'] | undefined {
+    if (!next) return prev;
+    return {
+        rating: next.rating ?? prev?.rating ?? 0,
+        pros: next.pros ?? prev?.pros ?? [],
+        cons: next.cons ?? prev?.cons ?? [],
+        struggledTopics: next.struggledTopics ?? prev?.struggledTopics ?? [],
+        notes: next.notes ?? prev?.notes ?? '',
+    };
+}
+
 interface AppState {
     // Data
     applications: Application[];
@@ -13,9 +34,7 @@ interface AppState {
     addApplication: (app: Application) => void;
     updateApplication: (
         id: string,
-        updates: Partial<Omit<Application, 'rounds'>> & {
-            rounds?: Array<Partial<InterviewRound> & Pick<InterviewRound, 'roundNumber'>>;
-        }
+        updates: ApplicationUpdate
     ) => void;
     deleteApplication: (id: string) => void;
 
@@ -76,7 +95,7 @@ export const useStore = create<AppState>()(
                                     scheduledDate: roundUpdate.scheduledDate,
                                     notes: roundUpdate.notes ?? '',
                                     questionsAsked: roundUpdate.questionsAsked ?? [],
-                                    feedback: roundUpdate.feedback,
+                                    feedback: mergeRoundFeedback(undefined, roundUpdate.feedback),
                                 });
                                 continue;
                             }
@@ -85,9 +104,10 @@ export const useStore = create<AppState>()(
                             nextRounds[idx] = {
                                 ...prev,
                                 ...roundUpdate,
-                                feedback: roundUpdate.feedback
-                                    ? { ...prev.feedback, ...roundUpdate.feedback }
-                                    : prev.feedback,
+                                feedback: mergeRoundFeedback(
+                                    prev.feedback,
+                                    roundUpdate.feedback
+                                ),
                             };
                         }
 
