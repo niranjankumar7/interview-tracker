@@ -392,14 +392,8 @@ export function PrepDetailPanel(props: {
                     <input
                       type="number"
                       value={roundDraft.roundNumber}
-                      min={1}
-                      onChange={(e) =>
-                        setRoundDraft((prev) => ({
-                          ...prev,
-                          roundNumber: Number(e.target.value),
-                        }))
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                     />
                   </div>
 
@@ -702,7 +696,7 @@ export function PrepDetailPanel(props: {
                       updateApplication(application.id, {
                         rounds: [
                           {
-                            roundNumber: activeRound.roundNumber,
+                            ...activeRound,
                             questionsAsked: linesToList(feedbackDraft.questionsText),
                             feedback: {
                               rating,
