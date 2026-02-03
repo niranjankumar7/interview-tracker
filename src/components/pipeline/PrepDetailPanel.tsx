@@ -683,8 +683,8 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => {
-                      const rating = Math.min(5, Math.max(1, feedbackDraft.rating));
-                      if (!Number.isFinite(rating)) return;
+                      const rating = feedbackDraft.rating;
+                      if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
                       updateApplication(application.id, {
                         rounds: [
                           {
