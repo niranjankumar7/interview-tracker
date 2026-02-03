@@ -35,12 +35,20 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
 }
 
 function formatZodError(error: z.ZodError): string {
-  const lines = error.issues.map((issue) => {
+  const maxIssues = 8;
+  const lines = error.issues.slice(0, maxIssues).map((issue) => {
     const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
-    return `${path}: ${issue.message}`;
+    return `• ${path}: ${issue.message}`;
   });
 
-  return `Backup format mismatch:\n${lines.join("\n")}`;
+  const moreIssues =
+    error.issues.length > maxIssues
+      ? `\n…and ${error.issues.length - maxIssues} more issue(s).`
+      : "";
+
+  return `Backup format mismatch. Please use a backup exported from this app.\n${lines.join(
+    "\n",
+  )}${moreIssues}`;
 }
 
 function readFileAsText(file: File): Promise<string> {
@@ -100,9 +108,9 @@ export default function SettingsPage() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      setStatus({ kind: "success", message: `Exported backup as ${filename}` });
+      setStatus({ kind: "success", message: `Download started: ${filename}` });
     } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
   };
 
@@ -110,6 +118,7 @@ export default function SettingsPage() {
     const completedTopics = backup.completedTopics ?? [];
 
     if (mode === "replace") {
+      // Replace mode trusts the backup as-is.
       useStore.setState({
         applications: backup.applications,
         sprints: backup.sprints,
@@ -130,6 +139,7 @@ export default function SettingsPage() {
       existing.questions,
       backup.questions,
     );
+    // `completedTopics` is treated as a set of unique identifiers (order-independent).
     const mergedCompletedTopics = Array.from(
       new Set([...existing.completedTopics, ...completedTopics]),
     );
