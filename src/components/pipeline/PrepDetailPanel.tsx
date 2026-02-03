@@ -687,7 +687,7 @@ export function PrepDetailPanel(props: {
                       updateApplication(application.id, {
                         rounds: [
                           {
-                            ...activeRound,
+                            roundNumber: activeRound.roundNumber,
                             questionsAsked: linesToList(feedbackDraft.questionsText),
                             feedback: {
                               rating,
