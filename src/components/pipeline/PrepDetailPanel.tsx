@@ -22,7 +22,6 @@ type RoundDraft = {
   roundType: InterviewRound["roundType"];
   scheduledDate: string;
   notes: string;
-  questionsText: string;
 };
 
 function linesToList(value: string): string[] {
@@ -83,7 +82,6 @@ export function PrepDetailPanel(props: {
     roundType: "Technical",
     scheduledDate: "",
     notes: "",
-    questionsText: "",
   });
 
   useEffect(() => {
@@ -101,7 +99,6 @@ export function PrepDetailPanel(props: {
       roundType: "Technical",
       scheduledDate: "",
       notes: "",
-      questionsText: "",
     }));
   }, [isAddRoundOpen, nextRoundNumber]);
 
@@ -465,23 +462,6 @@ export function PrepDetailPanel(props: {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Questions you remember (one per line)
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={roundDraft.questionsText}
-                    onChange={(e) =>
-                      setRoundDraft((prev) => ({
-                        ...prev,
-                        questionsText: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                  />
-                </div>
-
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
@@ -500,7 +480,7 @@ export function PrepDetailPanel(props: {
                         roundType: roundDraft.roundType,
                         scheduledDate,
                         notes: roundDraft.notes,
-                        questionsAsked: linesToList(roundDraft.questionsText),
+                        questionsAsked: [],
                       };
 
                       addInterviewRound(application.id, newRound);
@@ -703,7 +683,7 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => {
-                      const rating = Math.max(1, Math.min(5, feedbackDraft.rating));
+                      const rating = feedbackDraft.rating;
                       updateApplication(application.id, {
                         rounds: [
                           {
