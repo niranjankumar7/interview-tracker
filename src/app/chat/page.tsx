@@ -84,11 +84,12 @@ export default function ChatPage() {
 
             <Link
               href="/settings"
-              className="ml-2 inline-flex h-10 w-10 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="ml-2 inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               title="Settings"
               aria-label="Settings"
             >
-              <Settings className="h-5 w-5" />
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Settings</span>
             </Link>
           </div>
         </header>

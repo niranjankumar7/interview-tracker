@@ -51,12 +51,12 @@ interface AppState {
     importData: (data: unknown) => void;
 }
 
-const initialProgress: UserProgress = {
+const getInitialProgress = (): UserProgress => ({
     currentStreak: 0,
     longestStreak: 0,
     lastActiveDate: new Date().toISOString(),
     totalTasksCompleted: 0,
-};
+});
 
 const initialProfile: UserProfile = {
     name: '',
@@ -75,7 +75,7 @@ export const useStore = create<AppState>()(
             applications: [],
             sprints: [],
             questions: [],
-            progress: initialProgress,
+            progress: getInitialProgress(),
             profile: initialProfile,
             preferences: initialPreferences,
 
@@ -245,7 +245,7 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress,
+                progress: getInitialProgress(),
                 profile: initialProfile,
                 preferences: initialPreferences,
             }),
@@ -272,7 +272,10 @@ export const useStore = create<AppState>()(
                     return;
                 }
 
-                throw new Error('File does not match expected export format');
+                const issue = snapshotParse.error.issues[0];
+                const where = issue?.path?.length ? issue.path.join('.') : 'snapshot';
+                const message = issue?.message ?? 'File does not match expected export format';
+                throw new Error(`${where}: ${message}`);
             },
         }),
         {
