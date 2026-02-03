@@ -1,5 +1,6 @@
 import type { CompletedTopic } from "@/types";
 import { normalizeTopic } from "@/lib/topic-matcher";
+import { useStore } from "@/lib/store";
 
 type TopicCompletionGetter = (topicName: string) => CompletedTopic | undefined;
 
@@ -39,7 +40,7 @@ function getAllPrerequisites(topicName: string): string[] {
 */
 export function getMissingPrerequisites(
     topicName: string,
-    getTopicCompletion: TopicCompletionGetter
+    getTopicCompletion: TopicCompletionGetter = useStore.getState().getTopicCompletion
 ): string[] {
     const prerequisites = getAllPrerequisites(topicName);
     return prerequisites.filter((p) => !getTopicCompletion(p));
