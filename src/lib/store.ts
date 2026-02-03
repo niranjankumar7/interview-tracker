@@ -2,11 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, Sprint, Question, UserProgress } from '@/types';
 
+type CompletedTopic = {
+    date: string;
+    topic: string;
+};
+
 interface AppState {
     // Data
     applications: Application[];
     sprints: Sprint[];
     questions: Question[];
+    completedTopics: CompletedTopic[];
     progress: UserProgress;
 
     // Actions
@@ -35,12 +41,33 @@ const initialProgress: UserProgress = {
     totalTasksCompleted: 0,
 };
 
+function computeCompletedTopics(sprints: Sprint[]): CompletedTopic[] {
+    const completedTopics: CompletedTopic[] = [];
+
+    for (const sprint of sprints) {
+        for (const plan of sprint.dailyPlans) {
+            for (const block of plan.blocks) {
+                for (const task of block.tasks) {
+                    if (!task.completed) continue;
+                    completedTopics.push({
+                        date: plan.date,
+                        topic: task.category || 'General'
+                    });
+                }
+            }
+        }
+    }
+
+    return completedTopics;
+}
+
 export const useStore = create<AppState>()(
     persist(
-        (set, get) => ({
+        (set) => ({
             applications: [],
             sprints: [],
             questions: [],
+            completedTopics: [],
             progress: initialProgress,
 
             addApplication: (app) =>
@@ -58,20 +85,26 @@ export const useStore = create<AppState>()(
             deleteApplication: (id) =>
                 set((state) => ({
                     applications: state.applications.filter(app => app.id !== id),
-                    sprints: state.sprints.filter(sprint => sprint.applicationId !== id)
+                    sprints: state.sprints.filter(sprint => sprint.applicationId !== id),
+                    completedTopics: computeCompletedTopics(state.sprints.filter(sprint => sprint.applicationId !== id))
                 })),
 
             addSprint: (sprint) =>
                 set((state) => ({
-                    sprints: [...state.sprints, sprint]
+                    sprints: [...state.sprints, sprint],
+                    completedTopics: computeCompletedTopics([...state.sprints, sprint])
                 })),
 
             updateSprint: (id, updates) =>
-                set((state) => ({
-                    sprints: state.sprints.map(sprint =>
+                set((state) => {
+                    const sprints = state.sprints.map(sprint =>
                         sprint.id === id ? { ...sprint, ...updates } : sprint
-                    )
-                })),
+                    );
+                    return {
+                        sprints,
+                        completedTopics: computeCompletedTopics(sprints)
+                    };
+                }),
 
             addQuestion: (question) =>
                 set((state) => ({
@@ -80,6 +113,12 @@ export const useStore = create<AppState>()(
 
             completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
                 set((state) => {
+                    const sprint = state.sprints.find((s) => s.id === sprintId);
+                    const prevCompleted =
+                        sprint?.dailyPlans[dayIndex]?.blocks[blockIndex]?.tasks[taskIndex]
+                            ?.completed ?? false;
+                    const delta = prevCompleted ? -1 : 1;
+
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
 
@@ -107,9 +146,11 @@ export const useStore = create<AppState>()(
 
                     return {
                         sprints,
+                        completedTopics: computeCompletedTopics(sprints),
                         progress: {
                             ...state.progress,
-                            totalTasksCompleted: state.progress.totalTasksCompleted + 1
+                            lastActiveDate: delta > 0 ? new Date().toISOString() : state.progress.lastActiveDate,
+                            totalTasksCompleted: Math.max(0, state.progress.totalTasksCompleted + delta)
                         }
                     };
                 }),
@@ -186,6 +227,7 @@ export const useStore = create<AppState>()(
                     applications: demoApplications,
                     sprints: [],
                     questions: demoQuestions,
+                    completedTopics: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -199,6 +241,7 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
+                completedTopics: [],
                 progress: initialProgress
             }),
         }),
