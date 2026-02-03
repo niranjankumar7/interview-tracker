@@ -1,15 +1,18 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { ApplicationStatus } from "@/types";
+import type { Application, ApplicationStatus } from "@/types";
 import {
     Building2,
     Calendar,
     Briefcase,
     GripVertical,
+    Search,
     Trash2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useMemo, useState, type DragEvent } from "react";
+import { useDebounce } from "use-debounce";
 
 const statusColumns: { status: ApplicationStatus; label: string; color: string }[] = [
     { status: "applied", label: "Applied", color: "bg-gray-500" },
@@ -19,20 +22,76 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
     { status: "rejected", label: "Rejected", color: "bg-red-500" },
 ];
 
+const SEARCH_DEBOUNCE_MS = 250;
+
+const getSearchRank = (app: Application, normalizedQuery: string): number => {
+    const company = app.company.toLocaleLowerCase();
+    const role = app.role.toLocaleLowerCase();
+
+    if (company.startsWith(normalizedQuery)) return 0;
+    if (company.includes(normalizedQuery)) return 1;
+    if (role.startsWith(normalizedQuery)) return 2;
+    if (role.includes(normalizedQuery)) return 3;
+    return 4;
+};
+
 export function KanbanBoard() {
     const applications = useStore((state) => state.applications);
     const updateApplication = useStore((state) => state.updateApplication);
     const deleteApplication = useStore((state) => state.deleteApplication);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearchQuery] = useDebounce(searchQuery, SEARCH_DEBOUNCE_MS);
 
-    const handleDragStart = (e: React.DragEvent, appId: string) => {
+    const { applicationsByStatus, filteredCount } = useMemo(() => {
+        const normalizedQuery = debouncedSearchQuery.trim().toLocaleLowerCase();
+
+        const filtered =
+            normalizedQuery === ""
+                ? applications
+                : applications.filter((app) => {
+                      const company = app.company.toLocaleLowerCase();
+                      const role = app.role.toLocaleLowerCase();
+                      return company.includes(normalizedQuery) || role.includes(normalizedQuery);
+                  });
+
+        const sorted =
+            normalizedQuery === ""
+                ? filtered
+                : [...filtered].sort((a, b) => {
+                      const rankDelta =
+                          getSearchRank(a, normalizedQuery) -
+                          getSearchRank(b, normalizedQuery);
+                      if (rankDelta !== 0) return rankDelta;
+                      return a.company.localeCompare(b.company);
+                  });
+
+        const byStatus: Record<ApplicationStatus, Application[]> = {
+            applied: [],
+            shortlisted: [],
+            interview: [],
+            offer: [],
+            rejected: [],
+        };
+
+        for (const app of sorted) {
+            byStatus[app.status].push(app);
+        }
+
+        return {
+            applicationsByStatus: byStatus,
+            filteredCount: sorted.length,
+        };
+    }, [applications, debouncedSearchQuery]);
+
+    const handleDragStart = (e: DragEvent<HTMLDivElement>, appId: string) => {
         e.dataTransfer.setData("applicationId", appId);
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
     };
 
-    const handleDrop = (e: React.DragEvent, newStatus: ApplicationStatus) => {
+    const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ApplicationStatus) => {
         e.preventDefault();
         const appId = e.dataTransfer.getData("applicationId");
         if (appId) {
@@ -42,11 +101,30 @@ export function KanbanBoard() {
 
     return (
         <div className="h-full bg-gray-50 p-6 overflow-x-auto">
+            <div className="flex items-center gap-4 mb-4 min-w-max">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-semibold text-gray-800">Search</h2>
+                    <div className="relative w-80">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Company or role…"
+                            aria-label="Search applications by company or role"
+                            className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+                {debouncedSearchQuery.trim() !== "" && (
+                    <div className="text-sm text-gray-500">
+                        Showing {filteredCount} of {applications.length}
+                    </div>
+                )}
+            </div>
+
             <div className="flex gap-4 min-w-max h-full">
                 {statusColumns.map((column) => {
-                    const columnApps = applications.filter(
-                        (app) => app.status === column.status
-                    );
+                    const columnApps = applicationsByStatus[column.status];
 
                     return (
                         <div
