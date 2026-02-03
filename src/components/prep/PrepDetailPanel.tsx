@@ -23,7 +23,9 @@ import {
     HelpCircle,
     Target,
     Loader2,
+    AlertTriangle,
 } from "lucide-react";
+import { getMissingPrerequisites } from "@/services/PrepValidator";
 
 interface PrepDetailPanelProps {
     application: Application;
@@ -217,6 +219,11 @@ export function PrepDetailPanel({
                                 <div className="grid gap-4 md:grid-cols-2">
                                     {prepContent.keyTopics.map((topic, idx) => {
                                         const completion = isTopicCompleted(topic.name);
+                                        const missingPrerequisites = completion.completed
+                                            ? getMissingPrerequisites(topic.name, getTopicCompletion)
+                                            : [];
+                                        const hasMissingPrerequisites = missingPrerequisites.length > 0;
+
                                         return (
                                             <div
                                                 key={idx}
@@ -237,6 +244,16 @@ export function PrepDetailPanel({
                                                         <h4 className={`font-semibold ${completion.completed ? "text-green-800" : "text-gray-800"}`}>
                                                             {topic.name}
                                                         </h4>
+                                                        {completion.completed && hasMissingPrerequisites && (
+                                                            <span
+                                                                className="text-amber-600"
+                                                                title={`Missing prerequisite${missingPrerequisites.length === 1 ? "" : "s"}: ${missingPrerequisites.join(
+                                                                    ", "
+                                                                )}`}
+                                                            >
+                                                                <AlertTriangle className="w-4 h-4" />
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {completion.completed ? (
                                                         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
