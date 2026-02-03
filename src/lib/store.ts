@@ -123,11 +123,12 @@ export const useStore = create<AppState>()(
 
                         const isSprintCompleted = dailyPlans.every((d) => d.completed);
 
-                        const nextStatus: Sprint["status"] = isSprintCompleted
-                            ? 'completed'
-                            : sprint.status === 'completed'
-                                ? 'active'
-                                : sprint.status;
+                        const nextStatus: Sprint["status"] =
+                            sprint.status === 'completed'
+                                ? 'completed'
+                                : isSprintCompleted
+                                    ? 'completed'
+                                    : sprint.status;
 
                         return { ...sprint, dailyPlans, status: nextStatus };
                     });
