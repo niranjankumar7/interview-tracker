@@ -74,7 +74,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
             {sprintsToShow.map((sprint) => {
                 const app = applications.find((a) => a.id === sprint.applicationId);
                 const struggledTopics = app
-                    ? [...new Set(app.rounds.flatMap((r) => r.feedback?.struggledTopics ?? []))]
+                    ? [...new Set((app.rounds ?? []).flatMap((r) => r.feedback?.struggledTopics ?? []))]
                     : [];
                 const todaysPlan = sprint.dailyPlans.find((plan) =>
                     isToday(parseISO(plan.date))

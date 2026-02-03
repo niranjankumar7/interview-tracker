@@ -32,6 +32,7 @@ interface AppState {
 
     // Actions
     addApplication: (app: Application) => void;
+    addInterviewRound: (applicationId: string, round: InterviewRound) => void;
     updateApplication: (
         id: string,
         updates: ApplicationUpdate
@@ -72,6 +73,17 @@ export const useStore = create<AppState>()(
                     applications: [...state.applications, app]
                 })),
 
+            addInterviewRound: (applicationId, round) =>
+                set((state) => ({
+                    applications: state.applications.map((app) => {
+                        if (app.id !== applicationId) return app;
+                        const rounds = [...app.rounds, round].sort(
+                            (a, b) => a.roundNumber - b.roundNumber
+                        );
+                        return { ...app, rounds };
+                    }),
+                })),
+
             updateApplication: (id, updates) =>
                 set((state) => ({
                     applications: state.applications.map((app) => {
@@ -89,14 +101,6 @@ export const useStore = create<AppState>()(
                             );
 
                             if (idx === -1) {
-                                nextRounds.push({
-                                    roundNumber: roundUpdate.roundNumber,
-                                    roundType: roundUpdate.roundType ?? 'Technical',
-                                    scheduledDate: roundUpdate.scheduledDate,
-                                    notes: roundUpdate.notes ?? '',
-                                    questionsAsked: roundUpdate.questionsAsked ?? [],
-                                    feedback: mergeRoundFeedback(undefined, roundUpdate.feedback),
-                                });
                                 continue;
                             }
 

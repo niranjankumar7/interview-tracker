@@ -55,6 +55,7 @@ export function PrepDetailPanel(props: {
   const application = useStore((s) =>
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
+  const addInterviewRound = useStore((s) => s.addInterviewRound);
   const updateApplication = useStore((s) => s.updateApplication);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
@@ -490,7 +491,7 @@ export function PrepDetailPanel(props: {
                         questionsAsked: linesToList(roundDraft.questionsText),
                       };
 
-                      updateApplication(application.id, { rounds: [newRound] });
+                      addInterviewRound(application.id, newRound);
                       setIsAddRoundOpen(false);
                     }}
                     className="px-3 py-2 text-sm rounded-lg bg-gray-900 text-white hover:bg-gray-800"
