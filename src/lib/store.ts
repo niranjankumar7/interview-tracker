@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, Sprint, Question, UserProgress, UserProfile, AppPreferences } from '@/types';
+import { APP_VERSION } from '@/lib/constants';
+import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -46,7 +48,7 @@ interface AppState {
     loadDemoData: () => void;
     resetData: () => void;
     exportData: () => AppDataExport;
-    importData: (data: AppDataSnapshot | AppDataExport) => void;
+    importData: (data: unknown) => void;
 }
 
 const initialProgress: UserProgress = {
@@ -251,22 +253,26 @@ export const useStore = create<AppState>()(
             exportData: () => {
                 const { applications, sprints, questions, progress, profile, preferences } = get();
                 return {
-                    version: '0.1.0',
+                    version: APP_VERSION,
                     exportedAt: new Date().toISOString(),
                     snapshot: { applications, sprints, questions, progress, profile, preferences },
                 };
             },
 
             importData: (data) => {
-                const snapshot = 'snapshot' in data ? data.snapshot : data;
-                set({
-                    applications: snapshot.applications ?? [],
-                    sprints: snapshot.sprints ?? [],
-                    questions: snapshot.questions ?? [],
-                    progress: snapshot.progress ?? initialProgress,
-                    profile: snapshot.profile ?? initialProfile,
-                    preferences: snapshot.preferences ?? initialPreferences,
-                });
+                const exportParse = appDataExportSchema.safeParse(data);
+                if (exportParse.success) {
+                    set(exportParse.data.snapshot);
+                    return;
+                }
+
+                const snapshotParse = appDataSnapshotSchema.safeParse(data);
+                if (snapshotParse.success) {
+                    set(snapshotParse.data);
+                    return;
+                }
+
+                throw new Error('File does not match expected export format');
             },
         }),
         {

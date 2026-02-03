@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   ArrowLeft,
@@ -18,7 +18,8 @@ import {
   Database,
 } from "lucide-react";
 
-import { useStore, type AppDataExport, type AppDataSnapshot } from "@/lib/store";
+import { useStore } from "@/lib/store";
+import { APP_VERSION } from "@/lib/constants";
 import type { ExperienceLevel, ThemePreference } from "@/types";
 import {
   Card,
@@ -34,8 +35,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-const APP_VERSION = "0.1.0";
-
 type ThemeOption = {
   id: ThemePreference;
   label: string;
@@ -50,7 +49,7 @@ const themeOptions: ThemeOption[] = [
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const profile = useStore((s) => s.profile);
@@ -70,17 +69,12 @@ export default function SettingsPage() {
     setMounted(true);
   }, []);
 
-  // Keep next-themes in sync with our persisted preference.
   useEffect(() => {
     if (!mounted) return;
-    if (preferences.theme === theme) return;
     setTheme(preferences.theme);
-  }, [mounted, preferences.theme, setTheme, theme]);
+  }, [mounted, preferences.theme, setTheme]);
 
-  const selectedTheme = useMemo(() => {
-    if (!mounted) return preferences.theme;
-    return (theme as ThemePreference | undefined) ?? preferences.theme;
-  }, [mounted, preferences.theme, theme]);
+  const selectedTheme = preferences.theme;
 
   const handleThemeChange = (next: ThemePreference) => {
     updatePreferences({ theme: next });
@@ -106,19 +100,14 @@ export default function SettingsPage() {
 
   const handleImport = async (file: File) => {
     const text = await file.text();
-    const parsed = JSON.parse(text) as unknown;
-
-    if (!parsed || typeof parsed !== "object") {
-      throw new Error("Invalid file format");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error("File is not valid JSON");
     }
 
-    importData(parsed as AppDataSnapshot | AppDataExport);
-
-    const nextTheme = (parsed as { snapshot?: { preferences?: { theme?: ThemePreference } } })
-      .snapshot?.preferences?.theme;
-    if (nextTheme && mounted) {
-      setTheme(nextTheme);
-    }
+    importData(parsed);
   };
 
   const experienceLevelOptions: ExperienceLevel[] = ["Junior", "Mid", "Senior"];
