@@ -93,7 +93,7 @@ export default function SettingsPage() {
       link.remove();
       setStatus({ kind: "success", message: `Exported backup as ${filename}` });
     } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
   };
 
@@ -184,6 +184,13 @@ export default function SettingsPage() {
     if (!result.success) {
       setStatus({ kind: "error", message: formatZodError(result.error) });
       return;
+    }
+
+    if (importMode === "replace") {
+      const confirmed = window.confirm(
+        "Importing in Replace mode will overwrite your existing data. This cannot be undone. Continue?",
+      );
+      if (!confirmed) return;
     }
 
     applyImportedBackup(result.data, importMode);
