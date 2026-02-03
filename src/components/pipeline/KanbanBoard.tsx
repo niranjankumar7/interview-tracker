@@ -23,16 +23,18 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
+const DRAG_DATA_KEY = "applicationId";
 
-const getSearchRank = (app: Application, normalizedQuery: string): number => {
-    const company = app.company.toLocaleLowerCase();
-    const role = app.role.toLocaleLowerCase();
-
-    if (company.startsWith(normalizedQuery)) return 0;
-    if (company.includes(normalizedQuery)) return 1;
-    if (role.startsWith(normalizedQuery)) return 2;
-    if (role.includes(normalizedQuery)) return 3;
-    return 4;
+const getSearchRank = (
+    companyLower: string,
+    roleLower: string,
+    normalizedQuery: string
+): number | null => {
+    if (companyLower.startsWith(normalizedQuery)) return 0;
+    if (companyLower.includes(normalizedQuery)) return 1;
+    if (roleLower.startsWith(normalizedQuery)) return 2;
+    if (roleLower.includes(normalizedQuery)) return 3;
+    return null;
 };
 
 export function KanbanBoard() {
@@ -42,28 +44,18 @@ export function KanbanBoard() {
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery] = useDebounce(searchQuery, SEARCH_DEBOUNCE_MS);
 
+    const indexedApplications = useMemo(
+        () =>
+            applications.map((app) => ({
+                app,
+                companyLower: app.company.toLowerCase(),
+                roleLower: app.role.toLowerCase(),
+            })),
+        [applications]
+    );
+
     const { applicationsByStatus, filteredCount } = useMemo(() => {
-        const normalizedQuery = debouncedSearchQuery.trim().toLocaleLowerCase();
-
-        const filtered =
-            normalizedQuery === ""
-                ? applications
-                : applications.filter((app) => {
-                      const company = app.company.toLocaleLowerCase();
-                      const role = app.role.toLocaleLowerCase();
-                      return company.includes(normalizedQuery) || role.includes(normalizedQuery);
-                  });
-
-        const sorted =
-            normalizedQuery === ""
-                ? filtered
-                : [...filtered].sort((a, b) => {
-                      const rankDelta =
-                          getSearchRank(a, normalizedQuery) -
-                          getSearchRank(b, normalizedQuery);
-                      if (rankDelta !== 0) return rankDelta;
-                      return a.company.localeCompare(b.company);
-                  });
+        const normalizedQuery = debouncedSearchQuery.trim().toLowerCase();
 
         const byStatus: Record<ApplicationStatus, Application[]> = {
             applied: [],
@@ -73,18 +65,42 @@ export function KanbanBoard() {
             rejected: [],
         };
 
-        for (const app of sorted) {
-            byStatus[app.status].push(app);
+        if (normalizedQuery === "") {
+            for (const entry of indexedApplications) {
+                byStatus[entry.app.status].push(entry.app);
+            }
+
+            return {
+                applicationsByStatus: byStatus,
+                filteredCount: indexedApplications.length,
+            };
+        }
+
+        const matches: { app: Application; rank: number }[] = [];
+        for (const entry of indexedApplications) {
+            const rank = getSearchRank(entry.companyLower, entry.roleLower, normalizedQuery);
+            if (rank === null) continue;
+            matches.push({ app: entry.app, rank });
+        }
+
+        matches.sort((a, b) => {
+            const rankDelta = a.rank - b.rank;
+            if (rankDelta !== 0) return rankDelta;
+            return a.app.company.localeCompare(b.app.company);
+        });
+
+        for (const match of matches) {
+            byStatus[match.app.status].push(match.app);
         }
 
         return {
             applicationsByStatus: byStatus,
-            filteredCount: sorted.length,
+            filteredCount: matches.length,
         };
-    }, [applications, debouncedSearchQuery]);
+    }, [indexedApplications, debouncedSearchQuery]);
 
     const handleDragStart = (e: DragEvent<HTMLDivElement>, appId: string) => {
-        e.dataTransfer.setData("applicationId", appId);
+        e.dataTransfer.setData(DRAG_DATA_KEY, appId);
     };
 
     const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -93,7 +109,7 @@ export function KanbanBoard() {
 
     const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ApplicationStatus) => {
         e.preventDefault();
-        const appId = e.dataTransfer.getData("applicationId");
+        const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
         if (appId) {
             updateApplication(appId, { status: newStatus });
         }
