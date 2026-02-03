@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
-import { ApplicationStatus } from "@/types";
+import type { ApplicationStatus, Sprint } from "@/types";
 import {
   addDays,
   differenceInDays,
@@ -71,8 +71,30 @@ function Card({
   );
 }
 
-type CompletedTopic =
-  ReturnType<typeof useStore.getState>["completedTopics"][number];
+type CompletedTopic = {
+  date: string;
+  topic: string;
+};
+
+function computeCompletedTopics(sprints: Sprint[]): CompletedTopic[] {
+  const completedTopics: CompletedTopic[] = [];
+
+  for (const sprint of sprints) {
+    for (const plan of sprint.dailyPlans) {
+      for (const block of plan.blocks) {
+        for (const task of block.tasks) {
+          if (!task.completed) continue;
+          completedTopics.push({
+            date: plan.date,
+            topic: task.category || "General",
+          });
+        }
+      }
+    }
+  }
+
+  return completedTopics;
+}
 
 function getActivityCountsByDate(completedTopics: CompletedTopic[]) {
   const counts = new Map<string, number>();
@@ -105,13 +127,15 @@ export default function DashboardPage() {
   useEffect(() => setMounted(true), []);
 
   const applications = useStore((s) => s.applications);
-  const completedTopics = useStore((s) => s.completedTopics);
+  const sprints = useStore((s) => s.sprints);
   const progress = useStore((s) => s.progress);
   const loadDemoData = useStore((s) => s.loadDemoData);
   const resetData = useStore((s) => s.resetData);
 
   const now = useMemo(() => new Date(), []);
   const today = useMemo(() => startOfDay(now), [now]);
+
+  const completedTopics = useMemo(() => computeCompletedTopics(sprints), [sprints]);
 
   const completedTopicCountsByDate = useMemo(() => {
     return getTopicCountsByDate(completedTopics);
@@ -412,10 +436,14 @@ export default function DashboardPage() {
                                     ? "bg-green-400"
                                     : "bg-green-500";
 
+                          const title = cell.isFuture
+                            ? `${format(cell.date, "MMM d, yyyy")}: upcoming`
+                            : `${format(cell.date, "MMM d, yyyy")}: ${cell.count} task${cell.count === 1 ? "" : "s"}`;
+
                           return (
                             <div
                               key={cell.key}
-                              title={`${format(cell.date, "MMM d, yyyy")}: ${cell.count} task${cell.count === 1 ? "" : "s"}`}
+                              title={title}
                               className={`w-3.5 h-3.5 rounded-sm ${cell.isFuture ? "bg-transparent" : level}`}
                             />
                           );
