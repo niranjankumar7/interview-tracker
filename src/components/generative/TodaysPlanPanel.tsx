@@ -18,13 +18,23 @@ export const todaysPlanPanelSchema = z.object({
         .boolean()
         .optional()
         .describe("Whether to show all active sprints or just the first one"),
+    focusApplicationId: z
+        .string()
+        .optional()
+        .describe(
+            "Optional application ID to show first (useful when deep-linking from notifications)"
+        ),
 });
 
 interface TodaysPlanPanelProps {
     showAll?: boolean;
+    focusApplicationId?: string;
 }
 
-export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
+export function TodaysPlanPanel({
+    showAll = true,
+    focusApplicationId,
+}: TodaysPlanPanelProps) {
     const sprints = useStore((state) => state.sprints);
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
@@ -32,6 +42,14 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
 
     // Find active sprints
     const activeSprints = sprints.filter((s) => s.status === "active");
+
+    const orderedSprints = focusApplicationId
+        ? [...activeSprints].sort((a, b) => {
+            if (a.applicationId === focusApplicationId) return -1;
+            if (b.applicationId === focusApplicationId) return 1;
+            return 0;
+        })
+        : activeSprints;
 
     if (activeSprints.length === 0) {
         return (
@@ -50,7 +68,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
         );
     }
 
-    const sprintsToShow = showAll ? activeSprints : [activeSprints[0]];
+    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]];
 
     return (
         <div className="space-y-6 max-w-lg">

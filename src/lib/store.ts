@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, Sprint, Question, UserProgress } from '@/types';
+import { isToday, isYesterday, parseISO } from 'date-fns';
 
 interface AppState {
     // Data
@@ -80,6 +81,8 @@ export const useStore = create<AppState>()(
 
             completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
                 set((state) => {
+                    let didCompleteTask = false;
+
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
 
@@ -91,7 +94,13 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+
+                                    const nextCompleted = !task.completed;
+                                    if (nextCompleted && !task.completed) {
+                                        didCompleteTask = true;
+                                    }
+
+                                    return { ...task, completed: nextCompleted };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -102,13 +111,42 @@ export const useStore = create<AppState>()(
                             return { ...day, blocks, completed: dayCompleted };
                         });
 
-                        return { ...sprint, dailyPlans };
+                        const isSprintCompleted = dailyPlans.every((d) => d.completed);
+
+                        const nextStatus: Sprint["status"] = isSprintCompleted
+                            ? 'completed'
+                            : sprint.status === 'completed'
+                                ? 'active'
+                                : sprint.status;
+
+                        return { ...sprint, dailyPlans, status: nextStatus };
                     });
+
+                    if (!didCompleteTask) {
+                        return { sprints };
+                    }
+
+                    const now = new Date();
+                    const lastActive = parseISO(state.progress.lastActiveDate);
+
+                    let nextStreak = state.progress.currentStreak;
+                    if (isToday(lastActive)) {
+                        nextStreak = Math.max(1, nextStreak);
+                    } else if (isYesterday(lastActive)) {
+                        nextStreak = nextStreak + 1;
+                    } else {
+                        nextStreak = 1;
+                    }
+
+                    const nextLongest = Math.max(state.progress.longestStreak, nextStreak);
 
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
+                            currentStreak: nextStreak,
+                            longestStreak: nextLongest,
+                            lastActiveDate: now.toISOString(),
                             totalTasksCompleted: state.progress.totalTasksCompleted + 1
                         }
                     };
