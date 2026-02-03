@@ -41,6 +41,13 @@ export interface InterviewRound {
     scheduledDate?: string;
     notes: string;
     questionsAsked: string[];
+    feedback?: {
+        rating: number; // 1-5 stars
+        pros: string[];
+        cons: string[];
+        struggledTopics: string[]; // List of topic names
+        notes: string;
+    };
 }
 
 export interface Sprint {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress } from '@/types';
+import { Application, InterviewRound, Sprint, Question, UserProgress } from '@/types';
 
 interface AppState {
     // Data
@@ -11,7 +11,12 @@ interface AppState {
 
     // Actions
     addApplication: (app: Application) => void;
-    updateApplication: (id: string, updates: Partial<Application>) => void;
+    updateApplication: (
+        id: string,
+        updates: Partial<Omit<Application, 'rounds'>> & {
+            rounds?: Array<Partial<InterviewRound> & Pick<InterviewRound, 'roundNumber'>>;
+        }
+    ) => void;
     deleteApplication: (id: string) => void;
 
     addSprint: (sprint: Sprint) => void;
@@ -50,9 +55,43 @@ export const useStore = create<AppState>()(
 
             updateApplication: (id, updates) =>
                 set((state) => ({
-                    applications: state.applications.map(app =>
-                        app.id === id ? { ...app, ...updates } : app
-                    )
+                    applications: state.applications.map((app) => {
+                        if (app.id !== id) return app;
+
+                        const { rounds: roundUpdates, ...topLevelUpdates } = updates;
+                        if (!roundUpdates || roundUpdates.length === 0) {
+                            return { ...app, ...topLevelUpdates };
+                        }
+
+                        const nextRounds = [...app.rounds];
+                        for (const roundUpdate of roundUpdates) {
+                            const idx = nextRounds.findIndex(
+                                (r) => r.roundNumber === roundUpdate.roundNumber
+                            );
+
+                            if (idx === -1) {
+                                nextRounds.push(roundUpdate as InterviewRound);
+                                continue;
+                            }
+
+                            const prev = nextRounds[idx];
+                            nextRounds[idx] = {
+                                ...prev,
+                                ...roundUpdate,
+                                feedback: roundUpdate.feedback
+                                    ? { ...prev.feedback, ...roundUpdate.feedback }
+                                    : prev.feedback,
+                            };
+                        }
+
+                        nextRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+                        return {
+                            ...app,
+                            ...topLevelUpdates,
+                            rounds: nextRounds,
+                        };
+                    }),
                 })),
 
             deleteApplication: (id) =>

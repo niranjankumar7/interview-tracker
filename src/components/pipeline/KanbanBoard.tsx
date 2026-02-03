@@ -7,9 +7,12 @@ import {
     Calendar,
     Briefcase,
     GripVertical,
+    PanelRight,
     Trash2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { useState } from "react";
+import { PrepDetailPanel } from "./PrepDetailPanel";
 
 const statusColumns: { status: ApplicationStatus; label: string; color: string }[] = [
     { status: "applied", label: "Applied", color: "bg-gray-500" },
@@ -23,6 +26,8 @@ export function KanbanBoard() {
     const applications = useStore((state) => state.applications);
     const updateApplication = useStore((state) => state.updateApplication);
     const deleteApplication = useStore((state) => state.deleteApplication);
+
+    const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
 
     const handleDragStart = (e: React.DragEvent, appId: string) => {
         e.dataTransfer.setData("applicationId", appId);
@@ -118,6 +123,15 @@ export function KanbanBoard() {
                                             <div className="mt-3 text-xs text-gray-400">
                                                 Applied {format(parseISO(app.applicationDate), "MMM d, yyyy")}
                                             </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedApplicationId(app.id)}
+                                                className="mt-3 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
+                                            >
+                                                <PanelRight className="w-4 h-4" />
+                                                Prep details
+                                            </button>
                                         </div>
                                     ))
                                 )}
@@ -126,6 +140,12 @@ export function KanbanBoard() {
                     );
                 })}
             </div>
+
+            <PrepDetailPanel
+                applicationId={selectedApplicationId}
+                isOpen={selectedApplicationId !== null}
+                onClose={() => setSelectedApplicationId(null)}
+            />
         </div>
     );
 }
