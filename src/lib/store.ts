@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, InterviewRound, Sprint, Question, UserProgress } from '@/types';
 
-type InterviewRoundPatch = Partial<InterviewRound> &
-    Pick<InterviewRound, 'roundNumber'>;
+type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
+    Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
 
 type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
     rounds?: InterviewRoundPatch[];
