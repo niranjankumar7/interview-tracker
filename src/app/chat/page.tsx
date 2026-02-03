@@ -11,10 +11,11 @@ import {
   MessageSquare,
   Kanban,
   BookOpen,
-  RotateCcw,
   Database,
+  Settings,
   Flame,
 } from "lucide-react";
+import Link from "next/link";
 
 type View = "chat" | "pipeline" | "questions";
 
@@ -22,7 +23,6 @@ export default function ChatPage() {
   const [currentView, setCurrentView] = useState<View>("chat");
   const mcpServers = useMcpServers();
   const loadDemoData = useStore((s) => s.loadDemoData);
-  const resetData = useStore((s) => s.resetData);
   const progress = useStore((s) => s.progress);
 
   const navItems = [
@@ -92,18 +92,14 @@ export default function ChatPage() {
                 <Database className="w-4 h-4" />
                 <span className="hidden md:inline">Demo</span>
               </button>
-              <button
-                onClick={() => {
-                  if (confirm("Reset all data? This cannot be undone.")) {
-                    resetData();
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-                title="Reset data"
+              <Link
+                href="/settings"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
+                title="Settings"
               >
-                <RotateCcw className="w-4 h-4" />
-                <span className="hidden md:inline">Reset</span>
-              </button>
+                <Settings className="w-4 h-4" />
+                <span className="hidden md:inline">Settings</span>
+              </Link>
             </div>
           </div>
         </header>

@@ -7,6 +7,7 @@ interface AppState {
     applications: Application[];
     sprints: Sprint[];
     questions: Question[];
+    completedTopics: string[];
     progress: UserProgress;
 
     // Actions
@@ -41,6 +42,7 @@ export const useStore = create<AppState>()(
             applications: [],
             sprints: [],
             questions: [],
+            completedTopics: [],
             progress: initialProgress,
 
             addApplication: (app) =>
@@ -186,6 +188,7 @@ export const useStore = create<AppState>()(
                     applications: demoApplications,
                     sprints: [],
                     questions: demoQuestions,
+                    completedTopics: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -199,6 +202,7 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
+                completedTopics: [],
                 progress: initialProgress
             }),
         }),
