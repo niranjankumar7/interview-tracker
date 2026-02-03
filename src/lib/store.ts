@@ -70,7 +70,7 @@ export const useStore = create<AppState>()(
                 set((state) => ({
                     applications: state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
-                        const rounds = [...app.rounds, round].sort(
+                        const rounds = [...(app.rounds ?? []), round].sort(
                             (a, b) => a.roundNumber - b.roundNumber
                         );
                         return { ...app, rounds };
@@ -87,7 +87,7 @@ export const useStore = create<AppState>()(
                             return { ...app, ...topLevelUpdates };
                         }
 
-                        const nextRounds = [...app.rounds];
+                        const nextRounds = [...(app.rounds ?? [])];
                         for (const roundUpdate of roundUpdates) {
                             const idx = nextRounds.findIndex(
                                 (r) => r.roundNumber === roundUpdate.roundNumber

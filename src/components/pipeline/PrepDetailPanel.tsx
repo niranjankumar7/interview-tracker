@@ -73,8 +73,9 @@ export function PrepDetailPanel(props: {
   });
 
   const nextRoundNumber = useMemo(() => {
-    if (!application || application.rounds.length === 0) return 1;
-    return Math.max(...application.rounds.map((r) => r.roundNumber)) + 1;
+    const rounds = application?.rounds ?? [];
+    if (rounds.length === 0) return 1;
+    return Math.max(...rounds.map((r) => r.roundNumber)) + 1;
   }, [application]);
 
   const [roundDraft, setRoundDraft] = useState<RoundDraft>({
@@ -127,7 +128,9 @@ export function PrepDetailPanel(props: {
 
   const activeRound = useMemo(() => {
     if (!application || feedbackRoundNumber === null) return undefined;
-    return application.rounds.find((r) => r.roundNumber === feedbackRoundNumber);
+    return (application.rounds ?? []).find(
+      (r) => r.roundNumber === feedbackRoundNumber
+    );
   }, [application, feedbackRoundNumber]);
 
   useEffect(() => {
@@ -145,6 +148,8 @@ export function PrepDetailPanel(props: {
 
   if (!isOpen || !applicationId) return null;
   if (!application) return null;
+
+  const rounds = application.rounds ?? [];
 
   const modalContent = (
     <div
@@ -183,18 +188,25 @@ export function PrepDetailPanel(props: {
             </button>
           </div>
 
-          {application.rounds.length === 0 ? (
+          {rounds.length === 0 ? (
             <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-4">
               No rounds tracked yet.
             </div>
           ) : (
             <div className="space-y-4">
-              {application.rounds
+              {rounds
                 .slice()
                 .sort((a, b) => a.roundNumber - b.roundNumber)
                 .map((round) => {
+                  const questionsAsked = round.questionsAsked ?? [];
+                  const feedback = round.feedback;
+                  const pros = feedback?.pros ?? [];
+                  const cons = feedback?.cons ?? [];
+                  const struggledTopics = feedback?.struggledTopics ?? [];
+                  const feedbackNotes = feedback?.notes ?? "";
+
                   const isFuture = roundIsInFuture(round.scheduledDate);
-                  const hasFeedback = Boolean(round.feedback);
+                  const hasFeedback = Boolean(feedback);
                   const feedbackButtonLabel = hasFeedback
                     ? "Edit feedback"
                     : "Complete round";
@@ -249,7 +261,7 @@ export function PrepDetailPanel(props: {
                         </button>
                       </div>
 
-                      {(round.notes || round.questionsAsked.length > 0) && (
+                      {(round.notes || questionsAsked.length > 0) && (
                         <div className="mt-4 space-y-3">
                           {round.notes && (
                             <div className="text-sm text-gray-700">
@@ -258,14 +270,14 @@ export function PrepDetailPanel(props: {
                             </div>
                           )}
 
-                          {round.questionsAsked.length > 0 && (
+                          {questionsAsked.length > 0 && (
                             <div className="text-sm text-gray-700">
                               <div className="font-medium flex items-center gap-2 mb-1">
                                 <MessageSquareText className="w-4 h-4 text-gray-500" />
                                 Questions remembered
                               </div>
                               <ul className="list-disc pl-5 space-y-1">
-                                {round.questionsAsked.map((q, i) => (
+                                {questionsAsked.map((q, i) => (
                                   <li key={`${round.roundNumber}-${i}`}>{q}</li>
                                 ))}
                               </ul>
@@ -274,7 +286,7 @@ export function PrepDetailPanel(props: {
                         </div>
                       )}
 
-                      {round.feedback && (
+                      {feedback && (
                         <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -286,7 +298,7 @@ export function PrepDetailPanel(props: {
                                   <Star
                                     key={idx}
                                     className={`w-4 h-4 ${
-                                      idx < round.feedback!.rating
+                                      idx < feedback.rating
                                         ? "text-yellow-500 fill-yellow-500"
                                         : "text-gray-300"
                                     }`}
@@ -296,40 +308,40 @@ export function PrepDetailPanel(props: {
                             </div>
                           </div>
 
-                          {round.feedback.pros.length > 0 && (
+                          {pros.length > 0 && (
                             <div>
                               <div className="text-sm font-medium text-gray-700 mb-1">
                                 What went well
                               </div>
                               <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-                                {round.feedback.pros.map((p, i) => (
+                                {pros.map((p, i) => (
                                   <li key={`${round.roundNumber}-pro-${i}`}>{p}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
 
-                          {round.feedback.cons.length > 0 && (
+                          {cons.length > 0 && (
                             <div>
                               <div className="text-sm font-medium text-gray-700 mb-1">
                                 What needs improvement
                               </div>
                               <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-                                {round.feedback.cons.map((c, i) => (
+                                {cons.map((c, i) => (
                                   <li key={`${round.roundNumber}-con-${i}`}>{c}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
 
-                          {round.feedback.struggledTopics.length > 0 && (
+                          {struggledTopics.length > 0 && (
                             <div>
                               <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                                 <Tag className="w-4 h-4 text-gray-500" />
                                 Struggled topics
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                {round.feedback.struggledTopics.map((t) => (
+                                {struggledTopics.map((t) => (
                                   <span
                                     key={`${round.roundNumber}-topic-${t}`}
                                     className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200"
@@ -341,13 +353,13 @@ export function PrepDetailPanel(props: {
                             </div>
                           )}
 
-                          {round.feedback.notes && (
+                          {feedbackNotes && (
                             <div>
                               <div className="text-sm font-medium text-gray-700 mb-1">
                                 Notes
                               </div>
                               <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                {round.feedback.notes}
+                                {feedbackNotes}
                               </p>
                             </div>
                           )}
