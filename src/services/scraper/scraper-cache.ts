@@ -56,17 +56,30 @@ export function getScraperCache(key: string): ScrapedInterviewData | null {
 export function setScraperCache(key: string, data: ScrapedInterviewData): void {
     if (!isBrowser()) return;
 
+    const cacheKey = CACHE_PREFIX + key;
+    const entry: CacheEntry = {
+        data,
+        timestamp: Date.now(),
+    };
+
     try {
-        const cacheKey = CACHE_PREFIX + key;
-        const entry: CacheEntry = {
-            data,
-            timestamp: Date.now(),
-        };
         localStorage.setItem(cacheKey, JSON.stringify(entry));
     } catch (error) {
         console.warn('Error setting scraper cache:', error);
         // LocalStorage might be full, try to clear old entries
-        clearOldCacheEntries();
+        const cleared = clearOldCacheEntries();
+        // Retry write if we cleared something
+        if (cleared > 0) {
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(entry));
+            } catch {
+                // If still failing, try clearing oldest entry
+                clearOldestCacheEntry();
+            }
+        } else {
+            // No expired entries, clear oldest entry to make room
+            clearOldestCacheEntry();
+        }
     }
 }
 
@@ -96,9 +109,10 @@ export function clearAllScraperCache(): void {
 
 /**
  * Clear old cache entries to free up space
+ * Returns the number of entries cleared
  */
-function clearOldCacheEntries(): void {
-    if (!isBrowser()) return;
+function clearOldCacheEntries(): number {
+    if (!isBrowser()) return 0;
 
     const now = Date.now();
     const ttlMs = CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -122,6 +136,41 @@ function clearOldCacheEntries(): void {
     }
 
     keysToRemove.forEach(key => localStorage.removeItem(key));
+    return keysToRemove.length;
+}
+
+/**
+ * Clear the oldest cache entry to make room for new data (LRU-style eviction)
+ */
+function clearOldestCacheEntry(): void {
+    if (!isBrowser()) return;
+
+    let oldestKey: string | null = null;
+    let oldestTimestamp = Infinity;
+
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(CACHE_PREFIX)) {
+            try {
+                const cached = localStorage.getItem(key);
+                if (cached) {
+                    const entry: CacheEntry = JSON.parse(cached);
+                    if (entry.timestamp < oldestTimestamp) {
+                        oldestTimestamp = entry.timestamp;
+                        oldestKey = key;
+                    }
+                }
+            } catch {
+                // Invalid entry, remove it
+                localStorage.removeItem(key);
+                return;
+            }
+        }
+    }
+
+    if (oldestKey) {
+        localStorage.removeItem(oldestKey);
+    }
 }
 
 /**

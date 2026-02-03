@@ -120,6 +120,7 @@ export interface UserProgress {
 // Track completed prep topics globally
 export interface CompletedTopic {
     topicName: string;        // Normalized topic name
+    displayName?: string;     // Original display name (for UI)
     completedAt: string;      // ISO date string
     source: 'chat' | 'manual';
 }

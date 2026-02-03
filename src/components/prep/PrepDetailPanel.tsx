@@ -52,29 +52,44 @@ export function PrepDetailPanel({
     const availableRounds = getAvailableRounds(roleType);
     const template = getPrepTemplateByRole(roleType);
 
-    // Access completed topics from global store
-    const completedTopics = useStore((state) => state.completedTopics);
+    // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
     const daysUntilInterview = application.interviewDate
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
 
-    // Fetch scraped data when panel opens
+    // Reset selected round when application changes
     useEffect(() => {
+        setSelectedRound(application.currentRound || "TechnicalRound1");
+    }, [application.id, application.currentRound]);
+
+    // Fetch scraped data when panel opens
+    // Uses AbortController to prevent stale responses from overwriting current data
+    useEffect(() => {
+        const abortController = new AbortController();
+
         if (isOpen && application.company) {
             setIsLoadingScraped(true);
             getCompanyPrepData(application.company, application.role, roleType, selectedRound)
                 .then(data => {
-                    setScrapedContent(data);
+                    if (!abortController.signal.aborted) {
+                        setScrapedContent(data);
+                    }
                 })
                 .catch(err => {
-                    console.error('Error fetching scraped data:', err);
+                    if (!abortController.signal.aborted) {
+                        console.error('Error fetching scraped data:', err);
+                    }
                 })
                 .finally(() => {
-                    setIsLoadingScraped(false);
+                    if (!abortController.signal.aborted) {
+                        setIsLoadingScraped(false);
+                    }
                 });
         }
+
+        return () => abortController.abort();
     }, [isOpen, application.company, application.role, roleType, selectedRound]);
 
     const handleRoundChange = (round: InterviewRoundType) => {
@@ -82,12 +97,9 @@ export function PrepDetailPanel({
         onUpdateRound?.(round);
     };
 
-    // Helper to check if a topic is completed (using fuzzy matching)
+    // Helper to check if a topic is completed (using store's centralized matching)
     const isTopicCompleted = (topicName: string): { completed: boolean; date?: string } => {
-        const normalized = topicName.toLowerCase().replace(/&/g, 'and').replace(/\s+/g, ' ').trim();
-        const match = completedTopics.find(t =>
-            t.topicName.includes(normalized) || normalized.includes(t.topicName)
-        );
+        const match = getTopicCompletion(topicName);
         if (match) {
             return {
                 completed: true,
@@ -209,12 +221,12 @@ export function PrepDetailPanel({
                                             <div
                                                 key={idx}
                                                 className={`rounded-xl p-4 border transition-all ${completion.completed
-                                                        ? "bg-green-50 border-green-300 ring-2 ring-green-200"
-                                                        : topic.priority === "high"
-                                                            ? "bg-red-50 border-red-200"
-                                                            : topic.priority === "medium"
-                                                                ? "bg-yellow-50 border-yellow-200"
-                                                                : "bg-gray-50 border-gray-200"
+                                                    ? "bg-green-50 border-green-300 ring-2 ring-green-200"
+                                                    : topic.priority === "high"
+                                                        ? "bg-red-50 border-red-200"
+                                                        : topic.priority === "medium"
+                                                            ? "bg-yellow-50 border-yellow-200"
+                                                            : "bg-gray-50 border-gray-200"
                                                     }`}
                                             >
                                                 <div className="flex items-center justify-between mb-2">
@@ -233,10 +245,10 @@ export function PrepDetailPanel({
                                                     ) : (
                                                         <span
                                                             className={`text-xs px-2 py-0.5 rounded-full font-medium ${topic.priority === "high"
-                                                                    ? "bg-red-100 text-red-700"
-                                                                    : topic.priority === "medium"
-                                                                        ? "bg-yellow-100 text-yellow-700"
-                                                                        : "bg-gray-100 text-gray-600"
+                                                                ? "bg-red-100 text-red-700"
+                                                                : topic.priority === "medium"
+                                                                    ? "bg-yellow-100 text-yellow-700"
+                                                                    : "bg-gray-100 text-gray-600"
                                                                 }`}
                                                         >
                                                             {topic.priority} priority

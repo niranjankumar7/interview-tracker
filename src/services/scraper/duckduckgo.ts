@@ -25,6 +25,13 @@ interface DDGSearchResult {
 
 /**
  * Fetch company-specific interview data using DuckDuckGo
+ * 
+ * TODO: Security/Privacy Concern
+ * These fetch calls currently run client-side from the browser.
+ * This exposes user queries and may violate DuckDuckGo's ToS.
+ * Recommended fix: Create a Next.js API route (/api/interview-insights)
+ * to proxy these requests server-side with proper rate limiting.
+ * See PR review for details.
  */
 export async function fetchCompanyInterviewData(
     company: string,
@@ -51,7 +58,7 @@ export async function fetchCompanyInterviewData(
             headers: {
                 'Accept': 'application/json',
             },
-            next: { revalidate: 86400 } // Cache for 24 hours
+            // Note: next.revalidate only works server-side, removed for clarity
         });
 
         if (!response.ok) {

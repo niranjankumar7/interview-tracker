@@ -1,18 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Application, Sprint, Question, UserProgress, CompletedTopic } from '@/types';
-
-/**
- * Normalize topic name for consistent matching
- * Handles variations like "Arrays & Strings" vs "Arrays and Strings"
- */
-function normalizeTopic(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/&/g, 'and')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
+import { normalizeTopic } from '@/lib/topic-matcher';
 
 interface AppState {
     // Data
@@ -146,6 +135,7 @@ export const useStore = create<AppState>()(
                     set((state) => ({
                         completedTopics: [...state.completedTopics, {
                             topicName: normalized,
+                            displayName: topicName, // Preserve original for display
                             completedAt: new Date().toISOString(),
                             source
                         }]
