@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Application, InterviewRoundType, RoleType } from "@/types";
+import { useEffect, useState } from "react";
+import { InterviewRoundType, RoleType } from "@/types";
 import {
-    getPrepTemplateByRole,
     getRoundPrepContent,
     getAvailableRounds,
 } from "@/data/prep-templates";
@@ -26,22 +25,34 @@ import {
 } from "lucide-react";
 
 interface PrepDetailPanelProps {
-    application: Application;
+    appId: string;
     isOpen: boolean;
     onClose: () => void;
     onUpdateRound?: (round: InterviewRoundType) => void;
 }
 
 export function PrepDetailPanel({
-    application,
+    appId,
     isOpen,
     onClose,
     onUpdateRound,
 }: PrepDetailPanelProps) {
+    const application = useStore((state) =>
+        state.applications.find((app) => app.id === appId)
+    );
+
+    useEffect(() => {
+        if (isOpen && !application) {
+            onClose();
+        }
+    }, [application, isOpen, onClose]);
+
     // Determine role type - try to match from roleType or parse from role string
-    const roleType = application.roleType || inferRoleType(application.role);
-    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(
-        application.currentRound || "TechnicalRound1"
+    const roleType: RoleType =
+        application?.roleType || (application ? inferRoleType(application.role) : "SDE");
+
+    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() =>
+        application?.currentRound || "TechnicalRound1"
     );
 
     // Scraper state
@@ -50,26 +61,26 @@ export function PrepDetailPanel({
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
     const availableRounds = getAvailableRounds(roleType);
-    const template = getPrepTemplateByRole(roleType);
 
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
-    const daysUntilInterview = application.interviewDate
+    const daysUntilInterview = application?.interviewDate
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
 
     // Reset selected round when application changes
     useEffect(() => {
+        if (!application) return;
         setSelectedRound(application.currentRound || "TechnicalRound1");
-    }, [application.id, application.currentRound]);
+    }, [application?.id, application?.currentRound]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
     useEffect(() => {
         const abortController = new AbortController();
 
-        if (isOpen && application.company) {
+        if (isOpen && application?.company) {
             setIsLoadingScraped(true);
             getCompanyPrepData(application.company, application.role, roleType, selectedRound)
                 .then(data => {
@@ -90,7 +101,7 @@ export function PrepDetailPanel({
         }
 
         return () => abortController.abort();
-    }, [isOpen, application.company, application.role, roleType, selectedRound]);
+    }, [isOpen, application?.company, application?.role, roleType, selectedRound]);
 
     const handleRoundChange = (round: InterviewRoundType) => {
         setSelectedRound(round);
@@ -109,7 +120,7 @@ export function PrepDetailPanel({
         return { completed: false };
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !application) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
