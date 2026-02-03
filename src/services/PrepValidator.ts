@@ -6,6 +6,8 @@ type TopicCompletionGetter = (topicName: string) => CompletedTopic | undefined;
 
 const TOPIC_PREREQUISITES: Record<string, string[]> = {
     [normalizeTopic("Dynamic Programming")]: ["Recursion"],
+    [normalizeTopic("Common Systems")]: ["Fundamentals"],
+    [normalizeTopic("Data Storage")]: ["Fundamentals"],
 };
 
 function getDirectPrerequisites(topicName: string): string[] {
