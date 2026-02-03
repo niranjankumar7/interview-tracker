@@ -41,7 +41,7 @@ export function KanbanBoard() {
     };
 
     return (
-        <div className="h-full bg-gray-50 p-6 overflow-x-auto">
+        <div className="h-full bg-background p-6 overflow-x-auto">
             <div className="flex gap-4 min-w-max h-full">
                 {statusColumns.map((column) => {
                     const columnApps = applications.filter(
@@ -51,16 +51,16 @@ export function KanbanBoard() {
                     return (
                         <div
                             key={column.status}
-                            className="w-72 flex-shrink-0 flex flex-col bg-gray-100 rounded-xl"
+                            className="w-72 flex-shrink-0 flex flex-col bg-muted rounded-xl"
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, column.status)}
                         >
                             {/* Column Header */}
-                            <div className="p-4 border-b border-gray-200">
+                            <div className="p-4 border-b border-border">
                                 <div className="flex items-center gap-2">
                                     <div className={`w-3 h-3 rounded-full ${column.color}`} />
-                                    <h3 className="font-semibold text-gray-700">{column.label}</h3>
-                                    <span className="ml-auto bg-white px-2 py-0.5 rounded-full text-sm text-gray-500">
+                                    <h3 className="font-semibold text-foreground">{column.label}</h3>
+                                    <span className="ml-auto bg-background px-2 py-0.5 rounded-full text-sm text-muted-foreground">
                                         {columnApps.length}
                                     </span>
                                 </div>
@@ -69,7 +69,7 @@ export function KanbanBoard() {
                             {/* Cards Container */}
                             <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                                 {columnApps.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-400 text-sm">
+                                    <div className="text-center py-8 text-muted-foreground text-sm">
                                         Drop applications here
                                     </div>
                                 ) : (
@@ -78,15 +78,15 @@ export function KanbanBoard() {
                                             key={app.id}
                                             draggable
                                             onDragStart={(e) => handleDragStart(e, app.id)}
-                                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow group"
+                                            className="bg-card rounded-lg shadow-sm border border-border p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow group"
                                         >
                                             {/* Card Header */}
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-400" />
+                                                    <GripVertical className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground/70" />
                                                     <div>
-                                                        <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                                                            <Building2 className="w-4 h-4 text-gray-500" />
+                                                        <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                                            <Building2 className="w-4 h-4 text-muted-foreground" />
                                                             {app.company}
                                                         </h4>
                                                     </div>
@@ -101,21 +101,21 @@ export function KanbanBoard() {
                                             </div>
 
                                             {/* Role */}
-                                            <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                                 <Briefcase className="w-3.5 h-3.5" />
                                                 {app.role}
                                             </div>
 
                                             {/* Interview Date */}
                                             {app.interviewDate && (
-                                                <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                <div className="flex items-center gap-2 text-sm text-purple-600 bg-purple-50 px-2 py-1 rounded dark:bg-purple-950/30 dark:text-purple-200">
                                                     <Calendar className="w-3.5 h-3.5" />
                                                     Interview: {format(parseISO(app.interviewDate), "MMM d")}
                                                 </div>
                                             )}
 
                                             {/* Applied Date */}
-                                            <div className="mt-3 text-xs text-gray-400">
+                                            <div className="mt-3 text-xs text-muted-foreground">
                                                 Applied {format(parseISO(app.applicationDate), "MMM d, yyyy")}
                                             </div>
                                         </div>

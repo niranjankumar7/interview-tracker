@@ -1,6 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress } from '@/types';
+import { Application, Sprint, Question, UserProgress, UserProfile, AppPreferences } from '@/types';
+
+export type AppDataSnapshot = {
+    applications: Application[];
+    sprints: Sprint[];
+    questions: Question[];
+    progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
+};
+
+export type AppDataExport = {
+    version: string;
+    exportedAt: string;
+    snapshot: AppDataSnapshot;
+};
 
 interface AppState {
     // Data
@@ -8,6 +23,8 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
 
     // Actions
     addApplication: (app: Application) => void;
@@ -22,10 +39,14 @@ interface AppState {
     completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
+    updateProfile: (updates: Partial<UserProfile>) => void;
+    updatePreferences: (updates: Partial<AppPreferences>) => void;
 
     // Utilities
     loadDemoData: () => void;
     resetData: () => void;
+    exportData: () => AppDataExport;
+    importData: (data: AppDataSnapshot | AppDataExport) => void;
 }
 
 const initialProgress: UserProgress = {
@@ -35,6 +56,17 @@ const initialProgress: UserProgress = {
     totalTasksCompleted: 0,
 };
 
+const initialProfile: UserProfile = {
+    name: '',
+    targetRole: '',
+    experienceLevel: 'Mid',
+};
+
+const initialPreferences: AppPreferences = {
+    theme: 'system',
+    studyRemindersEnabled: false,
+};
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -42,6 +74,8 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             progress: initialProgress,
+            profile: initialProfile,
+            preferences: initialPreferences,
 
             addApplication: (app) =>
                 set((state) => ({
@@ -117,6 +151,16 @@ export const useStore = create<AppState>()(
             updateProgress: (updates) =>
                 set((state) => ({
                     progress: { ...state.progress, ...updates }
+                })),
+
+            updateProfile: (updates) =>
+                set((state) => ({
+                    profile: { ...state.profile, ...updates }
+                })),
+
+            updatePreferences: (updates) =>
+                set((state) => ({
+                    preferences: { ...state.preferences, ...updates }
                 })),
 
             loadDemoData: () => {
@@ -199,8 +243,31 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress
+                progress: initialProgress,
+                profile: initialProfile,
+                preferences: initialPreferences,
             }),
+
+            exportData: () => {
+                const { applications, sprints, questions, progress, profile, preferences } = get();
+                return {
+                    version: '0.1.0',
+                    exportedAt: new Date().toISOString(),
+                    snapshot: { applications, sprints, questions, progress, profile, preferences },
+                };
+            },
+
+            importData: (data) => {
+                const snapshot = 'snapshot' in data ? data.snapshot : data;
+                set({
+                    applications: snapshot.applications ?? [],
+                    sprints: snapshot.sprints ?? [],
+                    questions: snapshot.questions ?? [],
+                    progress: snapshot.progress ?? initialProgress,
+                    profile: snapshot.profile ?? initialProfile,
+                    preferences: snapshot.preferences ?? initialPreferences,
+                });
+            },
         }),
         {
             name: 'interview-prep-storage',
