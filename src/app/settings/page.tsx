@@ -29,7 +29,7 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
   const existingValid = Number.isFinite(existingTime);
   const incomingValid = Number.isFinite(incomingTime);
 
-  const winner =
+  const base =
     !existingValid && incomingValid
       ? incoming
       : existingValid && !incomingValid
@@ -40,7 +40,15 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
             ? incoming
             : existing;
 
-  return winner;
+  return {
+    currentStreak: Math.max(existing.currentStreak, incoming.currentStreak),
+    longestStreak: Math.max(existing.longestStreak, incoming.longestStreak),
+    lastActiveDate: base.lastActiveDate,
+    totalTasksCompleted: Math.max(
+      existing.totalTasksCompleted,
+      incoming.totalTasksCompleted,
+    ),
+  };
 }
 
 function formatZodError(error: z.ZodError): string {
@@ -78,10 +86,15 @@ function readFileAsText(file: File): Promise<string> {
 export default function SettingsPage() {
   const resetData = useStore((s) => s.resetData);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const importCancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const resetCancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>("replace");
+  const [pendingImport, setPendingImport] = useState<
+    | { backup: StoreBackup; mode: ImportMode }
+    | null
+  >(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [status, setStatus] = useState<
     | { kind: "success"; message: string }
@@ -93,13 +106,17 @@ export default function SettingsPage() {
     if (isResetModalOpen) resetCancelButtonRef.current?.focus();
   }, [isResetModalOpen]);
 
-  const applicationsCount = useStore((s) => s.applications.length);
-  const sprintsCount = useStore((s) => s.sprints.length);
-  const questionsCount = useStore((s) => s.questions.length);
+  useEffect(() => {
+    if (pendingImport) importCancelButtonRef.current?.focus();
+  }, [pendingImport]);
+
+  const applications = useStore((s) => s.applications);
+  const sprints = useStore((s) => s.sprints);
+  const questions = useStore((s) => s.questions);
+  const completedTopics = useStore((s) => s.completedTopics);
+  const progress = useStore((s) => s.progress);
 
   const exportData = () => {
-    const { applications, sprints, questions, completedTopics, progress } =
-      useStore.getState();
     const rawBackup: StoreBackup = {
       version: BACKUP_VERSION,
       applications,
@@ -140,8 +157,33 @@ export default function SettingsPage() {
     }
   };
 
+  const confirmImport = () => {
+    if (!pendingImport) return;
+
+    try {
+      applyImportedBackup(pendingImport.backup, pendingImport.mode);
+      setStatus({
+        kind: "success",
+        message:
+          pendingImport.mode === "replace"
+            ? "Imported backup (replaced existing data)."
+            : "Imported backup (merged with existing data).",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `Import failed: ${error.message}`
+          : "Import failed due to an unexpected error.";
+      setStatus({ kind: "error", message });
+    } finally {
+      setPendingImport(null);
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const applyImportedBackup = (backup: StoreBackup, mode: ImportMode) => {
-    const completedTopics = backup.completedTopics ?? [];
+    const completedTopics = backup.completedTopics;
 
     if (mode === "replace") {
       // Replace mode trusts the backup as-is.
@@ -225,23 +267,7 @@ export default function SettingsPage() {
       return;
     }
 
-    if (importMode === "replace") {
-      const confirmed = window.confirm(
-        "Importing in Replace mode will overwrite your existing data. This cannot be undone. Continue?",
-      );
-      if (!confirmed) return;
-    }
-
-    applyImportedBackup(result.data, importMode);
-    setStatus({
-      kind: "success",
-      message:
-        importMode === "replace"
-          ? "Imported backup (replaced existing data)."
-          : "Imported backup (merged with existing data).",
-    });
-    setSelectedFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setPendingImport({ backup: result.data, mode: importMode });
   };
 
   return (
@@ -293,9 +319,9 @@ export default function SettingsPage() {
               </div>
 
               <p className="mt-3 text-xs text-gray-500">
-                Current data: {applicationsCount} applications, {sprintsCount} sprints,
+                Current data: {applications.length} applications, {sprints.length} sprints,
                 {" "}
-                {questionsCount} questions.
+                {questions.length} questions.
               </p>
             </section>
 
@@ -411,6 +437,48 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+
+      {pendingImport && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Import data confirmation"
+        >
+          <div className="w-full max-w-md rounded-lg bg-white shadow-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {pendingImport.mode === "replace" ? "Import and replace?" : "Import and merge?"}
+            </h2>
+            <p className="text-sm text-gray-600 mt-2">
+              {pendingImport.mode === "replace"
+                ? "This will overwrite your existing data. This cannot be undone."
+                : "This will merge the backup into your existing data. Items with matching ids can be overwritten. This cannot be undone."}
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                ref={importCancelButtonRef}
+                type="button"
+                onClick={() => setPendingImport(null)}
+                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmImport}
+                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${
+                  pendingImport.mode === "replace"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-gray-900 hover:bg-gray-800"
+                }`}
+              >
+                Import Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isResetModalOpen && (
         <div

@@ -98,7 +98,7 @@ export const storeBackupSchema = z.object({
   applications: z.array(applicationSchema),
   sprints: z.array(sprintSchema),
   questions: z.array(questionSchema),
-  completedTopics: z.array(z.string()).optional(),
+  completedTopics: z.array(z.string()),
   progress: userProgressSchema,
 });
 

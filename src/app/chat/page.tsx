@@ -95,7 +95,7 @@ export default function ChatPage() {
               <Link
                 href="/settings"
                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
-                title="Settings"
+                title="Backup, restore, and reset data"
               >
                 <Settings className="w-4 h-4" />
                 <span className="hidden md:inline">Settings</span>
