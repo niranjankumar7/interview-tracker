@@ -23,8 +23,13 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
-const DRAG_DATA_KEY = "kanban/applicationId" as const;
+const DRAG_DATA_KEY = "applicationId";
 
+// Rank search results so that:
+// 0: company starts with query
+// 1: company contains query
+// 2: role starts with query
+// 3: role contains query
 const getSearchRank = (
     companyLower: string,
     roleLower: string,
@@ -169,7 +174,7 @@ export function KanbanBoard() {
                                     <div className="text-center py-8 text-gray-400 text-sm">
                                         {debouncedSearchQuery.trim() === ""
                                             ? "Drop applications here"
-                                            : "No matches"}
+                                            : "No matches. Drop applications here."}
                                     </div>
                                 ) : (
                                     columnApps.map((app) => (
