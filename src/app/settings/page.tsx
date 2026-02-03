@@ -154,7 +154,7 @@ export default function SettingsPage() {
     const typeIsJson = selectedFile.type
       ? selectedFile.type.toLowerCase().includes("json")
       : false;
-    if (selectedFile.type && !typeIsJson && !nameIsJson) {
+    if (!nameIsJson && !typeIsJson) {
       setStatus({
         kind: "error",
         message: "Invalid file type. Please upload a .json backup file.",

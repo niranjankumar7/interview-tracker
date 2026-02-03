@@ -22,7 +22,7 @@ const applicationStatusSchema = z.enum(APPLICATION_STATUSES);
 const interviewRoundSchema = z.object({
   roundNumber: z.number(),
   roundType: z.enum(INTERVIEW_ROUND_TYPES),
-  scheduledDate: z.string().optional(),
+  scheduledDate: dateStringSchema.optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
 });
@@ -32,11 +32,11 @@ const applicationSchema = z.object({
   company: z.string(),
   role: z.string(),
   status: applicationStatusSchema,
-  applicationDate: z.string(),
-  interviewDate: z.string().optional(),
+  applicationDate: dateStringSchema,
+  interviewDate: dateStringSchema.optional(),
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
-  createdAt: z.string(),
+  createdAt: dateStringSchema,
 });
 
 const roleTypeSchema = z.enum(ROLE_TYPES);
@@ -59,7 +59,7 @@ const blockSchema = z.object({
 
 const dailyPlanSchema = z.object({
   day: z.number(),
-  date: z.string(),
+  date: dateStringSchema,
   focus: focusAreaSchema,
   blocks: z.array(blockSchema),
   completed: z.boolean(),
@@ -68,12 +68,12 @@ const dailyPlanSchema = z.object({
 const sprintSchema = z.object({
   id: z.string(),
   applicationId: z.string(),
-  interviewDate: z.string(),
+  interviewDate: dateStringSchema,
   roleType: roleTypeSchema,
   totalDays: z.number(),
   dailyPlans: z.array(dailyPlanSchema),
   status: z.enum(SPRINT_STATUSES),
-  createdAt: z.string(),
+  createdAt: dateStringSchema,
 });
 
 const questionSchema = z.object({
@@ -83,7 +83,7 @@ const questionSchema = z.object({
   category: z.enum(QUESTION_CATEGORIES),
   difficulty: z.enum(QUESTION_DIFFICULTIES).optional(),
   askedInRound: z.string().optional(),
-  dateAdded: z.string(),
+  dateAdded: dateStringSchema,
 });
 
 const userProgressSchema = z.object({
