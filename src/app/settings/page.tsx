@@ -29,7 +29,7 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
   const existingValid = Number.isFinite(existingTime);
   const incomingValid = Number.isFinite(incomingTime);
 
-  const base =
+  const winner =
     !existingValid && incomingValid
       ? incoming
       : existingValid && !incomingValid
@@ -43,13 +43,7 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
   return {
     ...existing,
     ...incoming,
-    currentStreak: base.currentStreak,
-    lastActiveDate: base.lastActiveDate,
-    longestStreak: Math.max(existing.longestStreak, incoming.longestStreak),
-    totalTasksCompleted: Math.max(
-      existing.totalTasksCompleted,
-      incoming.totalTasksCompleted,
-    ),
+    ...winner,
   };
 }
 
