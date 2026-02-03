@@ -9,6 +9,9 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    hasHydrated: boolean;
+
+    setHasHydrated: (hasHydrated: boolean) => void;
 
     // Actions
     addApplication: (app: Application) => void;
@@ -36,6 +39,12 @@ const initialProgress: UserProgress = {
     totalTasksCompleted: 0,
 };
 
+function safeParseISO(value: string | undefined): Date | null {
+    if (!value) return null;
+    const parsed = parseISO(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -43,6 +52,9 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             progress: initialProgress,
+            hasHydrated: false,
+
+            setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
             addApplication: (app) =>
                 set((state) => ({
@@ -95,8 +107,10 @@ export const useStore = create<AppState>()(
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
 
+                                    const wasCompleted = task.completed;
                                     const nextCompleted = !task.completed;
-                                    if (nextCompleted && !task.completed) {
+
+                                    if (!wasCompleted && nextCompleted) {
                                         didCompleteTask = true;
                                     }
 
@@ -127,12 +141,12 @@ export const useStore = create<AppState>()(
                     }
 
                     const now = new Date();
-                    const lastActive = parseISO(state.progress.lastActiveDate);
+                    const lastActive = safeParseISO(state.progress.lastActiveDate);
 
                     let nextStreak = state.progress.currentStreak;
-                    if (isToday(lastActive)) {
+                    if (lastActive && isToday(lastActive)) {
                         nextStreak = Math.max(1, nextStreak);
-                    } else if (isYesterday(lastActive)) {
+                    } else if (lastActive && isYesterday(lastActive)) {
                         nextStreak = nextStreak + 1;
                     } else {
                         nextStreak = 1;
@@ -242,6 +256,15 @@ export const useStore = create<AppState>()(
         }),
         {
             name: 'interview-prep-storage',
+            partialize: (state) => ({
+                applications: state.applications,
+                sprints: state.sprints,
+                questions: state.questions,
+                progress: state.progress,
+            }),
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

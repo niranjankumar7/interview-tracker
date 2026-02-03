@@ -3,19 +3,20 @@
 import { useStore } from "@/lib/store";
 import { differenceInMinutes, format, isToday, isYesterday, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-
-type PersistApi = {
-  hasHydrated?: () => boolean;
-  onFinishHydration?: (cb: () => void) => () => void;
-};
 
 const LAST_SHOWN_STORAGE_KEY = "interview-prep:lastNotificationShownAt";
 const SNOOZED_STORAGE_KEY = "interview-prep:snoozedNotifications";
 
 function getLocalDayKey(date: Date): string {
   return format(date, "yyyy-MM-dd");
+}
+
+function safeParseISO(value: string | undefined): Date | null {
+  if (!value) return null;
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function readJsonRecord(key: string): Record<string, string> {
@@ -74,32 +75,12 @@ function snooze(notificationKey: string): void {
   }
 }
 
-function getPersistApi(): PersistApi | undefined {
-  return (useStore as unknown as { persist?: PersistApi }).persist;
-}
-
 export function NotificationManager() {
   const router = useRouter();
 
-  const [hasHydrated, setHasHydrated] = useState(() => {
-    const persistApi = getPersistApi();
-    return persistApi?.hasHydrated?.() ?? true;
-  });
+  const hasHydrated = useStore((s) => s.hasHydrated);
 
   const didRunInitialChecks = useRef(false);
-  const lastSprintStatuses = useRef<Record<string, string>>({});
-
-  useEffect(() => {
-    const persistApi = getPersistApi();
-    if (!persistApi?.onFinishHydration) return;
-
-    const unsubscribe = persistApi.onFinishHydration(() => {
-      setHasHydrated(true);
-    });
-
-    setHasHydrated(persistApi.hasHydrated?.() ?? true);
-    return unsubscribe;
-  }, []);
 
   useEffect(() => {
     if (!hasHydrated || didRunInitialChecks.current) return;
@@ -113,10 +94,13 @@ export function NotificationManager() {
     const upcoming = state.applications
       .filter((a) => a.interviewDate)
       .map((a) => {
-        const interviewDate = parseISO(a.interviewDate!);
+        const interviewDate = safeParseISO(a.interviewDate!);
+        if (!interviewDate) return null;
+
         const minutesUntil = differenceInMinutes(interviewDate, now);
         return { app: a, interviewDate, minutesUntil };
       })
+      .filter((x) => x !== null)
       .filter((x) => x.minutesUntil > 0 && x.minutesUntil <= 48 * 60)
       .sort((a, b) => a.minutesUntil - b.minutesUntil)[0];
 
@@ -145,7 +129,7 @@ export function NotificationManager() {
     }
 
     // Check 2 (Daily Habit): user was active yesterday but has not completed tasks today.
-    const lastActive = parseISO(state.progress.lastActiveDate);
+    const lastActive = safeParseISO(state.progress.lastActiveDate);
     const completedTasksToday = state.sprints.some((sprint) =>
       sprint.dailyPlans.some(
         (plan) =>
@@ -154,7 +138,7 @@ export function NotificationManager() {
       )
     );
 
-    if (isYesterday(lastActive) && !completedTasksToday) {
+    if (lastActive && isYesterday(lastActive) && !completedTasksToday) {
       const notificationKey = "daily-habit";
 
       if (!isSnoozed(notificationKey) && !wasShownToday(notificationKey, todayKey)) {
@@ -178,21 +162,14 @@ export function NotificationManager() {
   useEffect(() => {
     if (!hasHydrated) return;
 
-    const seedStatuses: Record<string, string> = {};
-    for (const sprint of useStore.getState().sprints) {
-      seedStatuses[sprint.id] = sprint.status;
-    }
-    lastSprintStatuses.current = seedStatuses;
-
     return useStore.subscribe((state, prevState) => {
       const now = new Date();
       const todayKey = getLocalDayKey(now);
 
       for (const sprint of state.sprints) {
         const prevStatus = prevState.sprints.find((s) => s.id === sprint.id)?.status;
-        const lastKnownStatus = prevStatus ?? lastSprintStatuses.current[sprint.id];
 
-        if (lastKnownStatus !== "completed" && sprint.status === "completed") {
+        if (prevStatus !== "completed" && sprint.status === "completed") {
           const notificationKey = `celebration:${sprint.id}`;
           if (isSnoozed(notificationKey) || wasShownToday(notificationKey, todayKey)) {
             continue;
@@ -213,8 +190,6 @@ export function NotificationManager() {
 
           markShown(notificationKey, todayKey);
         }
-
-        lastSprintStatuses.current[sprint.id] = sprint.status;
       }
     });
   }, [hasHydrated, router]);
