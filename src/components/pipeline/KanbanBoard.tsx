@@ -23,13 +23,15 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
 ];
 
 const SEARCH_DEBOUNCE_MS = 250;
-const DRAG_DATA_KEY = "applicationId";
+const DRAG_DATA_KEY = "kanban/applicationId" as const;
 
 const getSearchRank = (
     companyLower: string,
     roleLower: string,
     normalizedQuery: string
 ): number | null => {
+    if (normalizedQuery === "") return null;
+
     if (companyLower.startsWith(normalizedQuery)) return 0;
     if (companyLower.includes(normalizedQuery)) return 1;
     if (roleLower.startsWith(normalizedQuery)) return 2;
@@ -165,7 +167,9 @@ export function KanbanBoard() {
                             <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                                 {columnApps.length === 0 ? (
                                     <div className="text-center py-8 text-gray-400 text-sm">
-                                        Drop applications here
+                                        {debouncedSearchQuery.trim() === ""
+                                            ? "Drop applications here"
+                                            : "No matches"}
                                     </div>
                                 ) : (
                                     columnApps.map((app) => (
