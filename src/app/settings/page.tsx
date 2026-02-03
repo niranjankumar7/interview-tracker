@@ -40,11 +40,7 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
             ? incoming
             : existing;
 
-  return {
-    ...existing,
-    ...incoming,
-    ...winner,
-  };
+  return winner;
 }
 
 function formatZodError(error: z.ZodError): string {
@@ -104,7 +100,7 @@ export default function SettingsPage() {
   const exportData = () => {
     const { applications, sprints, questions, completedTopics, progress } =
       useStore.getState();
-    const backup: StoreBackup = {
+    const rawBackup: StoreBackup = {
       version: BACKUP_VERSION,
       applications,
       sprints,
@@ -112,6 +108,18 @@ export default function SettingsPage() {
       completedTopics,
       progress,
     };
+
+    let backup: StoreBackup;
+    try {
+      backup = storeBackupSchema.parse(rawBackup);
+    } catch (error) {
+      const message =
+        error instanceof z.ZodError
+          ? `Export failed: local data is invalid.\n${formatZodError(error)}`
+          : "Export failed: local data is invalid.";
+      setStatus({ kind: "error", message });
+      return;
+    }
 
     const date = new Date().toISOString().slice(0, 10);
     const filename = `interview-tracker-backup-${date}.json`;
@@ -349,7 +357,8 @@ export default function SettingsPage() {
                     />
                     <span className="text-sm text-gray-700">
                       <span className="font-medium">Merge</span> (keeps existing
-                      data and upserts by id)
+                      data and upserts by id; items with matching ids can be
+                      overwritten)
                     </span>
                   </label>
                 </fieldset>
