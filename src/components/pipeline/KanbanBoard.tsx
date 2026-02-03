@@ -83,6 +83,7 @@ export function KanbanBoard() {
             matches.push({ app: entry.app, rank });
         }
 
+        // Keep higher-relevance matches first; within the same rank, sort by company for stable UX.
         matches.sort((a, b) => {
             const rankDelta = a.rank - b.rank;
             if (rankDelta !== 0) return rankDelta;
@@ -131,7 +132,7 @@ export function KanbanBoard() {
                         />
                     </div>
                 </div>
-                {debouncedSearchQuery.trim() !== "" && (
+                {applications.length > 0 && debouncedSearchQuery.trim() !== "" && (
                     <div className="text-sm text-gray-500">
                         Showing {filteredCount} of {applications.length}
                     </div>
