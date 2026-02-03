@@ -70,7 +70,14 @@ export const useStore = create<AppState>()(
                             );
 
                             if (idx === -1) {
-                                nextRounds.push(roundUpdate as InterviewRound);
+                                nextRounds.push({
+                                    roundNumber: roundUpdate.roundNumber,
+                                    roundType: roundUpdate.roundType ?? 'Technical',
+                                    scheduledDate: roundUpdate.scheduledDate,
+                                    notes: roundUpdate.notes ?? '',
+                                    questionsAsked: roundUpdate.questionsAsked ?? [],
+                                    feedback: roundUpdate.feedback,
+                                });
                                 continue;
                             }
 

@@ -579,6 +579,11 @@ export function PrepDetailPanel(props: {
                       </span>
                     )}
                   </div>
+                  {feedbackDraft.rating === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select 1-5 stars to save.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -693,7 +698,7 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => {
-                      const rating = Math.max(1, Math.min(5, feedbackDraft.rating || 1));
+                      const rating = Math.max(1, Math.min(5, feedbackDraft.rating));
                       updateApplication(application.id, {
                         rounds: [
                           {
@@ -712,7 +717,12 @@ export function PrepDetailPanel(props: {
 
                       setFeedbackRoundNumber(null);
                     }}
-                    className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                    disabled={feedbackDraft.rating === 0}
+                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                      feedbackDraft.rating === 0
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    }`}
                   >
                     Save feedback
                   </button>
