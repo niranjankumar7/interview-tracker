@@ -28,17 +28,7 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
     Number.isFinite(incomingTime) &&
     (!Number.isFinite(existingTime) || incomingTime >= existingTime);
 
-  const newest = hasIncomingNewer ? incoming : existing;
-
-  return {
-    currentStreak: newest.currentStreak,
-    lastActiveDate: newest.lastActiveDate,
-    longestStreak: Math.max(existing.longestStreak, incoming.longestStreak),
-    totalTasksCompleted: Math.max(
-      existing.totalTasksCompleted,
-      incoming.totalTasksCompleted,
-    ),
-  };
+  return hasIncomingNewer ? incoming : existing;
 }
 
 function formatZodError(error: z.ZodError): string {
@@ -71,6 +61,7 @@ export default function SettingsPage() {
     const { applications, sprints, questions, completedTopics, progress } =
       useStore.getState();
     const backup: StoreBackup = {
+      version: 1,
       applications,
       sprints,
       questions,

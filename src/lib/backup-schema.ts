@@ -88,6 +88,7 @@ const userProgressSchema = z.object({
 });
 
 export const storeBackupSchema = z.object({
+  version: z.literal(1).optional(),
   applications: z.array(applicationSchema),
   sprints: z.array(sprintSchema),
   questions: z.array(questionSchema),
