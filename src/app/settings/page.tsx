@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, Upload, TriangleAlert } from "lucide-react";
 import { z } from "zod";
 
@@ -10,6 +10,8 @@ import { useStore } from "@/lib/store";
 import type { Application, Question, Sprint, UserProgress } from "@/types";
 
 type ImportMode = "replace" | "merge";
+
+const BACKUP_VERSION = 1 as const;
 
 function upsertById<T extends { id: string }>(
   existing: T[],
@@ -27,11 +29,28 @@ function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProg
   const existingValid = Number.isFinite(existingTime);
   const incomingValid = Number.isFinite(incomingTime);
 
-  if (!existingValid && incomingValid) return incoming;
-  if (existingValid && !incomingValid) return existing;
-  if (!existingValid && !incomingValid) return existing;
+  const base =
+    !existingValid && incomingValid
+      ? incoming
+      : existingValid && !incomingValid
+        ? existing
+        : !existingValid && !incomingValid
+          ? existing
+          : incomingTime >= existingTime
+            ? incoming
+            : existing;
 
-  return incomingTime >= existingTime ? incoming : existing;
+  return {
+    ...existing,
+    ...incoming,
+    currentStreak: base.currentStreak,
+    lastActiveDate: base.lastActiveDate,
+    longestStreak: Math.max(existing.longestStreak, incoming.longestStreak),
+    totalTasksCompleted: Math.max(
+      existing.totalTasksCompleted,
+      incoming.totalTasksCompleted,
+    ),
+  };
 }
 
 function formatZodError(error: z.ZodError): string {
@@ -69,6 +88,7 @@ function readFileAsText(file: File): Promise<string> {
 export default function SettingsPage() {
   const resetData = useStore((s) => s.resetData);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const resetCancelButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>("replace");
@@ -79,6 +99,10 @@ export default function SettingsPage() {
     | null
   >(null);
 
+  useEffect(() => {
+    if (isResetModalOpen) resetCancelButtonRef.current?.focus();
+  }, [isResetModalOpen]);
+
   const applicationsCount = useStore((s) => s.applications.length);
   const sprintsCount = useStore((s) => s.sprints.length);
   const questionsCount = useStore((s) => s.questions.length);
@@ -87,7 +111,7 @@ export default function SettingsPage() {
     const { applications, sprints, questions, completedTopics, progress } =
       useStore.getState();
     const backup: StoreBackup = {
-      version: 1,
+      version: BACKUP_VERSION,
       applications,
       sprints,
       questions,
@@ -188,6 +212,14 @@ export default function SettingsPage() {
     const result = storeBackupSchema.safeParse(parsedJson);
     if (!result.success) {
       setStatus({ kind: "error", message: formatZodError(result.error) });
+      return;
+    }
+
+    if (result.data.version !== BACKUP_VERSION) {
+      setStatus({
+        kind: "error",
+        message: `Unsupported backup version: v${result.data.version}.`,
+      });
       return;
     }
 
@@ -395,6 +427,7 @@ export default function SettingsPage() {
 
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
+                ref={resetCancelButtonRef}
                 type="button"
                 onClick={() => setIsResetModalOpen(false)}
                 className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
