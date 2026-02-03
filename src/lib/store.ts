@@ -7,6 +7,7 @@ interface AppState {
     applications: Application[];
     sprints: Sprint[];
     questions: Question[];
+    // Unique IDs/slugs for study topics the user has marked as completed.
     completedTopics: string[];
     progress: UserProgress;
 

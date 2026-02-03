@@ -24,11 +24,14 @@ function upsertById<T extends { id: string }>(
 function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProgress {
   const existingTime = Date.parse(existing.lastActiveDate);
   const incomingTime = Date.parse(incoming.lastActiveDate);
-  const hasIncomingNewer =
-    Number.isFinite(incomingTime) &&
-    (!Number.isFinite(existingTime) || incomingTime >= existingTime);
+  const existingValid = Number.isFinite(existingTime);
+  const incomingValid = Number.isFinite(incomingTime);
 
-  return hasIncomingNewer ? incoming : existing;
+  if (!existingValid && incomingValid) return incoming;
+  if (existingValid && !incomingValid) return existing;
+  if (!existingValid && !incomingValid) return existing;
+
+  return incomingTime >= existingTime ? incoming : existing;
 }
 
 function formatZodError(error: z.ZodError): string {
@@ -38,6 +41,21 @@ function formatZodError(error: z.ZodError): string {
   });
 
   return `Backup format mismatch:\n${lines.join("\n")}`;
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read the selected file."));
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Could not read the selected file as text."));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsText(file);
+  });
 }
 
 export default function SettingsPage() {
@@ -144,23 +162,9 @@ export default function SettingsPage() {
       return;
     }
 
-    const reader = new FileReader();
-
-    const readText = new Promise<string>((resolve, reject) => {
-      reader.onerror = () => reject(new Error("Could not read the selected file."));
-      reader.onload = () => {
-        if (typeof reader.result !== "string") {
-          reject(new Error("Could not read the selected file as text."));
-          return;
-        }
-        resolve(reader.result);
-      };
-      reader.readAsText(selectedFile);
-    });
-
     let parsedJson: unknown;
     try {
-      const text = await readText;
+      const text = await readFileAsText(selectedFile);
       parsedJson = JSON.parse(text);
     } catch (error) {
       const message =
