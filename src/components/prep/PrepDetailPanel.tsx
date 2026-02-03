@@ -40,6 +40,7 @@ export function PrepDetailPanel({
     const application = useStore((state) =>
         state.applications.find((app) => app.id === appId)
     );
+    const updateApplication = useStore((state) => state.updateApplication);
 
     useEffect(() => {
         if (isOpen && !application) {
@@ -51,16 +52,22 @@ export function PrepDetailPanel({
     const roleType: RoleType =
         application?.roleType || (application ? inferRoleType(application.role) : "SDE");
 
-    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() =>
-        application?.currentRound || "TechnicalRound1"
-    );
+    const selectedRoundFallback: InterviewRoundType = "TechnicalRound1";
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
-    const prepContent = getRoundPrepContent(roleType, selectedRound);
     const availableRounds = getAvailableRounds(roleType);
+    const defaultRound = availableRounds[0]?.value ?? selectedRoundFallback;
+    const selectedRoundFromStore = application?.currentRound;
+    const selectedRound =
+        selectedRoundFromStore &&
+            availableRounds.some((r) => r.value === selectedRoundFromStore)
+            ? selectedRoundFromStore
+            : defaultRound;
+
+    const prepContent = getRoundPrepContent(roleType, selectedRound);
 
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
@@ -68,12 +75,6 @@ export function PrepDetailPanel({
     const daysUntilInterview = application?.interviewDate
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
-
-    // Reset selected round when application changes
-    useEffect(() => {
-        if (!application) return;
-        setSelectedRound(application.currentRound || "TechnicalRound1");
-    }, [application?.id, application?.currentRound]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
@@ -104,8 +105,12 @@ export function PrepDetailPanel({
     }, [isOpen, application?.company, application?.role, roleType, selectedRound]);
 
     const handleRoundChange = (round: InterviewRoundType) => {
-        setSelectedRound(round);
-        onUpdateRound?.(round);
+        if (onUpdateRound) {
+            onUpdateRound(round);
+            return;
+        }
+
+        updateApplication(appId, { currentRound: round });
     };
 
     // Helper to check if a topic is completed (using store's centralized matching)
