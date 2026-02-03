@@ -690,11 +690,8 @@ export function getAllRoleOptions(): { value: RoleType; label: string }[] {
 }
 
 // Get available rounds for a role
-export function getAvailableRounds(roleType: RoleType): { value: InterviewRoundType; label: string }[] {
+export function getAvailableRounds(roleType: RoleType): InterviewRoundType[] {
     const template = getPrepTemplateByRole(roleType);
     if (!template) return [];
-    return template.rounds.map(r => ({
-        value: r.round,
-        label: r.displayName
-    }));
+    return template.rounds.map((r) => r.round);
 }
