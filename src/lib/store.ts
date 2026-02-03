@@ -13,7 +13,15 @@ function mergeRoundFeedback(
     prev: InterviewRound['feedback'] | undefined,
     next: InterviewRound['feedback'] | undefined
 ): InterviewRound['feedback'] | undefined {
-    return next ?? prev;
+    if (!next) return prev;
+    if (!prev) return next;
+    return {
+        rating: next.rating ?? prev.rating,
+        pros: next.pros ?? prev.pros,
+        cons: next.cons ?? prev.cons,
+        struggledTopics: next.struggledTopics ?? prev.struggledTopics,
+        notes: next.notes ?? prev.notes,
+    };
 }
 
 interface AppState {
@@ -26,6 +34,12 @@ interface AppState {
     // Actions
     addApplication: (app: Application) => void;
     addInterviewRound: (applicationId: string, round: InterviewRound) => void;
+    /**
+     * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
+     * patch merged into an existing round matched by `roundNumber`.
+     *
+     * To add new rounds, use `addInterviewRound`.
+     */
     updateApplication: (
         id: string,
         updates: ApplicationUpdate
