@@ -131,11 +131,15 @@ export function NotificationManager() {
     // Check 2 (Daily Habit): user was active yesterday but has not completed tasks today.
     const lastActive = safeParseISO(state.progress.lastActiveDate);
     const completedTasksToday = state.sprints.some((sprint) =>
-      sprint.dailyPlans.some(
-        (plan) =>
-          isToday(parseISO(plan.date)) &&
+      sprint.dailyPlans.some((plan) => {
+        const planDate = safeParseISO(plan.date);
+        if (!planDate) return false;
+
+        return (
+          isToday(planDate) &&
           plan.blocks.some((block) => block.tasks.some((task) => task.completed))
-      )
+        );
+      })
     );
 
     if (lastActive && isYesterday(lastActive) && !completedTasksToday) {
