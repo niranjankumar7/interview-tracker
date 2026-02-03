@@ -93,7 +93,7 @@ export default function SettingsPage() {
       link.remove();
       setStatus({ kind: "success", message: `Exported backup as ${filename}` });
     } finally {
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     }
   };
 

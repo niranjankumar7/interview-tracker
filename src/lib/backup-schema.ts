@@ -1,16 +1,21 @@
 import { z } from "zod";
 
-const applicationStatusSchema = z.enum([
-  "applied",
-  "shortlisted",
-  "interview",
-  "offer",
-  "rejected",
-]);
+import {
+  APPLICATION_STATUSES,
+  BLOCK_TYPES,
+  FOCUS_AREAS,
+  INTERVIEW_ROUND_TYPES,
+  QUESTION_CATEGORIES,
+  QUESTION_DIFFICULTIES,
+  ROLE_TYPES,
+  SPRINT_STATUSES,
+} from "@/types";
+
+const applicationStatusSchema = z.enum(APPLICATION_STATUSES);
 
 const interviewRoundSchema = z.object({
   roundNumber: z.number(),
-  roundType: z.enum(["Technical", "HR", "Managerial"]),
+  roundType: z.enum(INTERVIEW_ROUND_TYPES),
   scheduledDate: z.string().optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
@@ -28,14 +33,8 @@ const applicationSchema = z.object({
   createdAt: z.string(),
 });
 
-const roleTypeSchema = z.enum(["SDE", "QA", "Data", "PM"]);
-const focusAreaSchema = z.enum([
-  "DSA",
-  "SystemDesign",
-  "Behavioral",
-  "Review",
-  "Mock",
-]);
+const roleTypeSchema = z.enum(ROLE_TYPES);
+const focusAreaSchema = z.enum(FOCUS_AREAS);
 
 const taskSchema = z.object({
   id: z.string(),
@@ -46,7 +45,7 @@ const taskSchema = z.object({
 
 const blockSchema = z.object({
   id: z.string(),
-  type: z.enum(["morning", "evening", "quick"]),
+  type: z.enum(BLOCK_TYPES),
   duration: z.string(),
   tasks: z.array(taskSchema),
   completed: z.boolean(),
@@ -67,7 +66,7 @@ const sprintSchema = z.object({
   roleType: roleTypeSchema,
   totalDays: z.number(),
   dailyPlans: z.array(dailyPlanSchema),
-  status: z.enum(["active", "completed", "expired"]),
+  status: z.enum(SPRINT_STATUSES),
   createdAt: z.string(),
 });
 
@@ -75,8 +74,8 @@ const questionSchema = z.object({
   id: z.string(),
   companyId: z.string(),
   questionText: z.string(),
-  category: z.enum(["DSA", "SystemDesign", "Behavioral", "SQL", "Other"]),
-  difficulty: z.enum(["Easy", "Medium", "Hard"]).optional(),
+  category: z.enum(QUESTION_CATEGORIES),
+  difficulty: z.enum(QUESTION_DIFFICULTIES).optional(),
   askedInRound: z.string().optional(),
   dateAdded: z.string(),
 });
