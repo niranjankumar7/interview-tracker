@@ -206,7 +206,7 @@ export const tools: TamboTool[] = [
       const completedTopics = useStore.getState().completedTopics;
       return {
         topics: completedTopics.map(t => ({
-          name: t.topicName,
+          name: t.displayName || t.topicName, // Use displayName for proper casing
           completedAt: t.completedAt,
           source: t.source
         })),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
 import { PrepDetailPanel } from "@/components/prep";
@@ -31,6 +31,10 @@ export function KanbanBoard() {
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
     const [isPrepPanelOpen, setIsPrepPanelOpen] = useState(false);
 
+    // Track mouse position to distinguish click from drag
+    const mouseDownPosition = useRef<{ x: number; y: number } | null>(null);
+    const DRAG_THRESHOLD = 5; // pixels
+
     const handleDragStart = (e: React.DragEvent, appId: string) => {
         e.dataTransfer.setData("applicationId", appId);
     };
@@ -47,9 +51,26 @@ export function KanbanBoard() {
         }
     };
 
+    const handleMouseDown = (e: React.MouseEvent) => {
+        mouseDownPosition.current = { x: e.clientX, y: e.clientY };
+    };
+
     const handleCardClick = (app: Application, e: React.MouseEvent) => {
-        // Don't open panel if clicking on delete button or during drag
-        if ((e.target as HTMLElement).closest('button')) return;
+        // Don't open panel if clicking on interactive elements
+        if ((e.target as HTMLElement).closest('button, a, input')) return;
+
+        // Check if this was a drag gesture (mouse moved significantly)
+        if (mouseDownPosition.current) {
+            const dx = Math.abs(e.clientX - mouseDownPosition.current.x);
+            const dy = Math.abs(e.clientY - mouseDownPosition.current.y);
+            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                // This was a drag, not a click
+                mouseDownPosition.current = null;
+                return;
+            }
+        }
+        mouseDownPosition.current = null;
+
         setSelectedApp(app);
         setIsPrepPanelOpen(true);
     };
@@ -116,10 +137,11 @@ export function KanbanBoard() {
                                                     key={app.id}
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, app.id)}
+                                                    onMouseDown={handleMouseDown}
                                                     onClick={(e) => handleCardClick(app, e)}
                                                     className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
-                                                            ? "border-orange-300 ring-2 ring-orange-100"
-                                                            : "border-gray-200 hover:border-indigo-300"
+                                                        ? "border-orange-300 ring-2 ring-orange-100"
+                                                        : "border-gray-200 hover:border-indigo-300"
                                                         }`}
                                                 >
                                                     {/* Click hint */}
@@ -159,8 +181,8 @@ export function KanbanBoard() {
                                                     {/* Interview Date with countdown */}
                                                     {app.interviewDate && (
                                                         <div className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
-                                                                ? "bg-orange-50 text-orange-700"
-                                                                : "bg-purple-50 text-purple-600"
+                                                            ? "bg-orange-50 text-orange-700"
+                                                            : "bg-purple-50 text-purple-600"
                                                             }`}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="w-3.5 h-3.5" />
