@@ -1,4 +1,3 @@
-import type { InterviewRoundType } from "@/types";
 import type { LucideIcon } from "lucide-react";
 import {
     User,
@@ -75,7 +74,9 @@ export const interviewRoundRegistry = {
         tabInactiveClassName:
             "bg-white text-red-700 hover:bg-red-50 border border-red-200",
     },
-} satisfies Record<InterviewRoundType, InterviewRoundTheme>;
+} satisfies Record<string, InterviewRoundTheme>;
+
+export type InterviewRoundType = keyof typeof interviewRoundRegistry;
 
 export function getInterviewRoundTheme(roundType: InterviewRoundType): InterviewRoundTheme {
     return interviewRoundRegistry[roundType];
