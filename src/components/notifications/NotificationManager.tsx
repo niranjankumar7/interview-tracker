@@ -100,7 +100,7 @@ export function NotificationManager() {
         const minutesUntil = differenceInMinutes(interviewDate, now);
         return { app: a, interviewDate, minutesUntil };
       })
-      .filter((x) => x !== null)
+      .filter((x): x is NonNullable<typeof x> => x !== null)
       .filter((x) => x.minutesUntil > 0 && x.minutesUntil <= 48 * 60)
       .sort((a, b) => a.minutesUntil - b.minutesUntil)[0];
 
@@ -167,9 +167,10 @@ export function NotificationManager() {
       const todayKey = getLocalDayKey(now);
 
       for (const sprint of state.sprints) {
-        const prevStatus = prevState.sprints.find((s) => s.id === sprint.id)?.status;
+        const prevSprint = prevState.sprints.find((s) => s.id === sprint.id);
+        if (!prevSprint) continue;
 
-        if (prevStatus !== "completed" && sprint.status === "completed") {
+        if (prevSprint.status !== "completed" && sprint.status === "completed") {
           const notificationKey = `celebration:${sprint.id}`;
           if (isSnoozed(notificationKey) || wasShownToday(notificationKey, todayKey)) {
             continue;

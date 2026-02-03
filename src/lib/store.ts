@@ -107,14 +107,10 @@ export const useStore = create<AppState>()(
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
 
-                                    const wasCompleted = task.completed;
-                                    const nextCompleted = !task.completed;
+                                    if (task.completed) return task;
 
-                                    if (!wasCompleted && nextCompleted) {
-                                        didCompleteTask = true;
-                                    }
-
-                                    return { ...task, completed: nextCompleted };
+                                    didCompleteTask = true;
+                                    return { ...task, completed: true };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
