@@ -130,6 +130,7 @@ export function PrepDetailPanel(props: {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (e.isComposing) return;
+      if (e.defaultPrevented) return;
 
       const active = document.activeElement;
       const isFormControl =

@@ -36,7 +36,7 @@ function escapeRegExp(value: string): string {
 }
 
 function buildTopicMatcher(topic: string): TopicMatcher {
-    const needle = topic.trim().toLowerCase();
+    const needle = topic.toLowerCase();
 
     if (needle.length <= 3) {
         // Avoid overly-permissive substring matches for short topics (e.g. "SQL" in "sequel").
@@ -70,9 +70,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
                 ),
             ];
 
-            const matchers = topics
-                .map(buildTopicMatcher)
-                .filter((m) => m.needle.length > 0);
+            const matchers = topics.map(buildTopicMatcher).filter((m) => m.needle.length > 0);
 
             result.set(app.id, matchers);
         }
@@ -233,9 +231,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
 
                                     <ul className="space-y-2">
                                         {block.tasks.map((task, taskIdx) => {
-                                            const categoryLower = (task.category ?? "")
-                                                .trim()
-                                                .toLowerCase();
+                                            const categoryLower = (task.category ?? "").toLowerCase();
                                             const descriptionLower = task.description.toLowerCase();
 
                                             const struggledMatch =
