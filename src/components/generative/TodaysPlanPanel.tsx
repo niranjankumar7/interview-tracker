@@ -232,7 +232,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
                                     <ul className="space-y-2">
                                         {block.tasks.map((task, taskIdx) => {
                                             const categoryLower = (task.category ?? "").toLowerCase();
-                                            const descriptionLower = task.description.toLowerCase();
+                                            const descriptionLower = (task.description ?? "").toLowerCase();
 
                                             const struggledMatch =
                                                 struggledTopicMatchers.length > 0 &&
