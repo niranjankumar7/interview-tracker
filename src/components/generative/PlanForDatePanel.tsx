@@ -38,6 +38,21 @@ type TopicMatcher = {
     regex: RegExp | null;
 };
 
+function matchesStruggledTopic(
+    matchers: TopicMatcher[],
+    category: string,
+    description: string
+): boolean {
+    const categoryLower = category.toLowerCase();
+    const descriptionLower = description.toLowerCase();
+
+    return matchers.some((matcher) => {
+        if (categoryLower === matcher.needle) return true;
+        if (matcher.regex) return matcher.regex.test(descriptionLower);
+        return descriptionLower.includes(matcher.needle);
+    });
+}
+
 function escapeRegExp(value: string): string {
     // Escape topic text so it can be safely embedded in a RegExp.
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -64,6 +79,8 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
 
+    // `targetDate` comes from natural language. This panel is intentionally strict and
+    // shows a user-facing error when the input isn't recognized.
     const resolvedDate = useMemo(() => tryParseDateInput(targetDate), [targetDate]);
 
     const struggledTopicMatchersByAppId = useMemo(() => {
@@ -100,7 +117,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 </h3>
                 <p className="text-red-700 text-sm">
                     I couldn&apos;t understand &ldquo;{targetDate}&rdquo;. Try something like
-                    &ldquo;tomorrow&rdquo;, &ldquo;next Friday&rdquo;, or &ldquo;2026-02-05&rdquo;.
+                    &ldquo;tomorrow&rdquo;, &ldquo;next Friday&rdquo;, &ldquo;in 3 days&rdquo;, or &ldquo;2026-02-05&rdquo;.
                 </p>
             </div>
         );
@@ -195,36 +212,32 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 let guidanceMessage: string | null = null;
 
                 if (!planToShow) {
-                    let nextPlan: typeof requestedPlan = undefined;
-                    let nextPlanTime = Infinity;
-
                     const resolvedTime = resolvedDate.getTime();
 
-                    for (const plan of sprint.dailyPlans) {
-                        const planTime = parseISO(plan.date).getTime();
-                        if (planTime > resolvedTime && planTime < nextPlanTime) {
-                            nextPlan = plan;
-                            nextPlanTime = planTime;
-                        }
-                    }
+                    const nextPlan = sprint.dailyPlans.reduce<typeof requestedPlan | undefined>(
+                        (closest, plan) => {
+                            const planTime = parseISO(plan.date).getTime();
+                            if (planTime <= resolvedTime) return closest;
+                            if (!closest) return plan;
 
-                    let lastPlan = sprint.dailyPlans[0];
-                    let lastPlanTime = parseISO(lastPlan.date).getTime();
+                            const closestTime = parseISO(closest.date).getTime();
+                            return planTime < closestTime ? plan : closest;
+                        },
+                        undefined
+                    );
 
-                    for (const plan of sprint.dailyPlans.slice(1)) {
+                    const lastPlan = sprint.dailyPlans.reduce((latest, plan) => {
+                        const latestTime = parseISO(latest.date).getTime();
                         const planTime = parseISO(plan.date).getTime();
-                        if (planTime > lastPlanTime) {
-                            lastPlan = plan;
-                            lastPlanTime = planTime;
-                        }
-                    }
+                        return planTime > latestTime ? plan : latest;
+                    }, sprint.dailyPlans[0]);
 
                     if (nextPlan) {
                         planToShow = nextPlan;
                         guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. Showing the next available day: ${format(parseISO(nextPlan.date), "yyyy-MM-dd")}.`;
                     } else {
                         planToShow = lastPlan;
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. This sprint ends on ${format(parseISO(lastPlan.date), "yyyy-MM-dd")}.`;
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. This is the last planned prep day in this sprint (${format(parseISO(lastPlan.date), "yyyy-MM-dd")}).`;
                     }
                 }
 
@@ -243,6 +256,11 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     (acc, block) => acc + block.tasks.length,
                     0
                 );
+
+                const completionPercent =
+                    totalTasks === 0
+                        ? 0
+                        : Math.round((completedTasks / totalTasks) * 100);
 
                 const planDate = parseISO(planToShow.date);
                 const daysDiff = differenceInDays(
@@ -305,22 +323,13 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                                 <span>
                                     {completedTasks}/{totalTasks} tasks completed
                                 </span>
-                                <span>
-                                    {totalTasks === 0
-                                        ? "0%"
-                                        : `${Math.round(
-                                            (completedTasks / totalTasks) * 100
-                                        )}%`}
-                                </span>
+                                <span>{completionPercent}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     className="bg-gradient-to-r from-green-400 to-green-500 h-2 rounded-full transition-all duration-300"
                                     style={{
-                                        width:
-                                            totalTasks === 0
-                                                ? "0%"
-                                                : `${(completedTasks / totalTasks) * 100}%`,
+                                        width: `${completionPercent}%`,
                                     }}
                                 />
                             </div>
@@ -351,24 +360,13 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                                     <ul className="space-y-2">
                                         {block.tasks.map((task, taskIdx) => {
-                                            const categoryLower = (
-                                                task.category ?? ""
-                                            ).toLowerCase();
-                                            const descriptionLower = (
-                                                task.description ?? ""
-                                            ).toLowerCase();
-
                                             const struggledMatch =
                                                 struggledTopicMatchers.length > 0 &&
-                                                struggledTopicMatchers.some((matcher) => {
-                                                    if (categoryLower === matcher.needle) {
-                                                        return true;
-                                                    }
-
-                                                    return matcher.regex
-                                                        ? matcher.regex.test(descriptionLower)
-                                                        : descriptionLower.includes(matcher.needle);
-                                                });
+                                                matchesStruggledTopic(
+                                                    struggledTopicMatchers,
+                                                    task.category ?? "",
+                                                    task.description ?? ""
+                                                );
 
                                             return (
                                                 <li

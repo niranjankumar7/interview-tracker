@@ -64,5 +64,8 @@ export function tryParseDateInput(
 }
 
 export function parseDateInput(dateString: string, baseDate: Date = new Date()): Date {
+    // If the input cannot be parsed, we intentionally fall back to 7 days from baseDate.
+    // This behavior is useful for flows like sprint setup, where a reasonable default is
+    // better than a hard error.
     return tryParseDateInput(dateString, baseDate) ?? addDays(startOfDay(baseDate), 7);
 }

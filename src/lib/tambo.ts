@@ -400,7 +400,7 @@ export const components: TamboComponent[] = [
   {
     name: "PlanForDatePanel",
     description:
-      "A component that shows the user's prep tasks for a specific date (e.g. 'tomorrow', 'next Friday', 'in 3 days', or a YYYY-MM-DD date). Use this instead of TodaysPlanPanel when the user mentions any non-today date or asks for their plan on a particular day. If the exact date isn't available, it shows the nearest upcoming day with guidance.",
+      "A component that shows the user's prep tasks for a specific date. Supported patterns: 'today', 'tomorrow', weekday names (with optional 'next'), 'in N days', or a YYYY-MM-DD date. Use this instead of TodaysPlanPanel when the user mentions any non-today date or asks for their plan on a particular day. If the exact date isn't available, it shows the nearest upcoming day with guidance.",
     component: PlanForDatePanel,
     propsSchema: planForDatePanelSchema,
   },
