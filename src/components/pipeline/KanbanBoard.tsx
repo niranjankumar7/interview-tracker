@@ -61,7 +61,7 @@ export function KanbanBoard() {
         [applications]
     );
 
-    const { applicationsByStatus, filteredCount } = useMemo(() => {
+    const { applicationsByStatus, matchedApplicationsCount } = useMemo(() => {
         const normalizedQuery = debouncedSearchQuery.trim().toLowerCase();
 
         const byStatus: Record<ApplicationStatus, Application[]> = {
@@ -79,7 +79,7 @@ export function KanbanBoard() {
 
             return {
                 applicationsByStatus: byStatus,
-                filteredCount: indexedApplications.length,
+                matchedApplicationsCount: indexedApplications.length,
             };
         }
 
@@ -103,7 +103,7 @@ export function KanbanBoard() {
 
         return {
             applicationsByStatus: byStatus,
-            filteredCount: matches.length,
+            matchedApplicationsCount: matches.length,
         };
     }, [indexedApplications, debouncedSearchQuery]);
 
@@ -141,7 +141,7 @@ export function KanbanBoard() {
                 </div>
                 {applications.length > 0 && debouncedSearchQuery.trim() !== "" && (
                     <div className="text-sm text-gray-500">
-                        Showing {filteredCount} of {applications.length}
+                        Showing {matchedApplicationsCount} of {applications.length}
                     </div>
                 )}
             </div>
@@ -174,7 +174,7 @@ export function KanbanBoard() {
                                     <div className="text-center py-8 text-gray-400 text-sm">
                                         {debouncedSearchQuery.trim() === ""
                                             ? "Drop applications here"
-                                            : "No matches. Drop applications here."}
+                                            : "No matches for this search"}
                                     </div>
                                 ) : (
                                     columnApps.map((app) => (
