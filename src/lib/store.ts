@@ -109,9 +109,6 @@ export const useStore = create<AppState>()(
 
                         if (existingRound) {
                             const message = `addInterviewRound: duplicate roundNumber ${round.roundNumber} for application ${applicationId}`;
-                            if (process.env.NODE_ENV !== 'production') {
-                                throw new Error(message);
-                            }
                             console.error(message, {
                                 applicationId,
                                 roundNumber: round.roundNumber,
