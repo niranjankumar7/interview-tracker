@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,8 @@ const themeOptions: ThemeOption[] = [
   { id: "dark", label: "Dark", icon: Moon },
   { id: "system", label: "System", icon: Monitor },
 ];
+
+const EXPORT_REVOKE_URL_DELAY_MS = 1000;
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -74,11 +77,8 @@ export default function SettingsPage() {
     setTheme(preferences.theme);
   }, [mounted, preferences.theme, setTheme]);
 
-  const selectedTheme = preferences.theme;
-
   const handleThemeChange = (next: ThemePreference) => {
     updatePreferences({ theme: next });
-    if (mounted) setTheme(next);
   };
 
   const handleExport = () => {
@@ -93,9 +93,13 @@ export default function SettingsPage() {
     a.download = `interview-prep-tracker-export-${new Date()
       .toISOString()
       .slice(0, 10)}.json`;
-    a.click();
-
-    URL.revokeObjectURL(url);
+    document.body.appendChild(a);
+    try {
+      a.click();
+    } finally {
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), EXPORT_REVOKE_URL_DELAY_MS);
+    }
   };
 
   const handleImport = async (file: File) => {
@@ -110,7 +114,14 @@ export default function SettingsPage() {
     importData(parsed);
   };
 
-  const experienceLevelOptions: ExperienceLevel[] = ["Junior", "Mid", "Senior"];
+  const experienceLevelOptions: readonly ExperienceLevel[] = [
+    "Junior",
+    "Mid",
+    "Senior",
+  ];
+
+  const isExperienceLevel = (value: string): value is ExperienceLevel =>
+    (experienceLevelOptions as readonly string[]).includes(value);
 
   const aboutText =
     "Track applications, build a focused sprint plan, and keep a lightweight question bank — all in one place.";
@@ -166,22 +177,21 @@ export default function SettingsPage() {
 
             <div className="grid gap-2">
               <Label htmlFor={experienceId}>Experience level</Label>
-              <select
+              <NativeSelect
                 id={experienceId}
                 value={profile.experienceLevel}
-                onChange={(e) =>
-                  updateProfile({
-                    experienceLevel: e.target.value as ExperienceLevel,
-                  })
-                }
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (!isExperienceLevel(next)) return;
+                  updateProfile({ experienceLevel: next });
+                }}
               >
                 {experienceLevelOptions.map((level) => (
                   <option key={level} value={level}>
                     {level}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
           </CardContent>
         </Card>
@@ -199,7 +209,7 @@ export default function SettingsPage() {
               <div className="text-sm font-medium">Theme</div>
               <div className="flex flex-wrap gap-2">
                 {themeOptions.map((opt) => {
-                  const selected = selectedTheme === opt.id;
+                  const selected = preferences.theme === opt.id;
                   const Icon = opt.icon;
                   return (
                     <button
@@ -221,7 +231,7 @@ export default function SettingsPage() {
               </div>
               <div className="text-xs text-muted-foreground">
                 {mounted ? (
-                  <span>Current: {selectedTheme}</span>
+                  <span>Current: {preferences.theme}</span>
                 ) : (
                   <span>Loading theme…</span>
                 )}
@@ -279,7 +289,6 @@ export default function SettingsPage() {
                 onClick={() => {
                   if (confirm("Reset all data? This cannot be undone.")) {
                     resetData();
-                    if (mounted) setTheme("system");
                   }
                 }}
               >

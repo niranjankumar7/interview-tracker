@@ -58,16 +58,16 @@ const getInitialProgress = (): UserProgress => ({
     totalTasksCompleted: 0,
 });
 
-const initialProfile: UserProfile = {
+const getInitialProfile = (): UserProfile => ({
     name: '',
     targetRole: '',
     experienceLevel: 'Mid',
-};
+});
 
-const initialPreferences: AppPreferences = {
+const getInitialPreferences = (): AppPreferences => ({
     theme: 'system',
     studyRemindersEnabled: false,
-};
+});
 
 export const useStore = create<AppState>()(
     persist(
@@ -76,8 +76,8 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             progress: getInitialProgress(),
-            profile: initialProfile,
-            preferences: initialPreferences,
+            profile: getInitialProfile(),
+            preferences: getInitialPreferences(),
 
             addApplication: (app) =>
                 set((state) => ({
@@ -246,8 +246,8 @@ export const useStore = create<AppState>()(
                 sprints: [],
                 questions: [],
                 progress: getInitialProgress(),
-                profile: initialProfile,
-                preferences: initialPreferences,
+                profile: getInitialProfile(),
+                preferences: getInitialPreferences(),
             }),
 
             exportData: () => {
@@ -272,8 +272,9 @@ export const useStore = create<AppState>()(
                     return;
                 }
 
-                const issue = snapshotParse.error.issues[0];
-                const where = issue?.path?.length ? issue.path.join('.') : 'snapshot';
+                const issue = exportParse.error.issues[0] ?? snapshotParse.error.issues[0];
+                const defaultWhere = exportParse.error.issues[0] ? 'data' : 'snapshot';
+                const where = issue?.path?.length ? issue.path.join('.') : defaultWhere;
                 const message = issue?.message ?? 'File does not match expected export format';
                 throw new Error(`${where}: ${message}`);
             },
