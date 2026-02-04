@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from "@/types";
-import { differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import { Calendar, Briefcase, Building2 } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
@@ -11,9 +11,7 @@ export const pipelineSummaryPanelSchema = z.object({
     status: z
         .enum(APPLICATION_STATUSES)
         .optional()
-        .describe(
-            "Optional status filter (applied, shortlisted, interview, offer, rejected)"
-        ),
+        .describe(`Optional status filter. Valid values: ${APPLICATION_STATUSES.join(", ")}`),
 });
 
 interface PipelineSummaryPanelProps {
@@ -32,25 +30,18 @@ type StatusGroup = {
     badgeClass: string;
 };
 
-const STATUS_GROUPS: StatusGroup[] = [
-    { status: "applied", label: "Applied", badgeClass: "bg-gray-100 text-gray-700" },
-    {
-        status: "shortlisted",
-        label: "Shortlisted",
-        badgeClass: "bg-blue-100 text-blue-700",
-    },
-    {
-        status: "interview",
-        label: "Interview",
-        badgeClass: "bg-purple-100 text-purple-700",
-    },
-    { status: "offer", label: "Offer", badgeClass: "bg-green-100 text-green-700" },
-    {
-        status: "rejected",
-        label: "Rejected",
-        badgeClass: "bg-red-100 text-red-700",
-    },
-];
+const STATUS_META = {
+    applied: { label: "Applied", badgeClass: "bg-gray-100 text-gray-700" },
+    shortlisted: { label: "Shortlisted", badgeClass: "bg-blue-100 text-blue-700" },
+    interview: { label: "Interview", badgeClass: "bg-purple-100 text-purple-700" },
+    offer: { label: "Offer", badgeClass: "bg-green-100 text-green-700" },
+    rejected: { label: "Rejected", badgeClass: "bg-red-100 text-red-700" },
+} satisfies Record<ApplicationStatus, Omit<StatusGroup, "status">>;
+
+const STATUS_GROUPS: StatusGroup[] = APPLICATION_STATUSES.map((status) => ({
+    status,
+    ...STATUS_META[status],
+}));
 
 function safeParseISO(value: string | undefined): Date | null {
     if (!value) return null;
@@ -58,7 +49,7 @@ function safeParseISO(value: string | undefined): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function getNextInterviewDate(app: Application): Date | null {
+function getNextInterviewDate(app: Application, now: Date): Date | null {
     const candidates: Date[] = [];
 
     const appInterview = safeParseISO(app.interviewDate);
@@ -71,12 +62,24 @@ function getNextInterviewDate(app: Application): Date | null {
 
     if (candidates.length === 0) return null;
 
-    const now = new Date();
     const upcoming = candidates
         .filter((d) => d.getTime() >= now.getTime())
         .sort((a, b) => a.getTime() - b.getTime());
 
     return upcoming[0] ?? null;
+}
+
+function getNextInterviewInfo(
+    app: Application,
+    now: Date
+): { interviewDate: Date; daysLeft: number } | null {
+    const interviewDate = getNextInterviewDate(app, now);
+    if (!interviewDate) return null;
+
+    const daysLeft = differenceInDays(startOfDay(interviewDate), now);
+    if (daysLeft < 0) return null;
+
+    return { interviewDate, daysLeft };
 }
 
 function formatInterviewDate(date: Date): string {
@@ -97,6 +100,9 @@ function getCountdownClass(daysLeft: number): string {
 
 export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
     const applications = useStore((s) => s.applications);
+    // Use start-of-day so "days left" behaves like calendar-day countdowns.
+    const now = useMemo(() => startOfDay(new Date()), []);
+    const statusLabel = status ? STATUS_META[status]?.label ?? status : undefined;
 
     const scopedApplications = useMemo(() => {
         if (!status) return applications;
@@ -107,18 +113,14 @@ export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
         const upcoming: UpcomingInterview[] = [];
 
         for (const application of scopedApplications) {
-            const nextInterviewDate = getNextInterviewDate(application);
-            if (!nextInterviewDate) continue;
-
-            const daysLeft = differenceInDays(nextInterviewDate, new Date());
-            if (daysLeft < 0) continue;
-
-            upcoming.push({ application, interviewDate: nextInterviewDate, daysLeft });
+            const info = getNextInterviewInfo(application, now);
+            if (!info) continue;
+            upcoming.push({ application, ...info });
         }
 
         upcoming.sort((a, b) => a.interviewDate.getTime() - b.interviewDate.getTime());
         return upcoming;
-    }, [scopedApplications]);
+    }, [now, scopedApplications]);
 
     const groupedByStatus = useMemo(() => {
         const result = new Map<ApplicationStatus, Application[]>();
@@ -183,7 +185,7 @@ export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
                 </div>
                 {status && (
                     <span className="px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-700">
-                        Filter: {status}
+                        Filter: {statusLabel}
                     </span>
                 )}
             </div>
@@ -263,10 +265,7 @@ export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {apps.map((app) => {
-                                            const nextInterviewDate = getNextInterviewDate(app);
-                                            const daysLeft = nextInterviewDate
-                                                ? differenceInDays(nextInterviewDate, new Date())
-                                                : null;
+                                            const info = getNextInterviewInfo(app, now);
 
                                             return (
                                                 <div
@@ -279,13 +278,15 @@ export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
                                                     <p className="text-xs text-gray-500 truncate">
                                                         {app.role}
                                                     </p>
-                                                    {nextInterviewDate && daysLeft !== null && daysLeft >= 0 ? (
+                                                    {info ? (
                                                         <p
                                                             className={`text-xs mt-2 font-medium ${getCountdownClass(
-                                                                daysLeft
+                                                                info.daysLeft
                                                             )}`}
                                                         >
-                                                            Interview: {formatInterviewDate(nextInterviewDate)} ({formatDaysLeft(daysLeft)} left)
+                                                            Interview: {formatInterviewDate(
+                                                                info.interviewDate
+                                                            )} ({formatDaysLeft(info.daysLeft)} left)
                                                         </p>
                                                     ) : (
                                                         <p className="text-xs mt-2 text-gray-400">
