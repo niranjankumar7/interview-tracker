@@ -24,9 +24,15 @@ function readJsonRecord(key: string): Record<string, string> {
     const raw = localStorage.getItem(key);
     if (!raw) return {};
 
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed as Record<string, string>;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === "string") out[k] = v;
+    }
+
+    return out;
   } catch {
     return {};
   }
@@ -116,7 +122,7 @@ export function NotificationManager() {
           router.push(`/prep?applicationId=${encodeURIComponent(upcoming.app.id)}`);
         };
 
-        toast(`Upcoming Interview: ${upcoming.app.company} in ${timeLabel}! Click to prep.`, {
+        toast(`Upcoming Interview: ${upcoming.app.company} in ${timeLabel}.`, {
           action: { label: "Prep", onClick: goToPrep },
           cancel: {
             label: "Snooze",
@@ -167,16 +173,13 @@ export function NotificationManager() {
     if (!hasHydrated) return;
 
     return useStore.subscribe((state, prevState) => {
-      const now = new Date();
-      const todayKey = getLocalDayKey(now);
-
       for (const sprint of state.sprints) {
         const prevSprint = prevState.sprints.find((s) => s.id === sprint.id);
         if (!prevSprint) continue;
 
         if (prevSprint.status !== "completed" && sprint.status === "completed") {
           const notificationKey = `celebration:${sprint.id}`;
-          if (isSnoozed(notificationKey) || wasShownToday(notificationKey, todayKey)) {
+          if (isSnoozed(notificationKey)) {
             continue;
           }
 
@@ -192,8 +195,6 @@ export function NotificationManager() {
               onClick: () => snooze(notificationKey),
             },
           });
-
-          markShown(notificationKey, todayKey);
         }
       }
     });

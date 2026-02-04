@@ -44,11 +44,10 @@ export function TodaysPlanPanel({
     const activeSprints = sprints.filter((s) => s.status === "active");
 
     const orderedSprints = focusApplicationId
-        ? [...activeSprints].sort((a, b) => {
-            if (a.applicationId === focusApplicationId) return -1;
-            if (b.applicationId === focusApplicationId) return 1;
-            return 0;
-        })
+        ? [
+            ...activeSprints.filter((s) => s.applicationId === focusApplicationId),
+            ...activeSprints.filter((s) => s.applicationId !== focusApplicationId),
+        ]
         : activeSprints;
 
     if (activeSprints.length === 0) {

@@ -91,10 +91,15 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
-                set((state) => {
-                    let didCompleteTask = false;
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const existingTask =
+                    get()
+                        .sprints.find((sprint) => sprint.id === sprintId)
+                        ?.dailyPlans[dayIndex]?.blocks[blockIndex]?.tasks[taskIndex];
 
+                if (!existingTask || existingTask.completed) return;
+
+                set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
 
@@ -106,10 +111,6 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-
-                                    if (task.completed) return task;
-
-                                    didCompleteTask = true;
                                     return { ...task, completed: true };
                                 });
 
@@ -132,10 +133,6 @@ export const useStore = create<AppState>()(
 
                         return { ...sprint, dailyPlans, status: nextStatus };
                     });
-
-                    if (!didCompleteTask) {
-                        return { sprints };
-                    }
 
                     const now = new Date();
                     const lastActive = safeParseISO(state.progress.lastActiveDate);
@@ -161,7 +158,8 @@ export const useStore = create<AppState>()(
                             totalTasksCompleted: state.progress.totalTasksCompleted + 1
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({
