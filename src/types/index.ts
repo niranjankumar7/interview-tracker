@@ -21,7 +21,7 @@ export type RoleType =
     | 'MobileEngineer';
 
 // Interview round types for round-specific prep
-export type InterviewRoundType = import("@/lib/interviewRoundRegistry").InterviewRoundType;
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export type FocusArea =
     | 'DSA'

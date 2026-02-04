@@ -9,6 +9,8 @@ import {
     Trophy,
 } from "lucide-react";
 
+import { isInterviewRoundType, type InterviewRoundType } from "@/types/interviewRound";
+
 export interface InterviewRoundTheme {
     label: string;
     icon: LucideIcon;
@@ -74,10 +76,17 @@ export const interviewRoundRegistry = {
         tabInactiveClassName:
             "bg-white text-red-700 hover:bg-red-50 border border-red-200",
     },
-} satisfies Record<string, InterviewRoundTheme>;
+} satisfies Record<InterviewRoundType, InterviewRoundTheme>;
 
-export type InterviewRoundType = keyof typeof interviewRoundRegistry;
+export function getInterviewRoundTheme(roundType: InterviewRoundType): InterviewRoundTheme;
+export function getInterviewRoundTheme(
+    roundType: string | null | undefined
+): InterviewRoundTheme | undefined;
+export function getInterviewRoundTheme(
+    roundType: string | null | undefined
+): InterviewRoundTheme | undefined {
+    if (!roundType) return undefined;
+    if (!isInterviewRoundType(roundType)) return undefined;
 
-export function getInterviewRoundTheme(roundType: InterviewRoundType): InterviewRoundTheme {
     return interviewRoundRegistry[roundType];
 }

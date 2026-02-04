@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Application, InterviewRoundType, RoleType } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
@@ -42,16 +42,19 @@ export function PrepDetailPanel({
 }: PrepDetailPanelProps) {
     // Determine role type - try to match from roleType or parse from role string
     const roleType = application.roleType || inferRoleType(application.role);
-    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(
-        application.currentRound || "TechnicalRound1"
-    );
+    const availableRounds = useMemo(() => getAvailableRounds(roleType), [roleType]);
+    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
+        const preferredRound = application.currentRound;
+        if (preferredRound && availableRounds.includes(preferredRound)) return preferredRound;
+
+        return availableRounds[0] ?? "TechnicalRound1";
+    });
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
-    const availableRounds = getAvailableRounds(roleType);
 
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
@@ -60,10 +63,16 @@ export function PrepDetailPanel({
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
 
-    // Reset selected round when application changes
+    // Reset selected round when application changes and keep it within the available rounds
     useEffect(() => {
-        setSelectedRound(application.currentRound || "TechnicalRound1");
-    }, [application.id, application.currentRound]);
+        const preferredRound = application.currentRound;
+        const nextSelectedRound =
+            preferredRound && availableRounds.includes(preferredRound)
+                ? preferredRound
+                : (availableRounds[0] ?? "TechnicalRound1");
+
+        setSelectedRound(nextSelectedRound);
+    }, [application.id, application.currentRound, availableRounds]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
