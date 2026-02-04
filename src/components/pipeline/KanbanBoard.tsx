@@ -251,8 +251,7 @@ export function KanbanBoard() {
                                                     onClick={(e) => handleCardClick(app, e)}
                                                     className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
                                                         ? "border-orange-300 ring-2 ring-orange-100"
-                                                        : "border-gray-200 hover:border-indigo-300"}
-                                                        `}
+                                                        : "border-gray-200 hover:border-indigo-300"}`}
                                                 >
                                                     {/* Click hint */}
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
