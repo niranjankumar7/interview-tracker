@@ -9,6 +9,7 @@ import {
   differenceInDays,
   format,
   isAfter,
+  isValid,
   parseISO,
   startOfDay,
   startOfWeek,
@@ -72,6 +73,7 @@ function Card({
 }
 
 function computeCompletionStats(sprints: Sprint[]) {
+  // Map keys are normalized to local `yyyy-MM-dd` strings.
   const activityCounts = new Map<string, number>();
   const topicsByDate = new Map<string, Set<string>>();
 
@@ -180,7 +182,7 @@ export default function DashboardPage() {
       .flatMap((app) => {
         if (!app.interviewDate) return [];
         const interviewDate = parseISO(app.interviewDate);
-        if (!isAfter(interviewDate, today)) return [];
+        if (!isValid(interviewDate) || !isAfter(interviewDate, today)) return [];
         return [
           {
             app,

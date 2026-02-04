@@ -92,7 +92,6 @@ export const useStore = create<AppState>()(
 
                 set((state) => {
                     let delta = 0;
-                    let didToggle = false;
 
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -106,7 +105,6 @@ export const useStore = create<AppState>()(
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
                                     const nextCompleted = !task.completed;
-                                    didToggle = true;
                                     delta = nextCompleted ? 1 : -1;
                                     return { ...task, completed: nextCompleted };
                                 });
@@ -122,7 +120,7 @@ export const useStore = create<AppState>()(
                         return { ...sprint, dailyPlans };
                     });
 
-                    if (!didToggle) {
+                    if (delta === 0) {
                         return { sprints: state.sprints, progress: state.progress };
                     }
 
