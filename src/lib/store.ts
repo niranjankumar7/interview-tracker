@@ -37,7 +37,7 @@ const initialProgress: UserProgress = {
 
 export const useStore = create<AppState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             applications: [],
             sprints: [],
             questions: [],
@@ -78,7 +78,18 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const snapshot = get();
+                const snapshotTask = snapshot.sprints
+                    .find((s) => s.id === sprintId)
+                    ?.dailyPlans?.[dayIndex]
+                    ?.blocks?.[blockIndex]
+                    ?.tasks?.[taskIndex];
+
+                if (!snapshotTask) {
+                    return;
+                }
+
                 set((state) => {
                     const targetSprint = state.sprints.find((s) => s.id === sprintId);
                     const day = targetSprint?.dailyPlans[dayIndex];
@@ -86,10 +97,11 @@ export const useStore = create<AppState>()(
                     const task = block?.tasks[taskIndex];
 
                     if (!targetSprint || !day || !block || !task) {
-                        return {};
+                        return { sprints: state.sprints, progress: state.progress };
                     }
 
-                    const delta = task.completed ? -1 : 1;
+                    const nextCompleted = !task.completed;
+                    const delta = nextCompleted ? 1 : -1;
 
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -120,11 +132,12 @@ export const useStore = create<AppState>()(
                         sprints,
                         progress: {
                             ...state.progress,
-                            lastActiveDate: delta > 0 ? new Date().toISOString() : state.progress.lastActiveDate,
+                            lastActiveDate: nextCompleted ? new Date().toISOString() : state.progress.lastActiveDate,
                             totalTasksCompleted: Math.max(0, state.progress.totalTasksCompleted + delta)
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({

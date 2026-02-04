@@ -71,60 +71,62 @@ function Card({
   );
 }
 
-type CompletedTopic = {
-  date: string;
-  topic: string;
-};
-
-function computeCompletedTopics(sprints: Sprint[]): CompletedTopic[] {
-  const completedTopics: CompletedTopic[] = [];
+function computeCompletionStats(sprints: Sprint[]) {
+  const activityCounts = new Map<string, number>();
+  const topicsByDate = new Map<string, Set<string>>();
 
   for (const sprint of sprints) {
     for (const plan of sprint.dailyPlans) {
+      const key = format(startOfDay(parseISO(plan.date)), "yyyy-MM-dd");
+
       for (const block of plan.blocks) {
         for (const task of block.tasks) {
           if (!task.completed) continue;
-          completedTopics.push({
-            date: plan.date,
-            topic: task.category || "General",
-          });
+
+          activityCounts.set(key, (activityCounts.get(key) ?? 0) + 1);
+
+          const topic = task.category?.trim() || "General";
+          const set = topicsByDate.get(key) ?? new Set<string>();
+          set.add(topic);
+          topicsByDate.set(key, set);
         }
       }
     }
   }
 
-  return completedTopics;
-}
-
-function getActivityCountsByDate(completedTopics: CompletedTopic[]) {
-  const counts = new Map<string, number>();
-  for (const entry of completedTopics) {
-    const key = format(startOfDay(parseISO(entry.date)), "yyyy-MM-dd");
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-function getTopicCountsByDate(completedTopics: CompletedTopic[]) {
-  const topicsByDate = new Map<string, Set<string>>();
-  for (const entry of completedTopics) {
-    const key = format(startOfDay(parseISO(entry.date)), "yyyy-MM-dd");
-    const topic = entry.topic?.trim() || "General";
-    const set = topicsByDate.get(key) ?? new Set<string>();
-    set.add(topic);
-    topicsByDate.set(key, set);
-  }
-
-  const counts = new Map<string, number>();
+  const topicCounts = new Map<string, number>();
   for (const [key, topics] of topicsByDate.entries()) {
-    counts.set(key, topics.size);
+    topicCounts.set(key, topics.size);
   }
-  return counts;
+
+  return { activityCounts, topicCounts };
 }
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    setMounted(true);
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const scheduleNextTick = () => {
+      const current = new Date();
+      const nextMidnight = startOfDay(addDays(current, 1));
+      const msUntilNextMidnight = Math.max(0, nextMidnight.getTime() - current.getTime() + 1000);
+      timeoutId = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextTick();
+      }, msUntilNextMidnight);
+      return timeoutId;
+    };
+
+    scheduleNextTick();
+    return () => {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   const applications = useStore((s) => s.applications);
   const sprints = useStore((s) => s.sprints);
@@ -132,18 +134,10 @@ export default function DashboardPage() {
   const loadDemoData = useStore((s) => s.loadDemoData);
   const resetData = useStore((s) => s.resetData);
 
-  const now = useMemo(() => new Date(), []);
   const today = useMemo(() => startOfDay(now), [now]);
 
-  const completedTopics = useMemo(() => computeCompletedTopics(sprints), [sprints]);
-
-  const completedTopicCountsByDate = useMemo(() => {
-    return getTopicCountsByDate(completedTopics);
-  }, [completedTopics]);
-
-  const completedActivityCountsByDate = useMemo(() => {
-    return getActivityCountsByDate(completedTopics);
-  }, [completedTopics]);
+  const { activityCounts: completedActivityCountsByDate, topicCounts: completedTopicCountsByDate } =
+    useMemo(() => computeCompletionStats(sprints), [sprints]);
 
   const topicProgressSeries = useMemo(() => {
     const start = subDays(today, 29);
@@ -179,23 +173,20 @@ export default function DashboardPage() {
   }, [applications]);
 
   const upcomingInterviews = useMemo(() => {
-    const upcoming = applications
-      .filter((app) => {
-        if (!app.interviewDate) return false;
-        return isAfter(parseISO(app.interviewDate), today);
+    return applications
+      .flatMap((app) => {
+        if (!app.interviewDate) return [];
+        const interviewDate = parseISO(app.interviewDate);
+        if (!isAfter(interviewDate, today)) return [];
+        return [
+          {
+            app,
+            interviewDate,
+            daysLeft: differenceInDays(interviewDate, today),
+          },
+        ];
       })
-      .map((app) => ({
-        app,
-        interviewDate: parseISO(app.interviewDate!),
-      }))
-      .map(({ app, interviewDate }) => ({
-        app,
-        interviewDate,
-        daysLeft: differenceInDays(interviewDate, today),
-      }))
       .sort((a, b) => a.daysLeft - b.daysLeft);
-
-    return upcoming;
   }, [applications, today]);
 
   const heatmap = useMemo(() => {
@@ -220,10 +211,11 @@ export default function DashboardPage() {
 
   const totalActivityLastYear = useMemo(() => {
     const rangeStart = startOfWeek(subDays(today, 364), { weekStartsOn: 0 });
+    const rangeStartKey = format(rangeStart, "yyyy-MM-dd");
+    const todayKey = format(today, "yyyy-MM-dd");
     let total = 0;
     for (const [key, count] of completedActivityCountsByDate.entries()) {
-      const date = startOfDay(parseISO(key));
-      if (date.getTime() < rangeStart.getTime() || date.getTime() > today.getTime()) {
+      if (key < rangeStartKey || key > todayKey) {
         continue;
       }
       total += count;
@@ -437,14 +429,15 @@ export default function DashboardPage() {
                                     : "bg-green-500";
 
                           const title = cell.isFuture
-                            ? `${format(cell.date, "MMM d, yyyy")}: upcoming`
+                            ? undefined
                             : `${format(cell.date, "MMM d, yyyy")}: ${cell.count} task${cell.count === 1 ? "" : "s"}`;
 
                           return (
                             <div
                               key={cell.key}
                               title={title}
-                              className={`w-3.5 h-3.5 rounded-sm ${cell.isFuture ? "bg-transparent" : level}`}
+                              aria-hidden={cell.isFuture || undefined}
+                              className={`w-3.5 h-3.5 rounded-sm ${cell.isFuture ? "bg-transparent pointer-events-none" : level}`}
                             />
                           );
                         })}
