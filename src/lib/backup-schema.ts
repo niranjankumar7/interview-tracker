@@ -31,9 +31,11 @@ const applicationSchema = z.object({
   id: z.string(),
   company: z.string(),
   role: z.string(),
+  roleType: z.enum(ROLE_TYPES).optional(),
   status: applicationStatusSchema,
   applicationDate: dateStringSchema,
   interviewDate: dateStringSchema.optional(),
+  currentRound: z.enum(INTERVIEW_ROUND_TYPES).optional(),
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
   createdAt: dateStringSchema,
@@ -93,13 +95,20 @@ const userProgressSchema = z.object({
   totalTasksCompleted: z.number(),
 }).strict();
 
+const completedTopicSchema = z.object({
+  topicName: z.string(),
+  displayName: z.string().optional(),
+  completedAt: dateStringSchema,
+  source: z.enum(["chat", "manual"]),
+}).strict();
+
 // v1 backups are intentionally strict; unknown fields fail validation.
 export const storeBackupSchema = z.object({
   version: z.literal(1),
   applications: z.array(applicationSchema),
   sprints: z.array(sprintSchema),
   questions: z.array(questionSchema),
-  completedTopics: z.array(z.string()),
+  completedTopics: z.array(completedTopicSchema),
   progress: userProgressSchema,
 }).strict();
 

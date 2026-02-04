@@ -7,7 +7,8 @@ import { z } from "zod";
 
 import { storeBackupSchema, type StoreBackup } from "@/lib/backup-schema";
 import { useStore } from "@/lib/store";
-import type { Application, Question, Sprint, UserProgress } from "@/types";
+import { normalizeTopic } from "@/lib/topic-matcher";
+import type { Application, CompletedTopic, Question, Sprint, UserProgress } from "@/types";
 
 type ImportMode = "replace" | "merge";
 
@@ -25,21 +26,36 @@ function upsertById<T extends { id: string }>(
   return Array.from(byId.values());
 }
 
-function normalizeCompletedTopics(topics: string[]): string[] {
-  // Topics are treated as stable identifiers; whitespace is trimmed and empty
-  // values are discarded.
-  const seen = new Set<string>();
-  const normalized: string[] = [];
+function normalizeCompletedTopics(topics: CompletedTopic[]): CompletedTopic[] {
+  const byName = new Map<string, CompletedTopic>();
 
   for (const topic of topics) {
-    const value = topic.trim();
-    if (!value) continue;
-    if (seen.has(value)) continue;
-    seen.add(value);
-    normalized.push(value);
+    const rawName = topic.topicName || topic.displayName || "";
+    const topicName = normalizeTopic(rawName);
+    if (!topicName) continue;
+
+    const displayName = topic.displayName?.trim();
+    const next: CompletedTopic = {
+      topicName,
+      displayName: displayName ? displayName : undefined,
+      completedAt: topic.completedAt,
+      source: topic.source,
+    };
+
+    const existing = byName.get(topicName);
+    if (!existing) {
+      byName.set(topicName, next);
+      continue;
+    }
+
+    const existingTime = Date.parse(existing.completedAt);
+    const nextTime = Date.parse(next.completedAt);
+    if (!Number.isFinite(existingTime) || nextTime >= existingTime) {
+      byName.set(topicName, next);
+    }
   }
 
-  return normalized;
+  return Array.from(byName.values());
 }
 
 function trapFocusInModal(event: KeyboardEvent<HTMLElement>) {
