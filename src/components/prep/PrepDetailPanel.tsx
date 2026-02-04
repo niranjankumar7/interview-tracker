@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InterviewRoundType, RoleType } from "@/types";
+import { useState, useEffect } from "react";
+import { Application, InterviewRoundType, RoleType } from "@/types";
+import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
     getAvailableRounds,
@@ -22,7 +25,9 @@ import {
     HelpCircle,
     Target,
     Loader2,
+    AlertTriangle,
 } from "lucide-react";
+import { getMissingPrerequisites } from "@/services/PrepValidator";
 
 interface PrepDetailPanelProps {
     appId: string;
@@ -49,6 +54,16 @@ export function PrepDetailPanel({
 
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
+    // Determine role type - try to match from roleType or parse from role string
+    const roleType = application.roleType || inferRoleType(application.role);
+    const availableRounds = getAvailableRounds(roleType);
+    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
+        const rounds = getAvailableRounds(roleType);
+        const preferredRound = application.currentRound;
+        if (preferredRound && rounds.includes(preferredRound)) return preferredRound;
+
+        return rounds[0] ?? "TechnicalRound1";
+    });
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
@@ -57,6 +72,8 @@ export function PrepDetailPanel({
     // Only the latest scrape request is allowed to update local state.
     const activeScrapeAbortController = useRef<AbortController | null>(null);
     const scrapeRequestId = useRef(0);
+    const prepContent = getRoundPrepContent(roleType, selectedRound);
+    const availableRounds = getAvailableRounds(roleType);
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -114,6 +131,17 @@ export function PrepDetailPanel({
             : defaultRound;
 
     const scrapeKey = isOpen && company && role ? `${appId}|${company}|${role}|${roleType}|${selectedRound}` : null;
+    // Reset selected round when application changes and keep it within the available rounds
+    useEffect(() => {
+        const rounds = getAvailableRounds(roleType);
+        const preferredRound = application.currentRound;
+        const nextSelectedRound =
+            preferredRound && rounds.includes(preferredRound)
+                ? preferredRound
+                : (rounds[0] ?? "TechnicalRound1");
+
+        setSelectedRound(nextSelectedRound);
+    }, [application.id, application.currentRound, roleType]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
@@ -233,18 +261,25 @@ export function PrepDetailPanel({
                 {/* Round Selector Tabs */}
                 <div className="border-b bg-gray-50 px-6 py-3">
                     <div className="flex gap-2 overflow-x-auto">
-                        {availableRounds.map((round) => (
-                            <button
-                                key={round.value}
-                                onClick={() => handleRoundChange(round.value)}
-                                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${selectedRound === round.value
-                                    ? "bg-indigo-600 text-white shadow-md"
-                                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-                                    }`}
-                            >
-                                {round.label}
-                            </button>
-                        ))}
+                        {availableRounds.map((roundType) => {
+                            const roundTheme = getInterviewRoundTheme(roundType);
+                            const RoundIcon = roundTheme.icon;
+                            const isSelected = selectedRound === roundType;
+
+                            return (
+                                <button
+                                    key={roundType}
+                                    onClick={() => handleRoundChange(roundType)}
+                                    className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex items-center gap-2 ${isSelected
+                                        ? roundTheme.tabActiveClassName
+                                        : roundTheme.tabInactiveClassName
+                                        }`}
+                                >
+                                    <RoundIcon className="w-4 h-4" />
+                                    {roundTheme.label}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -285,11 +320,24 @@ export function PrepDetailPanel({
                                     Key Topics to Prepare
                                 </h3>
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    {prepContent.keyTopics.map((topic, idx) => {
+                                    {prepContent.keyTopics.map((topic) => {
                                         const completion = isTopicCompleted(topic.name);
+                                        const missingPrerequisites = completion.completed
+                                            ? getMissingPrerequisites(topic.name, getTopicCompletion)
+                                            : [];
+                                        const hasMissingPrerequisites = missingPrerequisites.length > 0;
+                                        const missingPrerequisitesLabel = hasMissingPrerequisites
+                                            ? `Missing prerequisite${missingPrerequisites.length === 1 ? "" : "s"}: ${missingPrerequisites.join(
+                                                ", "
+                                            )}`
+                                            : "";
+                                        const missingPrerequisitesTooltipId = `missing-prerequisites-${topic.name
+                                            .replace(/[^a-z0-9]+/gi, "-")
+                                            .toLowerCase()}`;
+
                                         return (
                                             <div
-                                                key={idx}
+                                                key={topic.name}
                                                 className={`rounded-xl p-4 border transition-all ${completion.completed
                                                     ? "bg-green-50 border-green-300 ring-2 ring-green-200"
                                                     : topic.priority === "high"
@@ -307,6 +355,25 @@ export function PrepDetailPanel({
                                                         <h4 className={`font-semibold ${completion.completed ? "text-green-800" : "text-gray-800"}`}>
                                                             {topic.name}
                                                         </h4>
+                                                        {completion.completed && hasMissingPrerequisites && (
+                                                            <span className="relative inline-flex items-center group">
+                                                                <button
+                                                                    type="button"
+                                                                    className="inline-flex items-center text-amber-600"
+                                                                    aria-describedby={missingPrerequisitesTooltipId}
+                                                                >
+                                                                    <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+                                                                    <span className="sr-only">{missingPrerequisitesLabel}</span>
+                                                                </button>
+                                                                <span
+                                                                    id={missingPrerequisitesTooltipId}
+                                                                    role="tooltip"
+                                                                    className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-max max-w-[240px] -translate-x-1/2 whitespace-normal rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                                                >
+                                                                    {missingPrerequisitesLabel}
+                                                                </span>
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {completion.completed ? (
                                                         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">

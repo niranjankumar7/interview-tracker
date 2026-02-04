@@ -677,18 +677,13 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
             class:
               "mention resource inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
           },
-          suggestion: createResourceMentionConfig(
-            stableSearchResources,
-            handleResourceSelect,
-            resourceRef,
-          ),
+          // TipTap suggestion configs are created during render but only read refs
+          // in event handlers (ESLint false positive).
+          suggestion: createResourceMentionConfig(stableSearchResources, handleResourceSelect, resourceRef),
           renderLabel: ({ node }) => `@${(node.attrs.label as string) ?? ""}`,
         }),
-        createPromptCommandExtension(
-          stableSearchPrompts,
-          handlePromptSelect,
-          promptRef,
-        ),
+        // TipTap extension creation closes over refs; refs are only read during events.
+        createPromptCommandExtension(stableSearchPrompts, handlePromptSelect, promptRef),
       ],
       content: value,
       editable: !disabled,

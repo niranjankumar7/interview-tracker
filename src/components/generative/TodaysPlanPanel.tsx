@@ -10,6 +10,7 @@ import {
     Target,
     Calendar,
 } from "lucide-react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -18,20 +19,94 @@ export const todaysPlanPanelSchema = z.object({
         .boolean()
         .optional()
         .describe("Whether to show all active sprints or just the first one"),
+    focusApplicationId: z
+        .string()
+        .optional()
+        .describe(
+            "Optional application ID to show first (useful when deep-linking from notifications)"
+        ),
 });
 
 interface TodaysPlanPanelProps {
     showAll?: boolean;
+    focusApplicationId?: string;
 }
 
-export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
+type TopicMatcher = {
+    needle: string;
+    regex: RegExp | null;
+};
+
+function escapeRegExp(value: string): string {
+    // Escape topic text so it can be safely embedded in a RegExp.
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildTopicMatcher(topic: string): TopicMatcher {
+    const needle = topic.toLowerCase();
+
+    if (needle.length <= 3) {
+        // Avoid overly-permissive substring matches for short topics (e.g. "SQL" in "sequel").
+        return {
+            needle,
+            regex: new RegExp(
+                `(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`
+            ),
+        };
+    }
+
+    return { needle, regex: null };
+}
+
+export function TodaysPlanPanel({
+    showAll = true,
+    focusApplicationId,
+}: TodaysPlanPanelProps) {
     const sprints = useStore((state) => state.sprints);
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
     const progress = useStore((state) => state.progress);
 
+    const struggledTopicMatchersByAppId = useMemo(() => {
+        // Precompute once per applications update to avoid per-task lowercasing and repeated scans.
+        const result = new Map<string, TopicMatcher[]>();
+
+        for (const app of applications) {
+            const topics = [
+                ...new Set(
+                    (app.rounds ?? []).flatMap(
+                        (r) => r.feedback?.struggledTopics ?? []
+                    )
+                ),
+            ];
+
+            const matchers = topics.map(buildTopicMatcher).filter((m) => m.needle.length > 0);
+
+            result.set(app.id, matchers);
+        }
+
+        return result;
+    }, [applications]);
+
     // Find active sprints
     const activeSprints = sprints.filter((s) => s.status === "active");
+
+    const orderedSprints = focusApplicationId
+        ? (() => {
+            const focused: typeof activeSprints = [];
+            const others: typeof activeSprints = [];
+
+            for (const sprint of activeSprints) {
+                if (sprint.applicationId === focusApplicationId) {
+                    focused.push(sprint);
+                } else {
+                    others.push(sprint);
+                }
+            }
+
+            return [...focused, ...others];
+        })()
+        : activeSprints;
 
     if (activeSprints.length === 0) {
         return (
@@ -50,7 +125,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
         );
     }
 
-    const sprintsToShow = showAll ? activeSprints : [activeSprints[0]];
+    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]];
 
     return (
         <div className="space-y-6 max-w-lg">
@@ -73,6 +148,8 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
 
             {sprintsToShow.map((sprint) => {
                 const app = applications.find((a) => a.id === sprint.applicationId);
+                const struggledTopicMatchers =
+                    struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
                 const todaysPlan = sprint.dailyPlans.find((plan) =>
                     isToday(parseISO(plan.date))
                 );
@@ -180,8 +257,22 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
                                     </div>
 
                                     <ul className="space-y-2">
-                                        {block.tasks.map((task, taskIdx) => (
-                                            <li key={task.id} className="flex items-start gap-3">
+                                        {block.tasks.map((task, taskIdx) => {
+                                            const categoryLower = (task.category ?? "").toLowerCase();
+                                            const descriptionLower = (task.description ?? "").toLowerCase();
+
+                                            const struggledMatch =
+                                                struggledTopicMatchers.length > 0 &&
+                                                struggledTopicMatchers.some((matcher) => {
+                                                    if (categoryLower === matcher.needle) return true;
+
+                                                    return matcher.regex
+                                                        ? matcher.regex.test(descriptionLower)
+                                                        : descriptionLower.includes(matcher.needle);
+                                                });
+
+                                            return (
+                                                <li key={task.id} className="flex items-start gap-3">
                                                 <button
                                                     onClick={() => {
                                                         completeTask(sprint.id, dayIndex, blockIdx, taskIdx);
@@ -198,12 +289,16 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
                                                     className={`text-sm ${task.completed
                                                             ? "line-through text-gray-400"
                                                             : "text-gray-700"
+                                                        } ${struggledMatch && !task.completed
+                                                            ? "bg-yellow-50 border border-yellow-200 rounded px-2 py-1"
+                                                            : ""
                                                         }`}
                                                 >
                                                     {task.description}
                                                 </span>
                                             </li>
-                                        ))}
+                                            );
+                                        })}
                                     </ul>
                                 </div>
                             ))}

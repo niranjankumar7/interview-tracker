@@ -1,7 +1,57 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress, CompletedTopic } from '@/types';
+import { isToday, isYesterday, parseISO } from 'date-fns';
+import {
+    Application,
+    InterviewRound,
+    Sprint,
+    Question,
+    UserProgress,
+    UserProfile,
+    AppPreferences,
+    CompletedTopic,
+} from '@/types';
+import { APP_VERSION } from '@/lib/constants';
+import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+
+export type AppDataSnapshot = {
+    applications: Application[];
+    sprints: Sprint[];
+    questions: Question[];
+    progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
+    completedTopics: CompletedTopic[];
+};
+
+export type AppDataExport = {
+    version: string;
+    exportedAt: string;
+    snapshot: AppDataSnapshot;
+};
+
+type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
+    Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
+
+type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
+    rounds?: InterviewRoundPatch[];
+};
+
+function mergeRoundFeedback(
+    prev: InterviewRound['feedback'] | undefined,
+    next: InterviewRound['feedback'] | undefined
+): InterviewRound['feedback'] | undefined {
+    if (!next) return prev;
+    if (!prev) return next;
+    return {
+        rating: next.rating ?? prev.rating,
+        pros: next.pros ?? prev.pros,
+        cons: next.cons ?? prev.cons,
+        struggledTopics: next.struggledTopics ?? prev.struggledTopics,
+        notes: next.notes ?? prev.notes,
+    };
+}
 
 interface AppState {
     // Data
@@ -9,11 +59,32 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    hasHydrated: boolean;
+
+    setHasHydrated: (hasHydrated: boolean) => void;
 
     // Actions
     addApplication: (app: Application) => void;
-    updateApplication: (id: string, updates: Partial<Application>) => void;
+
+    /**
+     * Attempts to add a new interview round. Returns `true` on success.
+     * Returns `false` if a round with the same `roundNumber` already exists.
+     */
+    addInterviewRound: (applicationId: string, round: InterviewRound) => boolean;
+    /**
+     * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
+     * patch merged into an existing round matched by `roundNumber`.
+     *
+     * To add new rounds, use `addInterviewRound`. If `feedback` is provided, it is merged field-
+     * by-field, so omitted fields preserve existing values.
+     */
+    updateApplication: (
+        id: string,
+        updates: ApplicationUpdate
+    ) => void;
     deleteApplication: (id: string) => void;
 
     addSprint: (sprint: Sprint) => void;
@@ -21,9 +92,16 @@ interface AppState {
 
     addQuestion: (question: Question) => void;
 
-    completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
+    completeTask: (
+        sprintId: string,
+        dayIndex: number,
+        blockIndex: number,
+        taskIndex: number
+    ) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
+    updateProfile: (updates: Partial<UserProfile>) => void;
+    updatePreferences: (updates: Partial<AppPreferences>) => void;
 
     // Topic progress tracking
     markTopicComplete: (topicName: string, source?: 'chat' | 'manual') => void;
@@ -33,14 +111,41 @@ interface AppState {
     // Utilities
     loadDemoData: () => void;
     resetData: () => void;
+    exportData: () => AppDataExport;
+    importData: (data: unknown) => void;
 }
 
-const initialProgress: UserProgress = {
+const getInitialProgress = (): UserProgress => ({
     currentStreak: 0,
     longestStreak: 0,
     lastActiveDate: new Date().toISOString(),
     totalTasksCompleted: 0,
-};
+});
+
+const getResetProgress = (): UserProgress => ({
+    currentStreak: 0,
+    longestStreak: 0,
+    // Use epoch as a sentinel for a fully reset state.
+    lastActiveDate: new Date(0).toISOString(),
+    totalTasksCompleted: 0,
+});
+
+const getInitialProfile = (): UserProfile => ({
+    name: '',
+    targetRole: '',
+    experienceLevel: 'Mid',
+});
+
+const getInitialPreferences = (): AppPreferences => ({
+    theme: 'system',
+    studyRemindersEnabled: false,
+});
+
+function safeParseISO(value: string | undefined): Date | null {
+    if (!value) return null;
+    const parsed = parseISO(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 export const useStore = create<AppState>()(
     persist(
@@ -48,19 +153,99 @@ export const useStore = create<AppState>()(
             applications: [],
             sprints: [],
             questions: [],
-            progress: initialProgress,
+            progress: getInitialProgress(),
+            profile: getInitialProfile(),
+            preferences: getInitialPreferences(),
             completedTopics: [],
+            hasHydrated: false,
+
+            setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
             addApplication: (app) =>
                 set((state) => ({
                     applications: [...state.applications, app]
                 })),
 
+            addInterviewRound: (applicationId, round) => {
+                let didAdd = false;
+
+                set((state) => ({
+                    applications: state.applications.map((app) => {
+                        if (app.id !== applicationId) return app;
+
+                        const existingRound = (app.rounds ?? []).some(
+                            (r) => r.roundNumber === round.roundNumber
+                        );
+
+                        if (existingRound) {
+                            const message = `addInterviewRound: duplicate roundNumber ${round.roundNumber} for application ${applicationId}`;
+                            console.error(message, {
+                                applicationId,
+                                roundNumber: round.roundNumber,
+                                round,
+                            });
+                            return app;
+                        }
+
+                        didAdd = true;
+                        const rounds = [...(app.rounds ?? []), round].sort(
+                            (a, b) => a.roundNumber - b.roundNumber
+                        );
+                        return { ...app, rounds };
+                    }),
+                }));
+
+                return didAdd;
+            },
+
             updateApplication: (id, updates) =>
                 set((state) => ({
-                    applications: state.applications.map(app =>
-                        app.id === id ? { ...app, ...updates } : app
-                    )
+                    applications: state.applications.map((app) => {
+                        if (app.id !== id) return app;
+
+                        const { rounds: roundUpdates, ...topLevelUpdates } = updates;
+                        if (!roundUpdates || roundUpdates.length === 0) {
+                            return { ...app, ...topLevelUpdates };
+                        }
+
+                        const nextRounds = [...(app.rounds ?? [])];
+                        for (const roundUpdate of roundUpdates) {
+                            const idx = nextRounds.findIndex(
+                                (r) => r.roundNumber === roundUpdate.roundNumber
+                            );
+
+                            if (idx === -1) {
+                                if (process.env.NODE_ENV !== 'production') {
+                                    console.warn(
+                                        'updateApplication: tried to update missing round',
+                                        {
+                                            applicationId: id,
+                                            roundNumber: roundUpdate.roundNumber,
+                                        }
+                                    );
+                                }
+                                continue;
+                            }
+
+                            const prev = nextRounds[idx];
+                            nextRounds[idx] = {
+                                ...prev,
+                                ...roundUpdate,
+                                feedback: mergeRoundFeedback(
+                                    prev.feedback,
+                                    roundUpdate.feedback
+                                ),
+                            };
+                        }
+
+                        nextRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+                        return {
+                            ...app,
+                            ...topLevelUpdates,
+                            rounds: nextRounds,
+                        };
+                    }),
                 })),
 
             deleteApplication: (id) =>
@@ -86,7 +271,14 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const existingTask =
+                    get()
+                        .sprints.find((sprint) => sprint.id === sprintId)
+                        ?.dailyPlans[dayIndex]?.blocks[blockIndex]?.tasks[taskIndex];
+
+                if (!existingTask || existingTask.completed) return;
+
                 set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -99,7 +291,7 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+                                    return { ...task, completed: true };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -110,21 +302,58 @@ export const useStore = create<AppState>()(
                             return { ...day, blocks, completed: dayCompleted };
                         });
 
-                        return { ...sprint, dailyPlans };
+                        const isSprintCompleted = dailyPlans.every((d) => d.completed);
+
+                        const nextStatus: Sprint["status"] =
+                            sprint.status === 'completed'
+                                ? 'completed'
+                                : isSprintCompleted
+                                    ? 'completed'
+                                    : sprint.status;
+
+                        return { ...sprint, dailyPlans, status: nextStatus };
                     });
+
+                    const now = new Date();
+                    const lastActive = safeParseISO(state.progress.lastActiveDate);
+
+                    let nextStreak = state.progress.currentStreak;
+                    if (lastActive && isToday(lastActive)) {
+                        nextStreak = Math.max(1, nextStreak);
+                    } else if (lastActive && isYesterday(lastActive)) {
+                        nextStreak = nextStreak + 1;
+                    } else {
+                        nextStreak = 1;
+                    }
+
+                    const nextLongest = Math.max(state.progress.longestStreak, nextStreak);
 
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
+                            currentStreak: nextStreak,
+                            longestStreak: nextLongest,
+                            lastActiveDate: now.toISOString(),
                             totalTasksCompleted: state.progress.totalTasksCompleted + 1
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({
                     progress: { ...state.progress, ...updates }
+                })),
+
+            updateProfile: (updates) =>
+                set((state) => ({
+                    profile: { ...state.profile, ...updates }
+                })),
+
+            updatePreferences: (updates) =>
+                set((state) => ({
+                    preferences: { ...state.preferences, ...updates }
                 })),
 
             // Topic progress tracking
@@ -135,7 +364,7 @@ export const useStore = create<AppState>()(
                     set((state) => ({
                         completedTopics: [...state.completedTopics, {
                             topicName: normalized,
-                            displayName: topicName, // Preserve original for display
+                            displayName: topicName,
                             completedAt: new Date().toISOString(),
                             source
                         }]
@@ -222,6 +451,7 @@ export const useStore = create<AppState>()(
                     applications: demoApplications,
                     sprints: [],
                     questions: demoQuestions,
+                    completedTopics: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -235,12 +465,55 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress,
+                progress: getResetProgress(),
+                profile: getInitialProfile(),
+                preferences: getInitialPreferences(),
                 completedTopics: [],
             }),
+
+            exportData: () => {
+                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
+                return {
+                    version: APP_VERSION,
+                    exportedAt: new Date().toISOString(),
+                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
+                };
+            },
+
+            importData: (data) => {
+                const exportParse = appDataExportSchema.safeParse(data);
+                if (exportParse.success) {
+                    set(exportParse.data.snapshot);
+                    return;
+                }
+
+                const snapshotParse = appDataSnapshotSchema.safeParse(data);
+                if (snapshotParse.success) {
+                    set(snapshotParse.data);
+                    return;
+                }
+
+                const issue = exportParse.error.issues[0] ?? snapshotParse.error.issues[0];
+                const defaultWhere = exportParse.error.issues[0] ? 'data' : 'snapshot';
+                const where = issue?.path?.length ? issue.path.join('.') : defaultWhere;
+                const message = issue?.message ?? 'File does not match expected export format';
+                throw new Error(`${where}: ${message}`);
+            },
         }),
         {
             name: 'interview-prep-storage',
+            partialize: (state) => ({
+                applications: state.applications,
+                sprints: state.sprints,
+                questions: state.questions,
+                progress: state.progress,
+                profile: state.profile,
+                preferences: state.preferences,
+                completedTopics: state.completedTopics,
+            }),
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

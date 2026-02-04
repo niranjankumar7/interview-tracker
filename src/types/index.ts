@@ -1,34 +1,64 @@
 // Core type definitions for Interview Prep Tracker
 
-export type ApplicationStatus =
-    | 'applied'
-    | 'shortlisted'
-    | 'interview'
-    | 'offer'
-    | 'rejected';
+export const APPLICATION_STATUSES = [
+    'applied',
+    'shortlisted',
+    'interview',
+    'offer',
+    'rejected',
+] as const;
+
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 // Extended to 10 role types for comprehensive prep templates
-export type RoleType =
-    | 'SDE'
-    | 'SDET'
-    | 'ML'
-    | 'DevOps'
-    | 'Frontend'
-    | 'Backend'
-    | 'FullStack'
-    | 'Data'
-    | 'PM'
-    | 'MobileEngineer';
+export const ROLE_TYPES = [
+    'SDE',
+    'SDET',
+    'ML',
+    'DevOps',
+    'Frontend',
+    'Backend',
+    'FullStack',
+    'Data',
+    'PM',
+    'MobileEngineer',
+] as const;
+
+export type RoleType = (typeof ROLE_TYPES)[number];
 
 // Interview round types for round-specific prep
-export type InterviewRoundType =
-    | 'HR'
-    | 'TechnicalRound1'
-    | 'TechnicalRound2'
-    | 'SystemDesign'
-    | 'Managerial'
-    | 'Assignment'
-    | 'Final';
+export const INTERVIEW_ROUND_TYPES = [
+    'HR',
+    'TechnicalRound1',
+    'TechnicalRound2',
+    'SystemDesign',
+    'Managerial',
+    'Assignment',
+    'Final',
+] as const;
+
+export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+
+export const FOCUS_AREAS = ['DSA', 'SystemDesign', 'Behavioral', 'Review', 'Mock'] as const;
+
+export type FocusArea = (typeof FOCUS_AREAS)[number];
+
+export const QUESTION_CATEGORIES = ['DSA', 'SystemDesign', 'Behavioral', 'SQL', 'Other'] as const;
+
+export type QuestionCategory = (typeof QUESTION_CATEGORIES)[number];
+
+export const QUESTION_DIFFICULTIES = ['Easy', 'Medium', 'Hard'] as const;
+
+export type QuestionDifficulty = (typeof QUESTION_DIFFICULTIES)[number];
+
+export const SPRINT_STATUSES = ['active', 'completed', 'expired'] as const;
+
+export type SprintStatus = (typeof SPRINT_STATUSES)[number];
+
+export const BLOCK_TYPES = ['morning', 'evening', 'quick'] as const;
+
+export type BlockType = (typeof BLOCK_TYPES)[number];
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export type FocusArea =
     | 'DSA'
@@ -64,6 +94,13 @@ export interface InterviewRound {
     scheduledDate?: string;
     notes: string;
     questionsAsked: string[];
+    feedback?: {
+        rating: number; // 1-5 stars
+        pros: string[];
+        cons: string[];
+        struggledTopics: string[]; // List of topic names
+        notes: string;
+    };
 }
 
 export interface Sprint {
@@ -73,7 +110,7 @@ export interface Sprint {
     roleType: RoleType;
     totalDays: number;
     dailyPlans: DailyPlan[];
-    status: 'active' | 'completed' | 'expired';
+    status: SprintStatus;
     createdAt: string;
 }
 
@@ -87,7 +124,7 @@ export interface DailyPlan {
 
 export interface Block {
     id: string;
-    type: 'morning' | 'evening' | 'quick';
+    type: BlockType;
     duration: string;
     tasks: Task[];
     completed: boolean;
@@ -105,7 +142,7 @@ export interface Question {
     companyId: string;
     questionText: string;
     category: QuestionCategory;
-    difficulty?: 'Easy' | 'Medium' | 'Hard';
+    difficulty?: QuestionDifficulty;
     askedInRound?: string;
     dateAdded: string;
 }
@@ -115,6 +152,20 @@ export interface UserProgress {
     longestStreak: number;
     lastActiveDate: string;
     totalTasksCompleted: number;
+}
+export type ExperienceLevel = 'Junior' | 'Mid' | 'Senior';
+
+export interface UserProfile {
+    name: string;
+    targetRole: string;
+    experienceLevel: ExperienceLevel;
+}
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export interface AppPreferences {
+    theme: ThemePreference;
+    studyRemindersEnabled: boolean;
 }
 
 // Track completed prep topics globally

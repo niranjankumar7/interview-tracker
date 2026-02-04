@@ -28,7 +28,7 @@ function sanitizeCompanyName(name: string): string {
   if (!name) return '';
 
   // Remove common status suffixes that might be concatenated
-  let cleaned = name
+  const cleaned = name
     .split('|')[0]  // Take content before pipe
     .split(' - ')[0] // Take content before dash separator
     .replace(/\s*(applied|shortlisted|interview|offer|rejected|status)\s*$/i, '') // Remove status keywords
