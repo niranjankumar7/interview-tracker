@@ -21,14 +21,7 @@ export type RoleType =
     | 'MobileEngineer';
 
 // Interview round types for round-specific prep
-export type InterviewRoundType =
-    | 'HR'
-    | 'TechnicalRound1'
-    | 'TechnicalRound2'
-    | 'SystemDesign'
-    | 'Managerial'
-    | 'Assignment'
-    | 'Final';
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export type FocusArea =
     | 'DSA'
