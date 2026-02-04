@@ -86,8 +86,21 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const snapshot = get();
+                const taskExists = snapshot.sprints
+                    .find((s) => s.id === sprintId)
+                    ?.dailyPlans?.[dayIndex]
+                    ?.blocks?.[blockIndex]
+                    ?.tasks?.[taskIndex];
+
+                if (!taskExists) {
+                    return;
+                }
+
                 set((state) => {
+                    let delta = 0;
+
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
 
@@ -99,7 +112,9 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+                                    const nextCompleted = !task.completed;
+                                    delta = nextCompleted ? 1 : -1;
+                                    return { ...task, completed: nextCompleted };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -113,14 +128,20 @@ export const useStore = create<AppState>()(
                         return { ...sprint, dailyPlans };
                     });
 
+                    if (delta === 0) {
+                        return { sprints: state.sprints, progress: state.progress };
+                    }
+
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
-                            totalTasksCompleted: state.progress.totalTasksCompleted + 1
+                            lastActiveDate: delta > 0 ? new Date().toISOString() : state.progress.lastActiveDate,
+                            totalTasksCompleted: Math.max(0, state.progress.totalTasksCompleted + delta)
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({
