@@ -16,6 +16,7 @@ import {
   Upload,
   RotateCcw,
   Database,
+  Calendar,
 } from "lucide-react";
 
 import { useStore } from "@/lib/store";
@@ -35,6 +36,7 @@ import { NativeSelect } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { LeetCodeSyncCard } from "@/components/leetcode";
 
 type ThemeOption = {
   id: ThemePreference;
@@ -72,12 +74,8 @@ export default function SettingsPage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-    setTheme(preferences.theme);
-  }, [mounted, preferences.theme, setTheme]);
-
   const handleThemeChange = (next: ThemePreference) => {
+    setTheme(next);
     updatePreferences({ theme: next });
   };
 
@@ -209,7 +207,9 @@ export default function SettingsPage() {
               <div className="text-sm font-medium">Theme</div>
               <div className="flex flex-wrap gap-2">
                 {themeOptions.map((opt) => {
-                  const selected = preferences.theme === opt.id;
+                  // Use source of truth from next-themes for UI selection
+                  const { theme: currentTheme } = useTheme();
+                  const selected = (currentTheme === opt.id) || (opt.id === 'system' && currentTheme === 'system');
                   const Icon = opt.icon;
                   return (
                     <button
@@ -231,7 +231,7 @@ export default function SettingsPage() {
               </div>
               <div className="text-xs text-muted-foreground">
                 {mounted ? (
-                  <span>Current: {preferences.theme}</span>
+                  <span>Current: {useTheme().theme}</span>
                 ) : (
                   <span>Loading theme…</span>
                 )}
@@ -254,6 +254,60 @@ export default function SettingsPage() {
                   updatePreferences({ studyRemindersEnabled: checked })
                 }
                 aria-label="Enable study reminders"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <LeetCodeSyncCard />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Calendar sync
+            </CardTitle>
+            <CardDescription>
+              Read-only calendar sync to detect interview invites.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+              <div>
+                <div className="text-sm font-medium text-foreground">
+                  Sync your calendar
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Calendar sync is disabled in this branch (already handled in another PR).
+                </div>
+              </div>
+              <Button variant="outline" disabled>
+                Sync calendar
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+              <div>
+                <div className="text-sm font-medium text-foreground">
+                  Auto-sync on login
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  If enabled, we&apos;ll sync your calendar daily when you log in.
+                </div>
+              </div>
+              <Switch
+                checked={preferences.calendarAutoSyncEnabled}
+                onCheckedChange={(checked) => {
+                  if (
+                    checked &&
+                    !confirm(
+                      "Enable daily auto-sync? We'll sync your calendar once per day when you log in."
+                    )
+                  ) {
+                    return;
+                  }
+                  updatePreferences({ calendarAutoSyncEnabled: checked });
+                }}
               />
             </div>
           </CardContent>

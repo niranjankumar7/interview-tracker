@@ -166,6 +166,8 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export interface AppPreferences {
     theme: ThemePreference;
     studyRemindersEnabled: boolean;
+    calendarAutoSyncEnabled: boolean;
+    leetcodeAutoSyncEnabled: boolean;
 }
 
 // Track completed prep topics globally
@@ -174,4 +176,22 @@ export interface CompletedTopic {
     displayName?: string;     // Original display name (for UI)
     completedAt: string;      // ISO date string
     source: 'chat' | 'manual';
+}
+
+export interface LeetCodeConnection {
+    connected: boolean;
+    username?: string;
+    connectedAt?: string;
+    lastSyncAt?: string;
+    readOnly: boolean;
+}
+
+export interface LeetCodeStats {
+    currentStreak: number;
+    longestStreak: number;
+    lastActiveDate?: string;
+    totalSolved: number;
+    easySolved: number;
+    mediumSolved: number;
+    hardSolved: number;
 }

@@ -56,6 +56,15 @@ const interviewRoundSchema = z.object({
   scheduledDate: z.string().optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
+  feedback: z
+    .object({
+      rating: z.number(),
+      pros: z.array(z.string()),
+      cons: z.array(z.string()),
+      struggledTopics: z.array(z.string()),
+      notes: z.string(),
+    })
+    .optional(),
 });
 
 const applicationSchema = z.object({
@@ -132,6 +141,8 @@ const userProfileSchema = z.object({
 const appPreferencesSchema = z.object({
   theme: themePreferenceSchema,
   studyRemindersEnabled: z.boolean(),
+  calendarAutoSyncEnabled: z.boolean().default(false),
+  leetcodeAutoSyncEnabled: z.boolean().default(false),
 });
 
 const completedTopicSchema = z.object({
@@ -139,6 +150,24 @@ const completedTopicSchema = z.object({
   displayName: z.string().optional(),
   completedAt: z.string(),
   source: z.enum(["chat", "manual"]),
+});
+
+const leetcodeConnectionSchema = z.object({
+  connected: z.boolean(),
+  username: z.string().optional(),
+  connectedAt: z.string().optional(),
+  lastSyncAt: z.string().optional(),
+  readOnly: z.boolean(),
+});
+
+const leetcodeStatsSchema = z.object({
+  currentStreak: z.number(),
+  longestStreak: z.number(),
+  lastActiveDate: z.string().optional(),
+  totalSolved: z.number(),
+  easySolved: z.number(),
+  mediumSolved: z.number(),
+  hardSolved: z.number(),
 });
 
 export const appDataSnapshotSchema = z.object({
@@ -149,6 +178,8 @@ export const appDataSnapshotSchema = z.object({
   profile: userProfileSchema,
   preferences: appPreferencesSchema,
   completedTopics: z.array(completedTopicSchema),
+  leetcode: leetcodeConnectionSchema.optional(),
+  leetcodeStats: leetcodeStatsSchema.optional(),
 });
 
 export const appDataExportSchema = z.object({

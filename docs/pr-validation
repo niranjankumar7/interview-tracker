@@ -1,0 +1,75 @@
+Dark Mode & Theme Toggle Walkthrough
+I have successfully fixed the dark mode issues on the Dashboard and implemented a theme toggle for better user control.
+
+Changes
+1. Theme Toggle
+Added a new 
+ThemeToggle
+ component to the top navigation bar. You can now easily switch between Light, Dark, and System themes.
+
+cycled via a sun/moon icon button in the header.
+2. Dashboard Dark Mode
+The Dashboard page (/dashboard) was previously hardcoded to white. I updated it to use theme-aware colors:
+
+Background adapts to theme (Dark/Light).
+Text colors adjust automatically for readability.
+Cards and charts now look consistent in both modes.
+4. Chat Input Visibility
+Fixed an issue where the chat input text was unreadable in dark mode.
+
+Added dark:prose-invert to the text editor to ensure proper typography contrast in dark mode.
+5. Sent Message Visibility
+Fixed an issue where sent message bubbles were white/invisible in dark mode due to undefined custom classes.
+
+Replaced bg-container and bg-backdrop with standard bg-muted and hover:bg-muted/80.
+6. Chat Persistence
+Fixed an issue where chat history was lost when navigating between pages (e.g., to Settings and back).
+
+Lifted 
+TamboProvider
+ to 
+src/app/layout.tsx
+ to maintain state globally.
+Created 
+TamboProviderWrapper
+ to handle client-side configuration.
+Verification Results
+Automated Browser Verification
+I ran a browser session to verify:
+
+Dashboard Appearance: Confirmed the dashboard is no longer "all-white" in dark mode.
+Input Readability: Verified that search bars and chat inputs are readable (light text on dark background).
+Toggle Functionality: Confirmed clicking the toggle switches themes instantly.
+Screenshots
+![Theme Toggle Action](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/.system_generated/click_feedback/click_feedback_1770225578028.png) ![Dashboard Dark Mode](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/.system_generated/click_feedback/click_feedback_1770225682717.png)
+Chat Input Verification
+Typed a test message in Dark Mode.
+Verified that the input background is dark and text is light (readable).
+![Chat Input Dark Mode](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/dark_mode_input_test_1770225945949.png)
+Sent Message Verification
+Confirmed sent message bubbles are clearly visible in Dark Mode (muted grey background).
+Verified text is readable.
+![Sent Message Dark Mode](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/chat_dark_mode_verification_1770227688740.png)
+Chat Persistence Verification
+Confirmed chat messages persist when navigating away from Chat page and returning.
+![Chat Persistence Verified](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/chat_persistence_verified_1770228074531.png)
+Restoration Verification after Branch Reset
+Re-applied all fixes and verified functional state.
+Chat Persistence confirmed with "Restoration Test".
+Dark Mode visibility confirmed.
+Theme Persistence & Toggle Fix
+Issue: Theme reverted to stored preference on navigation; Header toggle was unresponsive.
+Fix:
+Decoupled 
+SettingsPage
+ from forcing stored theme.
+Updated 
+ThemeToggle
+ to sync changes to store.
+Added z-50 to 
+ThemeToggle
+ to fix unresponsiveness.
+Verification: Verified toggling works and persists across 
+/chat
+ and /settings.
+![Theme Toggled Light](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/theme_toggled_light_1770229343235.png) ![Theme Toggled Back](/Users/niranjankumara/.gemini/antigravity/brain/5afaf347-84a7-4c34-a49a-733e1d38f8b6/theme_toggled_back_to_dark_or_light_1770229379301.png)
