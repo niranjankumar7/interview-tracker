@@ -1,0 +1,35 @@
+# Topic Progress Tracker - Implementation Plan
+
+Goal Description:
+Implement a global topic progress tracker that allows users to mark topics as completed via chat, and have this completion reflected across all relevant interview prep details, including the date of completion.
+
+Proposed Changes:
+
+1. Types Extension (src/types/index.ts)
+- Added 'CompletedTopic' interface: { topicName: string, completedAt: string, source: 'chat' | 'manual' }
+- This allows tracking when a topic was finished and where it was marked from.
+
+2. Store Updates (src/lib/store.ts)
+- Added 'completedTopics' array to state.
+- Added 'markTopicComplete' action with normalize logic.
+- Added 'unmarkTopicComplete' and 'getTopicCompletion' helpers.
+- Uses fuzzy matching to ensure "Arrays & Strings" matches "Arrays and Strings".
+
+3. Tambo Tool for Chat (src/lib/tambo.ts)
+- Added 'markTopicComplete' tool for the AI assistant.
+- AI can now handle requests like "I've finished studying Dynamic Programming".
+- Added 'getCompletedTopics' tool for users to ask "What have I studied so far?".
+
+4. Topic Matching Logic (src/lib/topic-matcher.ts)
+- Created a new utility for robust topic name normalization.
+- Handles case-insensitivity and special character variations.
+- Provides 'getAllPrepTopics' and 'findMatchingTopics' helpers.
+
+5. PrepDetailPanel Update (src/components/prep/PrepDetailPanel.tsx)
+- Integrated with global store to check topic completion.
+- Added visual '✅ Studied [Date]' badges to topic cards.
+- Implemented green styling and ring highlights for completed topics to provide clear visual feedback.
+
+Verification Plan:
+- Build verification: Run 'npm run build' to ensure no type errors or syntax issues.
+- Functional verification: Use chat to mark a topic as complete and verify the PrepDetailPanel UI updates globally across all relevant cards.

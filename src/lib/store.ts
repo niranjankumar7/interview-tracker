@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress } from '@/types';
+import { Application, Sprint, Question, UserProgress, CompletedTopic } from '@/types';
+import { normalizeTopic } from '@/lib/topic-matcher';
 
 interface AppState {
     // Data
@@ -8,6 +9,7 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    completedTopics: CompletedTopic[];
 
     // Actions
     addApplication: (app: Application) => void;
@@ -22,6 +24,11 @@ interface AppState {
     completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
+
+    // Topic progress tracking
+    markTopicComplete: (topicName: string, source?: 'chat' | 'manual') => void;
+    unmarkTopicComplete: (topicName: string) => void;
+    getTopicCompletion: (topicName: string) => CompletedTopic | undefined;
 
     // Utilities
     loadDemoData: () => void;
@@ -42,6 +49,7 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             progress: initialProgress,
+            completedTopics: [],
 
             addApplication: (app) =>
                 set((state) => ({
@@ -78,8 +86,21 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const snapshot = get();
+                const taskExists = snapshot.sprints
+                    .find((s) => s.id === sprintId)
+                    ?.dailyPlans?.[dayIndex]
+                    ?.blocks?.[blockIndex]
+                    ?.tasks?.[taskIndex];
+
+                if (!taskExists) {
+                    return;
+                }
+
                 set((state) => {
+                    let delta = 0;
+
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
 
@@ -91,7 +112,9 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+                                    const nextCompleted = !task.completed;
+                                    delta = nextCompleted ? 1 : -1;
+                                    return { ...task, completed: nextCompleted };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -105,19 +128,53 @@ export const useStore = create<AppState>()(
                         return { ...sprint, dailyPlans };
                     });
 
+                    if (delta === 0) {
+                        return { sprints: state.sprints, progress: state.progress };
+                    }
+
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
-                            totalTasksCompleted: state.progress.totalTasksCompleted + 1
+                            lastActiveDate: delta > 0 ? new Date().toISOString() : state.progress.lastActiveDate,
+                            totalTasksCompleted: Math.max(0, state.progress.totalTasksCompleted + delta)
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({
                     progress: { ...state.progress, ...updates }
                 })),
+
+            // Topic progress tracking
+            markTopicComplete: (topicName, source = 'manual') => {
+                const normalized = normalizeTopic(topicName);
+                const existing = get().completedTopics.find(t => t.topicName === normalized);
+                if (!existing) {
+                    set((state) => ({
+                        completedTopics: [...state.completedTopics, {
+                            topicName: normalized,
+                            displayName: topicName, // Preserve original for display
+                            completedAt: new Date().toISOString(),
+                            source
+                        }]
+                    }));
+                }
+            },
+
+            unmarkTopicComplete: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                set((state) => ({
+                    completedTopics: state.completedTopics.filter(t => t.topicName !== normalized)
+                }));
+            },
+
+            getTopicCompletion: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                return get().completedTopics.find(t => t.topicName === normalized);
+            },
 
             loadDemoData: () => {
                 const today = new Date();
@@ -199,7 +256,8 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress
+                progress: initialProgress,
+                completedTopics: [],
             }),
         }),
         {

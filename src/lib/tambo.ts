@@ -28,7 +28,7 @@ function sanitizeCompanyName(name: string): string {
   if (!name) return '';
 
   // Remove common status suffixes that might be concatenated
-  let cleaned = name
+  const cleaned = name
     .split('|')[0]  // Take content before pipe
     .split(' - ')[0] // Take content before dash separator
     .replace(/\s*(applied|shortlisted|interview|offer|rejected|status)\s*$/i, '') // Remove status keywords
@@ -154,6 +154,73 @@ export const tools: TamboTool[] = [
       currentStreak: z.number(),
       longestStreak: z.number(),
       totalTasksCompleted: z.number(),
+    }),
+  },
+  {
+    name: "markTopicComplete",
+    description:
+      "Mark a prep topic as completed when the user says they studied or finished a topic. Examples: 'I completed Arrays and Strings', 'I studied Dynamic Programming', 'Done with Trees and Graphs'. This updates the global progress and shows completion with date on all PrepDetailPanels.",
+    tool: (input: { topicName: string }) => {
+      const store = useStore.getState();
+      const { topicName } = input;
+
+      // Check if already completed
+      const existing = store.getTopicCompletion(topicName);
+      if (existing) {
+        return {
+          success: true,
+          alreadyCompleted: true,
+          topicName,
+          completedAt: existing.completedAt,
+          message: `"${topicName}" was already marked as completed on ${new Date(existing.completedAt).toLocaleDateString()}`
+        };
+      }
+
+      // Mark as complete
+      store.markTopicComplete(topicName, 'chat');
+
+      return {
+        success: true,
+        alreadyCompleted: false,
+        topicName,
+        completedAt: new Date().toISOString(),
+        message: `Great job! "${topicName}" marked as completed. This topic will now show as studied in all your interview prep panels.`
+      };
+    },
+    inputSchema: z.object({
+      topicName: z.string().describe("The name of the topic the user completed studying. Examples: 'Arrays & Strings', 'Dynamic Programming', 'System Design', 'STAR Method'"),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      alreadyCompleted: z.boolean(),
+      topicName: z.string(),
+      completedAt: z.string(),
+      message: z.string(),
+    }),
+  },
+  {
+    name: "getCompletedTopics",
+    description:
+      "Get all topics the user has marked as completed. Use this to show the user their study progress.",
+    tool: () => {
+      const completedTopics = useStore.getState().completedTopics;
+      return {
+        topics: completedTopics.map(t => ({
+          name: t.displayName || t.topicName, // Use displayName for proper casing
+          completedAt: t.completedAt,
+          source: t.source
+        })),
+        count: completedTopics.length
+      };
+    },
+    inputSchema: z.object({}),
+    outputSchema: z.object({
+      topics: z.array(z.object({
+        name: z.string(),
+        completedAt: z.string(),
+        source: z.enum(['chat', 'manual'])
+      })),
+      count: z.number(),
     }),
   },
   {
