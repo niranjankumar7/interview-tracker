@@ -44,11 +44,12 @@ export function PrepDetailPanel({
     const roleType = application.roleType || inferRoleType(application.role);
     const availableRounds = getAvailableRounds(roleType);
     const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
-        const rounds = getAvailableRounds(roleType);
         const preferredRound = application.currentRound;
-        if (preferredRound && rounds.includes(preferredRound)) return preferredRound;
+        if (preferredRound && availableRounds.includes(preferredRound)) {
+            return preferredRound;
+        }
 
-        return rounds[0] ?? "TechnicalRound1";
+        return availableRounds[0] ?? "TechnicalRound1";
     });
 
     // Scraper state
@@ -56,7 +57,6 @@ export function PrepDetailPanel({
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
-    const availableRounds = getAvailableRounds(roleType);
 
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
