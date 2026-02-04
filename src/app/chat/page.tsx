@@ -37,7 +37,7 @@ export default function ChatPage() {
       tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
       mcpServers={mcpServers}
     >
-      <div className="h-screen flex flex-col bg-background">
+      <div className="flex flex-1 min-h-0 flex-col bg-background">
         {/* Header */}
         <header className="bg-background border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">

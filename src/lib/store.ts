@@ -1,8 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress, UserProfile, AppPreferences } from '@/types';
+import {
+    Application,
+    Sprint,
+    Question,
+    UserProgress,
+    CompletedTopic,
+    UserProfile,
+    AppPreferences,
+} from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
+import { normalizeTopic } from '@/lib/topic-matcher';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -11,6 +20,7 @@ export type AppDataSnapshot = {
     progress: UserProgress;
     profile: UserProfile;
     preferences: AppPreferences;
+    completedTopics: CompletedTopic[];
 };
 
 export type AppDataExport = {
@@ -27,6 +37,7 @@ interface AppState {
     progress: UserProgress;
     profile: UserProfile;
     preferences: AppPreferences;
+    completedTopics: CompletedTopic[];
 
     // Actions
     addApplication: (app: Application) => void;
@@ -38,11 +49,21 @@ interface AppState {
 
     addQuestion: (question: Question) => void;
 
-    completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
+    completeTask: (
+        sprintId: string,
+        dayIndex: number,
+        blockIndex: number,
+        taskIndex: number
+    ) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
     updateProfile: (updates: Partial<UserProfile>) => void;
     updatePreferences: (updates: Partial<AppPreferences>) => void;
+
+    // Topic progress tracking
+    markTopicComplete: (topicName: string, source?: 'chat' | 'manual') => void;
+    unmarkTopicComplete: (topicName: string) => void;
+    getTopicCompletion: (topicName: string) => CompletedTopic | undefined;
 
     // Utilities
     loadDemoData: () => void;
@@ -78,6 +99,7 @@ export const useStore = create<AppState>()(
             progress: getInitialProgress(),
             profile: getInitialProfile(),
             preferences: getInitialPreferences(),
+            completedTopics: [],
 
             addApplication: (app) =>
                 set((state) => ({
@@ -165,6 +187,34 @@ export const useStore = create<AppState>()(
                     preferences: { ...state.preferences, ...updates }
                 })),
 
+            // Topic progress tracking
+            markTopicComplete: (topicName, source = 'manual') => {
+                const normalized = normalizeTopic(topicName);
+                const existing = get().completedTopics.find(t => t.topicName === normalized);
+                if (!existing) {
+                    set((state) => ({
+                        completedTopics: [...state.completedTopics, {
+                            topicName: normalized,
+                            displayName: topicName,
+                            completedAt: new Date().toISOString(),
+                            source
+                        }]
+                    }));
+                }
+            },
+
+            unmarkTopicComplete: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                set((state) => ({
+                    completedTopics: state.completedTopics.filter(t => t.topicName !== normalized)
+                }));
+            },
+
+            getTopicCompletion: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                return get().completedTopics.find(t => t.topicName === normalized);
+            },
+
             loadDemoData: () => {
                 const today = new Date();
                 const addDays = (date: Date, days: number) => {
@@ -232,6 +282,7 @@ export const useStore = create<AppState>()(
                     applications: demoApplications,
                     sprints: [],
                     questions: demoQuestions,
+                    completedTopics: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -248,14 +299,15 @@ export const useStore = create<AppState>()(
                 progress: getInitialProgress(),
                 profile: getInitialProfile(),
                 preferences: getInitialPreferences(),
+                completedTopics: [],
             }),
 
             exportData: () => {
-                const { applications, sprints, questions, progress, profile, preferences } = get();
+                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
                 return {
                     version: APP_VERSION,
                     exportedAt: new Date().toISOString(),
-                    snapshot: { applications, sprints, questions, progress, profile, preferences },
+                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
                 };
             },
 

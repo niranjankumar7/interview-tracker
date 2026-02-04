@@ -8,7 +8,18 @@ const applicationStatusSchema = z.enum([
   "rejected",
 ]);
 
-const roleTypeSchema = z.enum(["SDE", "QA", "Data", "PM"]);
+const roleTypeSchema = z.enum([
+  "SDE",
+  "SDET",
+  "ML",
+  "DevOps",
+  "Frontend",
+  "Backend",
+  "FullStack",
+  "Data",
+  "PM",
+  "MobileEngineer",
+]);
 
 const focusAreaSchema = z.enum([
   "DSA",
@@ -29,9 +40,19 @@ const questionCategorySchema = z.enum([
 const experienceLevelSchema = z.enum(["Junior", "Mid", "Senior"]);
 const themePreferenceSchema = z.enum(["light", "dark", "system"]);
 
+const interviewRoundTypeSchema = z.enum([
+  "HR",
+  "TechnicalRound1",
+  "TechnicalRound2",
+  "SystemDesign",
+  "Managerial",
+  "Assignment",
+  "Final",
+]);
+
 const interviewRoundSchema = z.object({
   roundNumber: z.number(),
-  roundType: z.enum(["Technical", "HR", "Managerial"]),
+  roundType: interviewRoundTypeSchema,
   scheduledDate: z.string().optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
@@ -41,9 +62,11 @@ const applicationSchema = z.object({
   id: z.string(),
   company: z.string(),
   role: z.string(),
+  roleType: roleTypeSchema.optional(),
   status: applicationStatusSchema,
   applicationDate: z.string(),
   interviewDate: z.string().optional(),
+  currentRound: interviewRoundTypeSchema.optional(),
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
   createdAt: z.string(),
@@ -111,6 +134,13 @@ const appPreferencesSchema = z.object({
   studyRemindersEnabled: z.boolean(),
 });
 
+const completedTopicSchema = z.object({
+  topicName: z.string(),
+  displayName: z.string().optional(),
+  completedAt: z.string(),
+  source: z.enum(["chat", "manual"]),
+});
+
 export const appDataSnapshotSchema = z.object({
   applications: z.array(applicationSchema),
   sprints: z.array(sprintSchema),
@@ -118,6 +148,7 @@ export const appDataSnapshotSchema = z.object({
   progress: userProgressSchema,
   profile: userProfileSchema,
   preferences: appPreferencesSchema,
+  completedTopics: z.array(completedTopicSchema),
 });
 
 export const appDataExportSchema = z.object({
