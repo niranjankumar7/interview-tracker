@@ -2,6 +2,10 @@
 
 import { useStore } from "@/lib/store";
 import { tryParseDateInput } from "@/lib/date-parsing";
+import {
+    buildStruggledTopicMatchersByAppId,
+    matchesStruggledTopic,
+} from "@/lib/struggled-topics";
 import { differenceInDays, format, isSameDay, parseISO } from "date-fns";
 import {
     Calendar,
@@ -33,44 +37,6 @@ interface PlanForDatePanelProps {
     applicationId?: string;
 }
 
-type TopicMatcher = {
-    needle: string;
-    regex: RegExp | null;
-};
-
-function matchesStruggledTopic(
-    matchers: TopicMatcher[],
-    categoryLower: string,
-    descriptionLower: string
-): boolean {
-    return matchers.some((matcher) => {
-        if (categoryLower === matcher.needle) return true;
-        if (matcher.regex) return matcher.regex.test(descriptionLower);
-        return descriptionLower.includes(matcher.needle);
-    });
-}
-
-function escapeRegExp(value: string): string {
-    // Escape topic text so it can be safely embedded in a RegExp.
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildTopicMatcher(topic: string): TopicMatcher {
-    const needle = topic.toLowerCase();
-
-    if (needle.length <= 3) {
-        // Avoid overly-permissive substring matches for short topics (e.g. "SQL" in "sequel").
-        return {
-            needle,
-            regex: new RegExp(
-                `(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`
-            ),
-        };
-    }
-
-    return { needle, regex: null };
-}
-
 export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanelProps) {
     const sprints = useStore((state) => state.sprints);
     const applications = useStore((state) => state.applications);
@@ -81,26 +47,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
     const resolvedDate = useMemo(() => tryParseDateInput(targetDate), [targetDate]);
 
     const struggledTopicMatchersByAppId = useMemo(() => {
-        // Precompute once per applications update to avoid per-task lowercasing and repeated scans.
-        const result = new Map<string, TopicMatcher[]>();
-
-        for (const app of applications) {
-            const topics = [
-                ...new Set(
-                    (app.rounds ?? []).flatMap(
-                        (r) => r.feedback?.struggledTopics ?? []
-                    )
-                ),
-            ];
-
-            const matchers = topics
-                .map(buildTopicMatcher)
-                .filter((m) => m.needle.length > 0);
-
-            result.set(app.id, matchers);
-        }
-
-        return result;
+        return buildStruggledTopicMatchersByAppId(applications);
     }, [applications]);
 
     if (!resolvedDate) {
@@ -210,6 +157,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 let guidanceMessage: string | null = null;
 
                 if (!planToShow) {
+                    // Fallback is computed per-sprint (not globally across all sprints).
                     const resolvedTime = resolvedDate.getTime();
 
                     const nextPlan = sprint.dailyPlans.reduce<typeof requestedPlan | undefined>(

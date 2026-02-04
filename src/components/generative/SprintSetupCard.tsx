@@ -81,7 +81,7 @@ export function SprintSetupCard({
             setState({
                 ...state,
                 errorMessage:
-                    "Please provide an interview date like 'tomorrow', 'next Thursday', or a YYYY-MM-DD date.",
+                    "Please select a valid interview date.",
             });
             return;
         }
