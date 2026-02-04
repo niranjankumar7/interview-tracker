@@ -19,10 +19,17 @@ export const todaysPlanPanelSchema = z.object({
         .boolean()
         .optional()
         .describe("Whether to show all active sprints or just the first one"),
+    focusApplicationId: z
+        .string()
+        .optional()
+        .describe(
+            "Optional application ID to show first (useful when deep-linking from notifications)"
+        ),
 });
 
 interface TodaysPlanPanelProps {
     showAll?: boolean;
+    focusApplicationId?: string;
 }
 
 type TopicMatcher = {
@@ -51,7 +58,10 @@ function buildTopicMatcher(topic: string): TopicMatcher {
     return { needle, regex: null };
 }
 
-export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
+export function TodaysPlanPanel({
+    showAll = true,
+    focusApplicationId,
+}: TodaysPlanPanelProps) {
     const sprints = useStore((state) => state.sprints);
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
@@ -81,6 +91,23 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
     // Find active sprints
     const activeSprints = sprints.filter((s) => s.status === "active");
 
+    const orderedSprints = focusApplicationId
+        ? (() => {
+            const focused: typeof activeSprints = [];
+            const others: typeof activeSprints = [];
+
+            for (const sprint of activeSprints) {
+                if (sprint.applicationId === focusApplicationId) {
+                    focused.push(sprint);
+                } else {
+                    others.push(sprint);
+                }
+            }
+
+            return [...focused, ...others];
+        })()
+        : activeSprints;
+
     if (activeSprints.length === 0) {
         return (
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 text-center max-w-md border border-gray-200">
@@ -98,7 +125,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
         );
     }
 
-    const sprintsToShow = showAll ? activeSprints : [activeSprints[0]];
+    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]];
 
     return (
         <div className="space-y-6 max-w-lg">
