@@ -679,12 +679,10 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
           },
           // TipTap suggestion configs are created during render but only read refs
           // in event handlers (ESLint false positive).
-          // eslint-disable-next-line react-hooks/refs
           suggestion: createResourceMentionConfig(stableSearchResources, handleResourceSelect, resourceRef),
           renderLabel: ({ node }) => `@${(node.attrs.label as string) ?? ""}`,
         }),
         // TipTap extension creation closes over refs; refs are only read during events.
-        // eslint-disable-next-line react-hooks/refs
         createPromptCommandExtension(stableSearchPrompts, handlePromptSelect, promptRef),
       ],
       content: value,
