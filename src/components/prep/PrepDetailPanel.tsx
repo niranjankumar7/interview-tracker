@@ -56,6 +56,7 @@ export function PrepDetailPanel({
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
+    const availableRounds = getAvailableRounds(roleType);
 
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);

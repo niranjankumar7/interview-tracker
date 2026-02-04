@@ -50,10 +50,7 @@ export const ScrollableMessageContainer = React.forwardRef<
     }));
   }, [thread.messages]);
 
-  const generationStage = useMemo(
-    () => thread?.generationStage ?? GenerationStage.IDLE,
-    [thread?.generationStage],
-  );
+  const generationStage = thread?.generationStage ?? GenerationStage.IDLE;
 
   // Handle scroll events to detect user scrolling
   const handleScroll = useCallback(() => {

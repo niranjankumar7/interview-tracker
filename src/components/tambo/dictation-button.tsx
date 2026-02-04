@@ -1,7 +1,7 @@
 import { Tooltip } from "@/components/tambo/suggestions-tooltip";
 import { useTamboThreadInput, useTamboVoice } from "@tambo-ai/react";
 import { Loader2Icon, Mic, Square } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 
 /**
  * Button for dictating speech into the message input.
@@ -16,11 +16,10 @@ export default function DictationButton() {
     transcriptionError,
   } = useTamboVoice();
   const { setValue } = useTamboThreadInput();
-  const [lastProcessedTranscript, setLastProcessedTranscript] =
-    useState<string>("");
+  const lastProcessedTranscriptRef = useRef<string>("");
 
   const handleStartRecording = () => {
-    setLastProcessedTranscript("");
+    lastProcessedTranscriptRef.current = "";
     startRecording();
   };
 
@@ -29,11 +28,16 @@ export default function DictationButton() {
   };
 
   useEffect(() => {
-    if (transcript && transcript !== lastProcessedTranscript) {
-      setLastProcessedTranscript(transcript);
-      setValue((prev) => prev + " " + transcript);
+    if (transcript && transcript !== lastProcessedTranscriptRef.current) {
+      lastProcessedTranscriptRef.current = transcript;
+      setValue((prev) => {
+        const trimmedPrev = prev.trimEnd();
+        const trimmedTranscript = transcript.trim();
+        if (!trimmedPrev) return trimmedTranscript;
+        return `${trimmedPrev} ${trimmedTranscript}`;
+      });
     }
-  }, [transcript, lastProcessedTranscript, setValue]);
+  }, [transcript, setValue]);
 
   if (isTranscribing) {
     return (

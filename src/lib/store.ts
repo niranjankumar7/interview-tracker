@@ -122,6 +122,14 @@ const getInitialProgress = (): UserProgress => ({
     totalTasksCompleted: 0,
 });
 
+const getResetProgress = (): UserProgress => ({
+    currentStreak: 0,
+    longestStreak: 0,
+    // Use epoch as a sentinel for a fully reset state.
+    lastActiveDate: new Date(0).toISOString(),
+    totalTasksCompleted: 0,
+});
+
 const getInitialProfile = (): UserProfile => ({
     name: '',
     targetRole: '',
@@ -457,7 +465,7 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: getInitialProgress(),
+                progress: getResetProgress(),
                 profile: getInitialProfile(),
                 preferences: getInitialPreferences(),
                 completedTopics: [],
