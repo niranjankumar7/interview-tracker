@@ -1,6 +1,6 @@
 "use client";
 
-import { PrepDetailPanel } from "@/components/prep";
+import { PrepDetailPanel as PrepGuidancePanel } from "@/components/prep";
 import { useStore } from "@/lib/store";
 import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -360,7 +360,7 @@ export function KanbanBoard() {
 
             {/* Prep Detail Panel Modal */}
             {selectedApp && (
-                <PrepDetailPanel
+                <PrepGuidancePanel
                     application={selectedApp}
                     isOpen={isPrepPanelOpen}
                     onClose={handleClosePrepPanel}

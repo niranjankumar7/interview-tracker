@@ -46,6 +46,11 @@ interface AppState {
 
     // Actions
     addApplication: (app: Application) => void;
+
+    /**
+     * Attempts to add a new interview round. Returns `true` on success.
+     * Returns `false` if a round with the same `roundNumber` already exists.
+     */
     addInterviewRound: (applicationId: string, round: InterviewRound) => boolean;
     /**
      * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
