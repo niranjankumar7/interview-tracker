@@ -84,7 +84,7 @@ export function PrepDetailPanel(props: {
 
   const [roundDraft, setRoundDraft] = useState<RoundDraft>({
     roundNumber: 1,
-    roundType: "Technical",
+    roundType: "TechnicalRound1",
     scheduledDate: "",
     notes: "",
   });
@@ -107,7 +107,7 @@ export function PrepDetailPanel(props: {
     setRoundDraft((prev) => ({
       ...prev,
       roundNumber: nextRoundNumber,
-      roundType: "Technical",
+      roundType: "TechnicalRound1",
       scheduledDate: "",
       notes: "",
     }));
@@ -449,9 +449,13 @@ export function PrepDetailPanel(props: {
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
                     >
-                      <option value="Technical">Technical</option>
                       <option value="HR">HR</option>
+                      <option value="TechnicalRound1">Technical Round 1</option>
+                      <option value="TechnicalRound2">Technical Round 2</option>
+                      <option value="SystemDesign">System Design</option>
                       <option value="Managerial">Managerial</option>
+                      <option value="Assignment">Assignment</option>
+                      <option value="Final">Final</option>
                     </select>
                   </div>
                 </div>
