@@ -14,12 +14,12 @@ const profiles = [
 ] as const;
 
 export function Footer() {
+  const year = new Date().getFullYear();
+
   return (
-    <footer className="shrink-0 border-t border-gray-200 bg-background text-gray-500 dark:border-gray-800 dark:text-gray-400">
+    <footer className="shrink-0 border-t border-border bg-background text-muted-foreground">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm">
-          © 2026 Interview Tracker. All rights reserved.
-        </div>
+        <div className="text-sm">© {year} Interview Tracker. All rights reserved.</div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -30,7 +30,7 @@ export function Footer() {
                   href={profile.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded p-1 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                  className="rounded p-1 transition-colors hover:text-foreground"
                   aria-label={`${profile.name} on GitHub`}
                 >
                   <Github className="h-4 w-4" />
@@ -39,7 +39,7 @@ export function Footer() {
                   href={profile.linkedinUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded p-1 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                  className="rounded p-1 transition-colors hover:text-foreground"
                   aria-label={`${profile.name} on LinkedIn`}
                 >
                   <Linkedin className="h-4 w-4" />
@@ -48,13 +48,14 @@ export function Footer() {
             ))}
           </div>
 
-          <span className="inline-flex w-fit items-center rounded-full border border-gray-200 px-2 py-0.5 text-xs dark:border-gray-800">
+          <span className="inline-flex w-fit items-center rounded-full border border-border px-2 py-0.5 text-xs">
             Built with Next.js + Tambo
           </span>
         </div>
 
         <div className="text-xs">
-          Data is stored locally on your device. We do not track you.
+          Progress data is stored locally in your browser (localStorage). AI chat
+          messages are sent to the configured provider.
         </div>
       </div>
     </footer>
