@@ -30,7 +30,12 @@ export default function DictationButton() {
   useEffect(() => {
     if (transcript && transcript !== lastProcessedTranscriptRef.current) {
       lastProcessedTranscriptRef.current = transcript;
-      setValue((prev) => prev + " " + transcript);
+      setValue((prev) => {
+        const trimmedPrev = prev.trimEnd();
+        const trimmedTranscript = transcript.trim();
+        if (!trimmedPrev) return trimmedTranscript;
+        return `${trimmedPrev} ${trimmedTranscript}`;
+      });
     }
   }, [transcript, setValue]);
 

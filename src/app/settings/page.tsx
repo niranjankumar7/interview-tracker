@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowLeft, Download, Upload, TriangleAlert } from "lucide-react";
 import { z } from "zod";
 
@@ -40,12 +40,7 @@ function normalizeCompletedTopics(topics: string[]): string[] {
   return normalized;
 }
 
-function trapFocusInModal(event: {
-  key: string;
-  shiftKey: boolean;
-  preventDefault: () => void;
-  currentTarget: HTMLElement;
-}) {
+function trapFocusInModal(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab") return;
 
   const container = event.currentTarget;
@@ -235,6 +230,18 @@ export default function SettingsPage() {
     setIsResetModalOpen(false);
   };
 
+  const openImportModal = (payload: { backup: StoreBackup; mode: ImportMode }) => {
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    setIsResetModalOpen(false);
+    setPendingImport(payload);
+  };
+
+  const openResetModal = () => {
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    setPendingImport(null);
+    setIsResetModalOpen(true);
+  };
+
   const confirmImport = () => {
     if (!pendingImport) return;
 
@@ -349,9 +356,7 @@ export default function SettingsPage() {
       return;
     }
 
-    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
-    setIsResetModalOpen(false);
-    setPendingImport({ backup: result.data, mode: importMode });
+    openImportModal({ backup: result.data, mode: importMode });
   };
 
   return (
@@ -498,10 +503,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => {
                   setStatus(null);
-                  setPendingImport(null);
-                  lastFocusedElementRef.current =
-                    document.activeElement as HTMLElement | null;
-                  setIsResetModalOpen(true);
+                  openResetModal();
                 }}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
               >

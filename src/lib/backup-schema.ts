@@ -93,6 +93,7 @@ const userProgressSchema = z.object({
   totalTasksCompleted: z.number(),
 }).strict();
 
+// v1 backups are intentionally strict; unknown fields fail validation.
 export const storeBackupSchema = z.object({
   version: z.literal(1),
   applications: z.array(applicationSchema),
