@@ -6,22 +6,23 @@ import { Button } from "@/components/ui/button";
 
 export function ThemeToggle() {
   const { setTheme, theme, resolvedTheme } = useTheme();
+  const currentTheme = theme ?? "system";
 
   const cycleTheme = () => {
-    if (theme === "light") setTheme("dark");
-    else if (theme === "dark") setTheme("system");
+    if (currentTheme === "light") setTheme("dark");
+    else if (currentTheme === "dark") setTheme("system");
     else setTheme("light");
   };
 
   const modeLabel =
-    theme === "system"
+    currentTheme === "system"
       ? `System (${resolvedTheme ?? "light"})`
-      : theme === "dark"
+      : currentTheme === "dark"
         ? "Dark"
         : "Light";
 
   const icon =
-    theme === "system" ? (
+    currentTheme === "system" ? (
       <Monitor className="h-4 w-4" />
     ) : resolvedTheme === "dark" ? (
       <Moon className="h-4 w-4" />
