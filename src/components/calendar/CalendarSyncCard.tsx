@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { CalendarClock, Plug, RefreshCcw, Shield, Unplug } from "lucide-react";
 
@@ -24,8 +24,27 @@ function ConnectModal({
   onConnect: (email?: string) => void;
 }) {
   const [email, setEmail] = useState("");
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const titleId = useId();
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof document === "undefined") return;
+    setPortalTarget(document.body);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !portalTarget) return null;
   return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
@@ -33,10 +52,17 @@ function ConnectModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background rounded-2xl shadow-xl w-full max-w-lg">
+      <div
+        className="bg-background rounded-2xl shadow-xl w-full max-w-lg"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className="border-b border-border px-5 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Connect Google Calendar</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">
+              Connect Google Calendar
+            </h2>
             <p className="text-sm text-muted-foreground">
               Read-only access to detect interview invites.
             </p>
@@ -80,7 +106,7 @@ function ConnectModal({
         </div>
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }
 

@@ -182,6 +182,13 @@ function safeParseISO(value: string | undefined): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function createClientId(): string {
+    return (
+        globalThis.crypto?.randomUUID?.() ??
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    );
+}
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -430,11 +437,66 @@ export const useStore = create<AppState>()(
                     );
 
                     const nextSuggestions = [...state.calendarSuggestions];
+                    const existingIds = new Set(nextSuggestions.map((suggestion) => suggestion.id));
+
                     for (const suggestion of newSuggestions) {
-                        const existing = nextSuggestions.find(
+                        const matches = nextSuggestions.filter(
                             (item) => item.eventId === suggestion.eventId
                         );
-                        if (existing) continue;
+
+                        const existingPending = matches.find(
+                            (item) => item.status === 'pending'
+                        );
+
+                        if (existingPending) {
+                            Object.assign(existingPending, {
+                                ...suggestion,
+                                id: existingPending.id,
+                                status: existingPending.status,
+                                createdAt: existingPending.createdAt,
+                            });
+                            continue;
+                        }
+
+                        const existingDismissed = matches.find(
+                            (item) => item.status === 'dismissed'
+                        );
+                        if (existingDismissed) continue;
+
+                        const existingConfirmed = matches.find(
+                            (item) => item.status === 'confirmed'
+                        );
+
+                        if (existingConfirmed) {
+                            const didChange =
+                                existingConfirmed.interviewDate !== suggestion.interviewDate ||
+                                existingConfirmed.title !== suggestion.title;
+
+                            if (!didChange) continue;
+
+                            const createdAt = new Date().toISOString();
+                            const baseId = `${suggestion.id}:${suggestion.interviewDate}`;
+                            let nextId = baseId;
+                            let suffix = 1;
+
+                            while (existingIds.has(nextId)) {
+                                nextId = `${baseId}:${suffix++}`;
+                            }
+
+                            existingIds.add(nextId);
+                            nextSuggestions.push({
+                                ...suggestion,
+                                id: nextId,
+                                status: 'pending',
+                                createdAt,
+                                reason: `Rescheduled: ${suggestion.reason}`,
+                            });
+                            continue;
+                        }
+
+                        if (existingIds.has(suggestion.id)) continue;
+
+                        existingIds.add(suggestion.id);
                         nextSuggestions.push(suggestion);
                     }
 
@@ -448,70 +510,90 @@ export const useStore = create<AppState>()(
                     };
                 }),
 
-            confirmCalendarSuggestion: (id, overrides = {}) => {
-                const state = get();
-                const suggestion = state.calendarSuggestions.find((s) => s.id === id);
-                if (!suggestion) return;
+            confirmCalendarSuggestion: (id, overrides = {}) =>
+                set((state) => {
+                    const suggestion = state.calendarSuggestions.find((s) => s.id === id);
+                    if (!suggestion) return {};
 
-                const company = (overrides.company ?? suggestion.company).trim() || suggestion.company;
-                const role = (overrides.role ?? suggestion.role ?? "Software Engineer").trim();
-                const interviewDate =
-                    overrides.interviewDate ?? suggestion.interviewDate;
-                const roleType = overrides.roleType ?? suggestion.roleType ?? "SDE";
-                const createSprint = overrides.createSprint ?? true;
+                    const company =
+                        (overrides.company ?? suggestion.company).trim() ||
+                        suggestion.company;
+                    const role = (overrides.role ?? suggestion.role ?? 'Software Engineer').trim();
+                    const interviewDate = overrides.interviewDate ?? suggestion.interviewDate;
+                    const roleType = overrides.roleType ?? suggestion.roleType ?? 'SDE';
+                    const createSprint = overrides.createSprint ?? true;
+                    const nowIso = new Date().toISOString();
 
-                const existingApp = state.applications.find(
-                    (app) => app.company.toLowerCase() === company.toLowerCase()
-                );
-
-                let applicationId = existingApp?.id;
-
-                if (!existingApp) {
-                    applicationId = Date.now().toString();
-                    state.addApplication({
-                        id: applicationId,
-                        company,
-                        role,
-                        roleType,
-                        status: "interview",
-                        applicationDate: new Date().toISOString(),
-                        interviewDate,
-                        rounds: [],
-                        notes: "",
-                        createdAt: new Date().toISOString(),
-                        source: "calendar",
-                    });
-                } else {
-                    state.updateApplication(existingApp.id, {
-                        interviewDate,
-                        status: "interview",
-                        role: existingApp.role || role,
-                        roleType: existingApp.roleType ?? roleType,
-                        source: existingApp.source ?? "calendar",
-                    });
-                }
-
-                if (applicationId && createSprint) {
-                    const hasActiveSprint = state.sprints.some(
-                        (sprint) =>
-                            sprint.applicationId === applicationId &&
-                            sprint.status === "active"
+                    const existingIndex = state.applications.findIndex(
+                        (app) => app.company.toLowerCase() === company.toLowerCase()
                     );
-                    if (!hasActiveSprint) {
-                        const parsedDate = parseISO(interviewDate);
-                        const dateToUse = Number.isNaN(parsedDate.getTime())
-                            ? new Date()
-                            : parsedDate;
-                        state.addSprint(generateSprint(applicationId, dateToUse, roleType));
-                    }
-                }
 
-                set((state) => ({
-                    calendarSuggestions: state.calendarSuggestions.map((s) =>
-                        s.id === id ? { ...s, status: "confirmed" } : s
-                    ),
-                }));
-            },
+                    const nextApplications = [...state.applications];
+                    let applicationId: string;
+
+                    if (existingIndex === -1) {
+                        applicationId = createClientId();
+                        nextApplications.push({
+                            id: applicationId,
+                            company,
+                            role,
+                            roleType,
+                            status: 'interview',
+                            applicationDate: nowIso,
+                            interviewDate,
+                            rounds: [],
+                            notes: '',
+                            createdAt: nowIso,
+                            source: 'calendar',
+                        });
+                    } else {
+                        const existingApp = nextApplications[existingIndex];
+                        applicationId = existingApp.id;
+                        nextApplications[existingIndex] = {
+                            ...existingApp,
+                            interviewDate,
+                            status: 'interview',
+                            role: existingApp.role || role,
+                            roleType: existingApp.roleType ?? roleType,
+                            source: existingApp.source ?? 'calendar',
+                        };
+                    }
+
+                    const nextSprints = [...state.sprints];
+                    if (createSprint) {
+                        const hasActiveSprint = nextSprints.some(
+                            (sprint) =>
+                                sprint.applicationId === applicationId &&
+                                sprint.status === 'active'
+                        );
+
+                        if (!hasActiveSprint) {
+                            const parsedDate = safeParseISO(interviewDate);
+                            if (parsedDate) {
+                                nextSprints.push(
+                                    generateSprint(applicationId, parsedDate, roleType)
+                                );
+                            }
+                        }
+                    }
+
+                    return {
+                        applications: nextApplications,
+                        sprints: nextSprints,
+                        calendarSuggestions: state.calendarSuggestions.map((item) =>
+                            item.id === id
+                                ? {
+                                      ...item,
+                                      company,
+                                      role,
+                                      roleType,
+                                      interviewDate,
+                                      status: 'confirmed',
+                                  }
+                                : item
+                        ),
+                    };
+                }),
 
             dismissCalendarSuggestion: (id) =>
                 set((state) => ({
@@ -715,12 +797,24 @@ export const useStore = create<AppState>()(
                 calendarEvents: state.calendarEvents,
                 calendarSuggestions: state.calendarSuggestions,
             }),
+            merge: (persistedState, currentState) => {
+                const persisted = persistedState as Partial<AppState> | undefined;
+
+                return {
+                    ...currentState,
+                    ...persisted,
+                    preferences: {
+                        ...currentState.preferences,
+                        ...(persisted?.preferences ?? {}),
+                    },
+                    calendar: {
+                        ...currentState.calendar,
+                        ...(persisted?.calendar ?? {}),
+                    },
+                };
+            },
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);
-                if (!state) return;
-                if (state.preferences.calendarAutoSyncEnabled === undefined) {
-                    state.updatePreferences({ calendarAutoSyncEnabled: false });
-                }
             },
         }
     )

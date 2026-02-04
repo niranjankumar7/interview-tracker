@@ -1,4 +1,4 @@
-import { addDays, isAfter, parseISO, startOfDay } from "date-fns";
+import { addDays, addHours, isAfter, parseISO, startOfDay } from "date-fns";
 import type {
   Application,
   CalendarEvent,
@@ -132,7 +132,7 @@ export function buildCalendarSuggestions(
     }
 
     suggestions.push({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `${event.provider}:${event.id}`,
       eventId: event.id,
       title: event.title,
       company,
@@ -169,8 +169,8 @@ export function createDemoCalendarEvents(): CalendarEvent[] {
       id: "demo-interview-google",
       provider: "google",
       title: "Google SDE Interview",
-      start: addDays(today, 5).toISOString(),
-      end: addDays(today, 5).toISOString(),
+      start: addHours(addDays(today, 5), 10).toISOString(),
+      end: addHours(addDays(today, 5), 11).toISOString(),
       location: "Google Meet",
       meetingLink: "https://meet.google.com/demo",
       source: "demo",
@@ -179,8 +179,8 @@ export function createDemoCalendarEvents(): CalendarEvent[] {
       id: "demo-interview-amazon",
       provider: "google",
       title: "Amazon Phone Screen - Backend",
-      start: addDays(today, 9).toISOString(),
-      end: addDays(today, 9).toISOString(),
+      start: addHours(addDays(today, 9), 15).toISOString(),
+      end: addHours(addDays(today, 9), 16).toISOString(),
       location: "Zoom",
       meetingLink: "https://zoom.us/demo",
       source: "demo",
@@ -189,8 +189,8 @@ export function createDemoCalendarEvents(): CalendarEvent[] {
       id: "demo-non-interview",
       provider: "google",
       title: "Team Retro",
-      start: addDays(today, 3).toISOString(),
-      end: addDays(today, 3).toISOString(),
+      start: addHours(addDays(today, 3), 12).toISOString(),
+      end: addHours(addDays(today, 3), 13).toISOString(),
       source: "demo",
     },
   ];

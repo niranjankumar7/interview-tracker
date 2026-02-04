@@ -37,9 +37,10 @@ function toInputDate(value: string): string {
   return value.slice(0, 10);
 }
 
-function toIsoDate(value: string): string {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+function toIsoDate(value: string): string | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = parseISO(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 function SuggestionCard({
@@ -56,6 +57,20 @@ function SuggestionCard({
   const [date, setDate] = useState(toInputDate(suggestion.interviewDate));
   const [createSprint, setCreateSprint] = useState(true);
 
+  useEffect(() => {
+    setCompany(suggestion.company);
+    setRole(suggestion.role ?? "");
+    setDate(toInputDate(suggestion.interviewDate));
+    setCreateSprint(true);
+  }, [suggestion.id, suggestion.company, suggestion.interviewDate, suggestion.role]);
+
+  const interviewIso = toIsoDate(date);
+  const canConfirm = Boolean(company.trim()) && Boolean(interviewIso);
+  const parsedInterviewDate = parseISO(suggestion.interviewDate);
+  const interviewLabel = Number.isNaN(parsedInterviewDate.getTime())
+    ? suggestion.interviewDate.slice(0, 10)
+    : format(parsedInterviewDate, "MMM d, yyyy");
+
   return (
     <div className="border border-border rounded-xl p-4 space-y-4 bg-background">
       <div className="flex items-start justify-between gap-3">
@@ -67,7 +82,7 @@ function SuggestionCard({
             </span>
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            {format(parseISO(suggestion.interviewDate), "MMM d, yyyy")}
+            {interviewLabel}
             {" · "}
             Confidence: {suggestion.confidence}
           </div>
@@ -130,11 +145,12 @@ function SuggestionCard({
           Dismiss
         </Button>
         <Button
+          disabled={!canConfirm}
           onClick={() =>
             onConfirm(suggestion.id, {
               company,
               role,
-              interviewDate: toIsoDate(date),
+              interviewDate: interviewIso,
               createSprint,
             })
           }
