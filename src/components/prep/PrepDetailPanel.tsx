@@ -9,7 +9,7 @@ import {
 } from "@/data/prep-templates";
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInDays, startOfDay } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -223,8 +223,10 @@ export function PrepDetailPanel({
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
 
+    const today = startOfDay(new Date());
+
     const daysUntilInterview = application.interviewDate
-        ? differenceInDays(parseISO(application.interviewDate), new Date())
+        ? differenceInDays(startOfDay(parseISO(application.interviewDate)), today)
         : null;
 
     const sprintStatusSummary = sprintForApplication
@@ -256,8 +258,8 @@ export function PrepDetailPanel({
             const clampedPercent = Math.max(0, Math.min(100, percent));
 
             const daysDelta = differenceInDays(
-                parseISO(sprintForApplication.interviewDate),
-                new Date()
+                startOfDay(parseISO(sprintForApplication.interviewDate)),
+                today
             );
 
             const overdueDays =
@@ -498,7 +500,7 @@ export function PrepDetailPanel({
 
                                     <p className="text-xs text-emerald-800">
                                         {sprintStatusSummary.completedDays}/{
-                                            sprintForApplication.totalDays
+                                            sprintForApplication.dailyPlans.length
                                         } days • {sprintStatusSummary.completedTasks}/
                                         {sprintStatusSummary.totalTasks} tasks
                                     </p>
