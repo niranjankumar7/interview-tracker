@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { NotificationRoot } from "@/components/notifications/NotificationRoot";
 import { Footer } from "@/components/layout/Footer";
 
 const geistSans = Geist({
@@ -26,6 +27,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <NotificationRoot />
       </body>
     </html>
   );
