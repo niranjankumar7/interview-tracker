@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import type { InterviewRound } from "@/types";
 import { format, isAfter, parseISO, startOfDay } from "date-fns";
 import { Calendar, Check, MessageSquareText, Star, Tag, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 type FeedbackDraft = {
@@ -51,6 +51,10 @@ export function PrepDetailPanel(props: {
 }) {
   const { applicationId, isOpen, onClose } = props;
 
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(() => {
+    return typeof document === "undefined" ? null : document.body;
+  });
+
   const application = useStore((s) =>
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
@@ -92,6 +96,11 @@ export function PrepDetailPanel(props: {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    setPortalTarget(document.body);
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isAddRoundOpen) return;
     setRoundDraft((prev) => ({
       ...prev,
@@ -102,26 +111,42 @@ export function PrepDetailPanel(props: {
     }));
   }, [isAddRoundOpen, nextRoundNumber]);
 
+  const closeTopmostOverlay = useCallback(() => {
+    if (feedbackRoundNumber !== null) {
+      setFeedbackRoundNumber(null);
+      return;
+    }
+    if (isAddRoundOpen) {
+      setIsAddRoundOpen(false);
+      return;
+    }
+    onClose();
+  }, [feedbackRoundNumber, isAddRoundOpen, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (feedbackRoundNumber !== null) {
-          setFeedbackRoundNumber(null);
-          return;
-        }
-        if (isAddRoundOpen) {
-          setIsAddRoundOpen(false);
-          return;
-        }
-        onClose();
+      if (e.key !== "Escape") return;
+      if (e.isComposing) return;
+
+      const active = document.activeElement;
+      const isTextInput =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+
+      if (isTextInput && feedbackRoundNumber === null && !isAddRoundOpen) {
+        return;
       }
+
+      e.preventDefault();
+      closeTopmostOverlay();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [feedbackRoundNumber, isAddRoundOpen, isOpen, onClose]);
+  }, [closeTopmostOverlay, feedbackRoundNumber, isAddRoundOpen, isOpen]);
 
   const activeRound = useMemo(() => {
     if (!application || feedbackRoundNumber === null) return undefined;
@@ -721,7 +746,7 @@ export function PrepDetailPanel(props: {
     </div>
   );
 
-  return typeof window !== "undefined"
-    ? createPortal(modalContent, document.body)
-    : null;
+  if (!portalTarget) return null;
+
+  return createPortal(modalContent, portalTarget);
 }

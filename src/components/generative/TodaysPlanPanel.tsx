@@ -10,6 +10,7 @@ import {
     Target,
     Calendar,
 } from "lucide-react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -24,11 +25,57 @@ interface TodaysPlanPanelProps {
     showAll?: boolean;
 }
 
+type TopicMatcher = {
+    needle: string;
+    regex: RegExp | null;
+};
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildTopicMatcher(topic: string): TopicMatcher {
+    const needle = topic.trim().toLowerCase();
+
+    if (needle.length <= 3) {
+        return {
+            needle,
+            regex: new RegExp(
+                `(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`
+            ),
+        };
+    }
+
+    return { needle, regex: null };
+}
+
 export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
     const sprints = useStore((state) => state.sprints);
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
     const progress = useStore((state) => state.progress);
+
+    const struggledTopicMatchersByAppId = useMemo(() => {
+        const result = new Map<string, TopicMatcher[]>();
+
+        for (const app of applications) {
+            const topics = [
+                ...new Set(
+                    (app.rounds ?? []).flatMap(
+                        (r) => r.feedback?.struggledTopics ?? []
+                    )
+                ),
+            ];
+
+            const matchers = topics
+                .map(buildTopicMatcher)
+                .filter((m) => m.needle.length > 0);
+
+            result.set(app.id, matchers);
+        }
+
+        return result;
+    }, [applications]);
 
     // Find active sprints
     const activeSprints = sprints.filter((s) => s.status === "active");
@@ -73,9 +120,8 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
 
             {sprintsToShow.map((sprint) => {
                 const app = applications.find((a) => a.id === sprint.applicationId);
-                const struggledTopics = app
-                    ? [...new Set((app.rounds ?? []).flatMap((r) => r.feedback?.struggledTopics ?? []))]
-                    : [];
+                const struggledTopicMatchers =
+                    struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
                 const todaysPlan = sprint.dailyPlans.find((plan) =>
                     isToday(parseISO(plan.date))
                 );
@@ -184,13 +230,20 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
 
                                     <ul className="space-y-2">
                                         {block.tasks.map((task, taskIdx) => {
-                                            const struggledMatch = struggledTopics.some(
-                                                (topic) =>
-                                                    task.category === topic ||
-                                                    task.description
-                                                        .toLowerCase()
-                                                        .includes(topic.toLowerCase())
-                                            );
+                                            const categoryLower = (task.category ?? "")
+                                                .trim()
+                                                .toLowerCase();
+                                            const descriptionLower = task.description.toLowerCase();
+
+                                            const struggledMatch =
+                                                struggledTopicMatchers.length > 0 &&
+                                                struggledTopicMatchers.some((matcher) => {
+                                                    if (categoryLower === matcher.needle) return true;
+
+                                                    return matcher.regex
+                                                        ? matcher.regex.test(descriptionLower)
+                                                        : descriptionLower.includes(matcher.needle);
+                                                });
 
                                             return (
                                                 <li key={task.id} className="flex items-start gap-3">

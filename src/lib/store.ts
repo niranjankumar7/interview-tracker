@@ -3,7 +3,9 @@ import { persist } from 'zustand/middleware';
 import { Application, InterviewRound, Sprint, Question, UserProgress } from '@/types';
 
 type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
-    Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
+    Partial<Pick<InterviewRound, 'questionsAsked'>> & {
+        feedback?: InterviewRound['feedback'] | null;
+    };
 
 type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
     rounds?: InterviewRoundPatch[];
@@ -11,9 +13,10 @@ type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
 
 function mergeRoundFeedback(
     prev: InterviewRound['feedback'] | undefined,
-    next: InterviewRound['feedback'] | undefined
+    next: InterviewRound['feedback'] | null | undefined
 ): InterviewRound['feedback'] | undefined {
-    if (!next) return prev;
+    if (next === undefined) return prev;
+    if (next === null) return undefined;
     if (!prev) return next;
     return {
         rating: next.rating ?? prev.rating,
@@ -38,7 +41,8 @@ interface AppState {
      * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
      * patch merged into an existing round matched by `roundNumber`.
      *
-     * To add new rounds, use `addInterviewRound`.
+     * To add new rounds, use `addInterviewRound`. To clear an existing `feedback` block, pass
+     * `feedback: null` for that `roundNumber`.
      */
     updateApplication: (
         id: string,
@@ -84,6 +88,22 @@ export const useStore = create<AppState>()(
                 set((state) => ({
                     applications: state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
+                        if (
+                            (app.rounds ?? []).some(
+                                (r) => r.roundNumber === round.roundNumber
+                            )
+                        ) {
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.warn(
+                                    'addInterviewRound: duplicate roundNumber; ignoring',
+                                    {
+                                        applicationId,
+                                        roundNumber: round.roundNumber,
+                                    }
+                                );
+                            }
+                            return app;
+                        }
                         const rounds = [...(app.rounds ?? []), round].sort(
                             (a, b) => a.roundNumber - b.roundNumber
                         );
