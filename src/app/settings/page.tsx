@@ -1,658 +1,358 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowLeft, Download, Upload, TriangleAlert } from "lucide-react";
-import { z } from "zod";
+import { useEffect, useId, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import {
+  ArrowLeft,
+  Monitor,
+  Moon,
+  Save,
+  Settings,
+  Sun,
+  User,
+  Bell,
+  Download,
+  Upload,
+  RotateCcw,
+  Database,
+} from "lucide-react";
 
-import { storeBackupSchema, type StoreBackup } from "@/lib/backup-schema";
 import { useStore } from "@/lib/store";
-import { normalizeTopic } from "@/lib/topic-matcher";
-import type { Application, CompletedTopic, Question, Sprint, UserProgress } from "@/types";
+import { APP_VERSION } from "@/lib/constants";
+import type { ExperienceLevel, ThemePreference } from "@/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
-type ImportMode = "replace" | "merge";
+type ThemeOption = {
+  id: ThemePreference;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
 
-const BACKUP_VERSION = 1 as const;
+const themeOptions: ThemeOption[] = [
+  { id: "light", label: "Light", icon: Sun },
+  { id: "dark", label: "Dark", icon: Moon },
+  { id: "system", label: "System", icon: Monitor },
+];
 
-function upsertById<T extends { id: string }>(
-  existing: T[],
-  incoming: T[],
-): T[] {
-  // Incoming items win on ID collisions; existing ordering is preserved and new
-  // incoming IDs are appended.
-  const byId = new Map<string, T>();
-  for (const item of existing) byId.set(item.id, item);
-  for (const item of incoming) byId.set(item.id, item);
-  return Array.from(byId.values());
-}
-
-function normalizeCompletedTopics(topics: CompletedTopic[]): CompletedTopic[] {
-  const byName = new Map<string, CompletedTopic>();
-
-  for (const topic of topics) {
-    const rawName = topic.topicName || topic.displayName || "";
-    const topicName = normalizeTopic(rawName);
-    if (!topicName) continue;
-
-    const displayName = topic.displayName?.trim();
-    const next: CompletedTopic = {
-      topicName,
-      displayName: displayName ? displayName : undefined,
-      completedAt: topic.completedAt,
-      source: topic.source,
-    };
-
-    const existing = byName.get(topicName);
-    if (!existing) {
-      byName.set(topicName, next);
-      continue;
-    }
-
-    const existingTime = Date.parse(existing.completedAt);
-    const nextTime = Date.parse(next.completedAt);
-    if (!Number.isFinite(existingTime) || nextTime >= existingTime) {
-      byName.set(topicName, next);
-    }
-  }
-
-  return Array.from(byName.values());
-}
-
-function trapFocusInModal(event: KeyboardEvent<HTMLElement>) {
-  if (event.key !== "Tab") return;
-
-  const container = event.currentTarget;
-  const focusable = Array.from(
-    container.querySelectorAll<HTMLElement>(
-      "a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])",
-    ),
-  ).filter((el) => el.tabIndex !== -1);
-
-  if (focusable.length === 0) return;
-
-  const active = document.activeElement;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-
-  if (!active || !container.contains(active)) {
-    event.preventDefault();
-    first.focus();
-    return;
-  }
-
-  if (!event.shiftKey && active === last) {
-    event.preventDefault();
-    first.focus();
-    return;
-  }
-
-  if (event.shiftKey && active === first) {
-    event.preventDefault();
-    last.focus();
-  }
-}
-
-function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProgress {
-  const existingTime = Date.parse(existing.lastActiveDate);
-  const incomingTime = Date.parse(incoming.lastActiveDate);
-  const existingValid = Number.isFinite(existingTime);
-  const incomingValid = Number.isFinite(incomingTime);
-
-  const base =
-    !existingValid && incomingValid
-      ? incoming
-      : existingValid && !incomingValid
-        ? existing
-        : !existingValid && !incomingValid
-          ? existing
-          : incomingTime >= existingTime
-            ? incoming
-            : existing;
-
-  return {
-    currentStreak: Math.max(existing.currentStreak, incoming.currentStreak),
-    longestStreak: Math.max(existing.longestStreak, incoming.longestStreak),
-    lastActiveDate: base.lastActiveDate,
-    totalTasksCompleted: Math.max(
-      existing.totalTasksCompleted,
-      incoming.totalTasksCompleted,
-    ),
-  };
-}
-
-function formatZodError(error: z.ZodError): string {
-  const maxIssues = 8;
-  const lines = error.issues.slice(0, maxIssues).map((issue) => {
-    const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
-    return `• ${path}: ${issue.message}`;
-  });
-
-  const moreIssues =
-    error.issues.length > maxIssues
-      ? `\n…and ${error.issues.length - maxIssues} more issue(s).`
-      : "";
-
-  return `Backup format mismatch. Please use a backup exported from this app.\n${lines.join(
-    "\n",
-  )}${moreIssues}`;
-}
-
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read the selected file."));
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        reject(new Error("Could not read the selected file as text."));
-        return;
-      }
-      resolve(reader.result);
-    };
-    reader.readAsText(file);
-  });
-}
+const EXPORT_REVOKE_URL_DELAY_MS = 1000;
 
 export default function SettingsPage() {
-  const resetData = useStore((s) => s.resetData);
+  const [mounted, setMounted] = useState(false);
+  const { setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const importCancelButtonRef = useRef<HTMLButtonElement | null>(null);
-  const resetCancelButtonRef = useRef<HTMLButtonElement | null>(null);
-  const importModalRef = useRef<HTMLDivElement | null>(null);
-  const resetModalRef = useRef<HTMLDivElement | null>(null);
-  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
-  const wasModalOpenRef = useRef(false);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importMode, setImportMode] = useState<ImportMode>("replace");
-  const [pendingImport, setPendingImport] = useState<
-    | { backup: StoreBackup; mode: ImportMode }
-    | null
-  >(null);
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [status, setStatus] = useState<
-    | { kind: "success"; message: string }
-    | { kind: "error"; message: string }
-    | null
-  >(null);
+  const profile = useStore((s) => s.profile);
+  const preferences = useStore((s) => s.preferences);
+  const updateProfile = useStore((s) => s.updateProfile);
+  const updatePreferences = useStore((s) => s.updatePreferences);
+  const exportData = useStore((s) => s.exportData);
+  const importData = useStore((s) => s.importData);
+  const resetData = useStore((s) => s.resetData);
+  const loadDemoData = useStore((s) => s.loadDemoData);
+
+  const nameId = useId();
+  const targetRoleId = useId();
+  const experienceId = useId();
 
   useEffect(() => {
-    if (isResetModalOpen) resetCancelButtonRef.current?.focus();
-  }, [isResetModalOpen]);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (pendingImport) importCancelButtonRef.current?.focus();
-  }, [pendingImport]);
+    if (!mounted) return;
+    setTheme(preferences.theme);
+  }, [mounted, preferences.theme, setTheme]);
 
-  const isAnyModalOpen = Boolean(pendingImport) || isResetModalOpen;
-  useEffect(() => {
-    if (!isAnyModalOpen && wasModalOpenRef.current) {
-      const el = lastFocusedElementRef.current;
-      lastFocusedElementRef.current = null;
-      if (el && document.contains(el)) el.focus();
-    }
-    wasModalOpenRef.current = isAnyModalOpen;
-  }, [isAnyModalOpen]);
+  const handleThemeChange = (next: ThemePreference) => {
+    updatePreferences({ theme: next });
+  };
 
-  const applications = useStore((s) => s.applications);
-  const sprints = useStore((s) => s.sprints);
-  const questions = useStore((s) => s.questions);
-  const completedTopics = useStore((s) => s.completedTopics);
-  const progress = useStore((s) => s.progress);
-
-  const exportData = () => {
-    const rawBackup: StoreBackup = {
-      version: BACKUP_VERSION,
-      applications,
-      sprints,
-      questions,
-      completedTopics,
-      progress,
-    };
-
-    let backup: StoreBackup;
-    try {
-      backup = storeBackupSchema.parse(rawBackup);
-    } catch (error) {
-      const message =
-        error instanceof z.ZodError
-          ? `Export failed: local data is invalid.\n${formatZodError(error)}`
-          : "Export failed: local data is invalid.";
-      setStatus({ kind: "error", message });
-      return;
-    }
-
-    const date = new Date().toISOString().slice(0, 10);
-    const filename = `interview-tracker-backup-${date}.json`;
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
+  const handleExport = () => {
+    const data = exportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
 
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `interview-prep-tracker-export-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json`;
+    document.body.appendChild(a);
     try {
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setStatus({ kind: "success", message: `Download started: ${filename}` });
+      a.click();
     } finally {
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), EXPORT_REVOKE_URL_DELAY_MS);
     }
   };
 
-  const closeImportModal = () => {
-    setPendingImport(null);
-  };
-
-  const closeResetModal = () => {
-    setIsResetModalOpen(false);
-  };
-
-  const openImportModal = (payload: { backup: StoreBackup; mode: ImportMode }) => {
-    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
-    setIsResetModalOpen(false);
-    setPendingImport(payload);
-  };
-
-  const openResetModal = () => {
-    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
-    setPendingImport(null);
-    setIsResetModalOpen(true);
-  };
-
-  const confirmImport = () => {
-    if (!pendingImport) return;
-
+  const handleImport = async (file: File) => {
+    const text = await file.text();
+    let parsed: unknown;
     try {
-      applyImportedBackup(pendingImport.backup, pendingImport.mode);
-      setStatus({
-        kind: "success",
-        message:
-          pendingImport.mode === "replace"
-            ? "Imported backup (replaced tracker data)."
-            : "Imported backup (merged with existing data).",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? `Import failed: ${error.message}`
-          : "Import failed due to an unexpected error.";
-      setStatus({ kind: "error", message });
-    } finally {
-      closeImportModal();
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error("File is not valid JSON");
     }
+
+    importData(parsed);
   };
 
-  const applyImportedBackup = (backup: StoreBackup, mode: ImportMode) => {
-    const incomingCompletedTopics = normalizeCompletedTopics(backup.completedTopics);
+  const experienceLevelOptions: readonly ExperienceLevel[] = [
+    "Junior",
+    "Mid",
+    "Senior",
+  ];
 
-    if (mode === "replace") {
-      // Replace mode overwrites tracker data keys only; other persisted keys (if
-      // added in the future) are intentionally left untouched.
-      useStore.setState({
-        applications: backup.applications,
-        sprints: backup.sprints,
-        questions: backup.questions,
-        completedTopics: incomingCompletedTopics,
-        progress: backup.progress,
-      });
-      return;
-    }
+  const isExperienceLevel = (value: string): value is ExperienceLevel =>
+    (experienceLevelOptions as readonly string[]).includes(value);
 
-    const existing = useStore.getState();
-    const mergedApplications = upsertById<Application>(
-      existing.applications,
-      backup.applications,
-    );
-    const mergedSprints = upsertById<Sprint>(existing.sprints, backup.sprints);
-    const mergedQuestions = upsertById<Question>(
-      existing.questions,
-      backup.questions,
-    );
-    // `completedTopics` is treated as a set of unique identifiers (order-independent).
-    const mergedCompletedTopics = normalizeCompletedTopics([
-      ...existing.completedTopics,
-      ...incomingCompletedTopics,
-    ]);
-    const mergedProgress = mergeProgress(existing.progress, backup.progress);
-
-    useStore.setState({
-      applications: mergedApplications,
-      sprints: mergedSprints,
-      questions: mergedQuestions,
-      completedTopics: mergedCompletedTopics,
-      progress: mergedProgress,
-    });
-  };
-
-  const importData = async () => {
-    setStatus(null);
-
-    if (!selectedFile) {
-      setStatus({ kind: "error", message: "Select a .json file to import." });
-      return;
-    }
-
-    const nameIsJson = selectedFile.name.toLowerCase().endsWith(".json");
-    const typeIsJson = selectedFile.type
-      ? selectedFile.type.toLowerCase().includes("json")
-      : false;
-    if (!nameIsJson && !typeIsJson) {
-      setStatus({
-        kind: "error",
-        message: "Invalid file type. Please upload a .json backup file.",
-      });
-      return;
-    }
-
-    let parsedJson: unknown;
-    try {
-      const text = await readFileAsText(selectedFile);
-      parsedJson = JSON.parse(text);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Invalid JSON file. Please upload a valid backup.";
-      setStatus({ kind: "error", message });
-      return;
-    }
-
-    const result = storeBackupSchema.safeParse(parsedJson);
-    if (!result.success) {
-      setStatus({ kind: "error", message: formatZodError(result.error) });
-      return;
-    }
-
-    if (result.data.version !== BACKUP_VERSION) {
-      setStatus({
-        kind: "error",
-        message: `Unsupported backup version: v${result.data.version}.`,
-      });
-      return;
-    }
-
-    openImportModal({ backup: result.data, mode: importMode });
-  };
+  const aboutText =
+    "Track applications, build a focused sprint plan, and keep a lightweight question bank — all in one place.";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 shadow-sm">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Link
-            href="/chat"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Link>
-          <div className="h-4 w-px bg-gray-200" />
-          <div>
-            <h1 className="font-bold text-gray-800">Settings</h1>
-            <p className="text-xs text-gray-500">Manage your local data backup</p>
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+          <Button asChild variant="ghost" size="icon" aria-label="Back to app">
+            <Link href="/chat">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-muted-foreground" />
+            <h1 className="text-lg font-semibold">Settings</h1>
           </div>
+          <div className="ml-auto text-xs text-muted-foreground">v{APP_VERSION}</div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 sm:p-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">
-            Data Management
-          </h2>
-          <p className="text-sm text-gray-600 mb-6">
-            Backup, restore, or clear your locally stored tracker data.
-          </p>
+      <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Profile
+            </CardTitle>
+            <CardDescription>
+              Used to personalize sprint planning and suggestions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor={nameId}>Name</Label>
+              <Input
+                id={nameId}
+                value={profile.name}
+                onChange={(e) => updateProfile({ name: e.target.value })}
+                placeholder="Your name"
+              />
+            </div>
 
-          <div className="grid gap-6">
-            <section className="rounded-lg border border-gray-200 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-medium text-gray-900">Export</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Download a JSON backup of your applications, sprints, and
-                    questions.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={exportData}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Export Data
-                </button>
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor={targetRoleId}>Target role</Label>
+              <Input
+                id={targetRoleId}
+                value={profile.targetRole}
+                onChange={(e) => updateProfile({ targetRole: e.target.value })}
+                placeholder='e.g. "Full Stack Engineer"'
+              />
+            </div>
 
-              <p className="mt-3 text-xs text-gray-500">
-                Current data: {applications.length} applications, {sprints.length} sprints,
-                {" "}
-                {questions.length} questions.
-              </p>
-            </section>
-
-            <section className="rounded-lg border border-gray-200 p-4">
-              <h3 className="font-medium text-gray-900">Import</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Restore data from a backup file. Replace is recommended.
-              </p>
-
-              <div className="mt-4 grid gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Backup file (.json)
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
-                      setSelectedFile(file);
-                      setStatus(null);
-                    }}
-                    className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
-                  />
-                  {selectedFile && (
-                    <p className="text-xs text-gray-500">
-                      Selected: {selectedFile.name}
-                    </p>
-                  )}
-                </div>
-
-                <fieldset className="grid gap-2">
-                  <legend className="text-sm font-medium text-gray-700">
-                    Import mode
-                  </legend>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="importMode"
-                      value="replace"
-                      checked={importMode === "replace"}
-                      onChange={() => setImportMode("replace")}
-                      className="mt-1"
-                    />
-                    <span className="text-sm text-gray-700">
-                      <span className="font-medium">Replace tracker data</span> (applications, sprints,
-                      questions, topics, progress)
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name="importMode"
-                      value="merge"
-                      checked={importMode === "merge"}
-                      onChange={() => setImportMode("merge")}
-                      className="mt-1"
-                    />
-                    <span className="text-sm text-gray-700">
-                      <span className="font-medium">Merge</span> (keeps existing data; incoming wins on
-                      id collisions)
-                    </span>
-                  </label>
-                </fieldset>
-
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-xs text-gray-500">
-                    Imported files are validated before applying.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={importData}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!selectedFile}
-                  >
-                    <Upload className="w-4 h-4" />
-                    Import Data
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <h3 className="font-medium text-red-900">Danger Zone</h3>
-              <p className="text-sm text-red-700 mt-1">
-                Clear all locally stored data. This cannot be undone.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatus(null);
-                  openResetModal();
+            <div className="grid gap-2">
+              <Label htmlFor={experienceId}>Experience level</Label>
+              <NativeSelect
+                id={experienceId}
+                value={profile.experienceLevel}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (!isExperienceLevel(next)) return;
+                  updateProfile({ experienceLevel: next });
                 }}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
               >
-                <TriangleAlert className="w-4 h-4" />
-                Reset All Data
-              </button>
-            </section>
+                {experienceLevelOptions.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </CardContent>
+        </Card>
 
-            {status && (
-              <div
-                className={`rounded-md border p-3 text-sm whitespace-pre-wrap ${
-                  status.kind === "success"
-                    ? "border-green-200 bg-green-50 text-green-800"
-                    : "border-red-200 bg-red-50 text-red-800"
-                }`}
-                role="status"
-                aria-live="polite"
-              >
-                {status.message}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sun className="h-5 w-5" />
+              Preferences
+            </CardTitle>
+            <CardDescription>Appearance and reminders.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Theme</div>
+              <div className="flex flex-wrap gap-2">
+                {themeOptions.map((opt) => {
+                  const selected = preferences.theme === opt.id;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleThemeChange(opt.id)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        </div>
+              <div className="text-xs text-muted-foreground">
+                {mounted ? (
+                  <span>Current: {preferences.theme}</span>
+                ) : (
+                  <span>Loading theme…</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Bell className="h-4 w-4" />
+                  Enable study reminders
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Simple daily reminder toggle (stored locally).
+                </div>
+              </div>
+              <Switch
+                checked={preferences.studyRemindersEnabled}
+                onCheckedChange={(checked) =>
+                  updatePreferences({ studyRemindersEnabled: checked })
+                }
+                aria-label="Enable study reminders"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Data management
+            </CardTitle>
+            <CardDescription>Export, import, or reset app data.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={handleExport}>
+                <Download className="h-4 w-4" />
+                Export data
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                Import data
+              </Button>
+
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  if (confirm("Reset all data? This cannot be undone.")) {
+                    resetData();
+                  }
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset data
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  if (confirm("Load demo data? This will overwrite current data.")) {
+                    loadDemoData();
+                  }
+                }}
+              >
+                <Save className="h-4 w-4" />
+                Load demo data
+              </Button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                try {
+                  await handleImport(file);
+                  alert("Import complete");
+                } catch (err) {
+                  alert(
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to import data",
+                  );
+                } finally {
+                  e.target.value = "";
+                }
+              }}
+            />
+
+            <div className="text-xs text-muted-foreground">
+              Exported data includes profile, preferences, applications, questions, and progress.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>About</CardTitle>
+            <CardDescription>App info and a quick description.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm">
+              <span className="text-muted-foreground">Version:</span> v{APP_VERSION}
+            </div>
+            <Textarea value={aboutText} readOnly className="resize-none" />
+          </CardContent>
+        </Card>
       </main>
-
-      {pendingImport && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Import data confirmation"
-        >
-          <div
-            ref={importModalRef}
-            className="w-full max-w-md rounded-lg bg-white shadow-lg p-6"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closeImportModal();
-                return;
-              }
-              trapFocusInModal(e);
-            }}
-          >
-            <h2 className="text-lg font-semibold text-gray-900">
-              {pendingImport.mode === "replace"
-                ? "Import and replace tracker data?"
-                : "Import and merge?"}
-            </h2>
-            <p className="text-sm text-gray-600 mt-2">
-              {pendingImport.mode === "replace"
-                ? "This will overwrite your tracker data (applications, sprints, questions, topics, progress). This cannot be undone."
-                : "This will merge the backup into your existing data. Incoming items win on id collisions. This cannot be undone."}
-            </p>
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                ref={importCancelButtonRef}
-                type="button"
-                onClick={closeImportModal}
-                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmImport}
-                className={`px-4 py-2 rounded-md text-white text-sm font-medium ${
-                  pendingImport.mode === "replace"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-gray-900 hover:bg-gray-800"
-                }`}
-              >
-                Import Data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isResetModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Reset all data confirmation"
-        >
-          <div
-            ref={resetModalRef}
-            className="w-full max-w-md rounded-lg bg-white shadow-lg p-6"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closeResetModal();
-                return;
-              }
-              trapFocusInModal(e);
-            }}
-          >
-            <h2 className="text-lg font-semibold text-gray-900">
-              Are you sure?
-            </h2>
-            <p className="text-sm text-gray-600 mt-2">
-              This cannot be undone. Your applications, sprints, and questions
-              will be permanently removed from this browser.
-            </p>
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                ref={resetCancelButtonRef}
-                type="button"
-                onClick={closeResetModal}
-                className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  resetData();
-                  closeResetModal();
-                  setStatus({ kind: "success", message: "All data reset." });
-                }}
-                className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700"
-              >
-                Reset All Data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

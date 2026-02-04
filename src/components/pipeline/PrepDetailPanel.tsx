@@ -1,0 +1,769 @@
+"use client";
+
+import { PREP_TOPICS } from "@/lib/sprintGenerator";
+import { useStore } from "@/lib/store";
+import type { InterviewRound } from "@/types";
+import { format, isAfter, parseISO, startOfDay } from "date-fns";
+import { Calendar, Check, MessageSquareText, Star, Tag, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+
+type FeedbackDraft = {
+  rating: number;
+  prosText: string;
+  consText: string;
+  struggledTopics: string[];
+  notes: string;
+  questionsText: string;
+};
+
+type RoundDraft = {
+  roundNumber: number;
+  roundType: InterviewRound["roundType"];
+  scheduledDate: string;
+  notes: string;
+};
+
+function linesToList(value: string): string[] {
+  return value
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function listToLines(value: string[]): string {
+  return value.join("\n");
+}
+
+function roundIsInFuture(scheduledDate?: string): boolean {
+  if (!scheduledDate) return false;
+  try {
+    return isAfter(startOfDay(parseISO(scheduledDate)), startOfDay(new Date()));
+  } catch {
+    return false;
+  }
+}
+
+export function PrepDetailPanel(props: {
+  applicationId: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { applicationId, isOpen, onClose } = props;
+
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(() => {
+    return typeof document === "undefined" ? null : document.body;
+  });
+
+  const application = useStore((s) =>
+    applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
+  );
+  const addInterviewRound = useStore((s) => s.addInterviewRound);
+  const updateApplication = useStore((s) => s.updateApplication);
+
+  const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
+    null
+  );
+  const [isAddRoundOpen, setIsAddRoundOpen] = useState(false);
+  const [addRoundError, setAddRoundError] = useState<string | null>(null);
+
+  const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft>({
+    rating: 0,
+    prosText: "",
+    consText: "",
+    struggledTopics: [],
+    notes: "",
+    questionsText: "",
+  });
+
+  const nextRoundNumber = useMemo(() => {
+    const rounds = application?.rounds ?? [];
+    if (rounds.length === 0) return 1;
+    return Math.max(...rounds.map((r) => r.roundNumber)) + 1;
+  }, [application]);
+
+  const [roundDraft, setRoundDraft] = useState<RoundDraft>({
+    roundNumber: 1,
+    roundType: "TechnicalRound1",
+    scheduledDate: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFeedbackRoundNumber(null);
+      setIsAddRoundOpen(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPortalTarget(document.body);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isAddRoundOpen) return;
+    setAddRoundError(null);
+    setRoundDraft((prev) => ({
+      ...prev,
+      roundNumber: nextRoundNumber,
+      roundType: "TechnicalRound1",
+      scheduledDate: "",
+      notes: "",
+    }));
+  }, [isAddRoundOpen, nextRoundNumber]);
+
+  const closeTopmostOverlay = useCallback(() => {
+    // Close priority: feedback modal > add round modal > panel.
+    if (feedbackRoundNumber !== null) {
+      setFeedbackRoundNumber(null);
+      return;
+    }
+    if (isAddRoundOpen) {
+      setIsAddRoundOpen(false);
+      return;
+    }
+    onClose();
+  }, [feedbackRoundNumber, isAddRoundOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (e.isComposing) return;
+      if (e.defaultPrevented) return;
+
+      const active = document.activeElement;
+      const isFormControl =
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement ||
+        (active instanceof HTMLElement && active.isContentEditable);
+
+      if (isFormControl) {
+        return;
+      }
+      closeTopmostOverlay();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeTopmostOverlay, isOpen]);
+
+  const activeRound = useMemo(() => {
+    if (!application || feedbackRoundNumber === null) return undefined;
+    return (application.rounds ?? []).find(
+      (r) => r.roundNumber === feedbackRoundNumber
+    );
+  }, [application, feedbackRoundNumber]);
+
+  useEffect(() => {
+    if (!activeRound) return;
+
+    setFeedbackDraft({
+      rating: activeRound.feedback?.rating ?? 0,
+      prosText: listToLines(activeRound.feedback?.pros ?? []),
+      consText: listToLines(activeRound.feedback?.cons ?? []),
+      struggledTopics: activeRound.feedback?.struggledTopics ?? [],
+      notes: activeRound.feedback?.notes ?? "",
+      questionsText: listToLines(activeRound.questionsAsked ?? []),
+    });
+  }, [activeRound]);
+
+  if (!isOpen || !applicationId) return null;
+  if (!application) return null;
+
+  const rounds = application.rounds ?? [];
+
+  const modalContent = (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {application.company}
+            </h2>
+            <p className="text-sm text-gray-500">{application.role}</p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800">Interview rounds</h3>
+            <button
+              onClick={() => setIsAddRoundOpen(true)}
+              className="text-sm px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              type="button"
+            >
+              Add round
+            </button>
+          </div>
+
+          {rounds.length === 0 ? (
+            <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-4">
+              No rounds tracked yet.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {rounds
+                .slice()
+                .sort((a, b) => a.roundNumber - b.roundNumber)
+                .map((round) => {
+                  const questionsAsked = round.questionsAsked ?? [];
+                  const feedback = round.feedback;
+                  const pros = feedback?.pros ?? [];
+                  const cons = feedback?.cons ?? [];
+                  const struggledTopics = feedback?.struggledTopics ?? [];
+                  const feedbackNotes = feedback?.notes ?? "";
+
+                  const isFuture = roundIsInFuture(round.scheduledDate);
+                  const hasFeedback = Boolean(feedback);
+                  const feedbackButtonLabel = hasFeedback
+                    ? "Edit feedback"
+                    : "Complete round";
+
+                  return (
+                    <div
+                      key={round.roundNumber}
+                      className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-800">
+                              Round {round.roundNumber}
+                            </h4>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                              {round.roundType}
+                            </span>
+                          </div>
+
+                          {round.scheduledDate && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              {format(parseISO(round.scheduledDate), "MMM d, yyyy")}
+                              {isFuture && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                  upcoming
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setFeedbackRoundNumber(round.roundNumber)}
+                          disabled={isFuture}
+                          title={
+                            isFuture
+                              ? "Feedback can be added after the scheduled date"
+                              : undefined
+                          }
+                          className={`text-sm px-3 py-2 rounded-lg transition-colors ${
+                            isFuture
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : hasFeedback
+                              ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700"
+                          }`}
+                        >
+                          {feedbackButtonLabel}
+                        </button>
+                      </div>
+
+                      {(round.notes || questionsAsked.length > 0) && (
+                        <div className="mt-4 space-y-3">
+                          {round.notes && (
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">Round notes:</span>{" "}
+                              {round.notes}
+                            </div>
+                          )}
+
+                          {questionsAsked.length > 0 && (
+                            <div className="text-sm text-gray-700">
+                              <div className="font-medium flex items-center gap-2 mb-1">
+                                <MessageSquareText className="w-4 h-4 text-gray-500" />
+                                Questions remembered
+                              </div>
+                              <ul className="list-disc pl-5 space-y-1">
+                                {questionsAsked.map((q, i) => (
+                                  <li key={`${round.roundNumber}-${i}`}>{q}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {feedback && (
+                        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-800">
+                                Feedback
+                              </span>
+                              <div className="flex items-center">
+                                {Array.from({ length: 5 }).map((_, idx) => (
+                                  <Star
+                                    key={idx}
+                                    className={`w-4 h-4 ${
+                                      idx < feedback.rating
+                                        ? "text-yellow-500 fill-yellow-500"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {pros.length > 0 && (
+                            <div>
+                              <div className="text-sm font-medium text-gray-700 mb-1">
+                                What went well
+                              </div>
+                              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                                {pros.map((p, i) => (
+                                  <li key={`${round.roundNumber}-pro-${i}`}>{p}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {cons.length > 0 && (
+                            <div>
+                              <div className="text-sm font-medium text-gray-700 mb-1">
+                                What needs improvement
+                              </div>
+                              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                                {cons.map((c, i) => (
+                                  <li key={`${round.roundNumber}-con-${i}`}>{c}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {struggledTopics.length > 0 && (
+                            <div>
+                              <div className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                <Tag className="w-4 h-4 text-gray-500" />
+                                Struggled topics
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {struggledTopics.map((t) => (
+                                  <span
+                                    key={`${round.roundNumber}-topic-${t}`}
+                                    className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {feedbackNotes && (
+                            <div>
+                              <div className="text-sm font-medium text-gray-700 mb-1">
+                                Notes
+                              </div>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                {feedbackNotes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        {/* Add Round Modal */}
+        {isAddRoundOpen && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (e.target === e.currentTarget) setIsAddRoundOpen(false);
+            }}
+          >
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Add interview round
+                </h3>
+                <button
+                  onClick={() => setIsAddRoundOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  aria-label="Close"
+                  type="button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Round number
+                    </label>
+                    <input
+                      type="number"
+                      value={roundDraft.roundNumber}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Round type
+                    </label>
+                    <select
+                      value={roundDraft.roundType}
+                      onChange={(e) =>
+                        setRoundDraft((prev) => ({
+                          ...prev,
+                          roundType: e.target.value as InterviewRound["roundType"],
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <option value="HR">HR</option>
+                      <option value="TechnicalRound1">Technical Round 1</option>
+                      <option value="TechnicalRound2">Technical Round 2</option>
+                      <option value="SystemDesign">System Design</option>
+                      <option value="Managerial">Managerial</option>
+                      <option value="Assignment">Assignment</option>
+                      <option value="Final">Final</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Scheduled date (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={roundDraft.scheduledDate}
+                    onChange={(e) =>
+                      setRoundDraft((prev) => ({
+                        ...prev,
+                        scheduledDate: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={roundDraft.notes}
+                    onChange={(e) =>
+                      setRoundDraft((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                  />
+                </div>
+
+                {addRoundError && (
+                  <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                    {addRoundError}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddRoundOpen(false)}
+                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const scheduledDate = roundDraft.scheduledDate || undefined;
+
+                      const newRound: InterviewRound = {
+                        roundNumber: roundDraft.roundNumber,
+                        roundType: roundDraft.roundType,
+                        scheduledDate,
+                        notes: roundDraft.notes,
+                        questionsAsked: [],
+                      };
+
+                      const didAdd = addInterviewRound(application.id, newRound);
+                      if (!didAdd) {
+                        setAddRoundError("Round number already exists.");
+                        return;
+                      }
+                      setIsAddRoundOpen(false);
+                    }}
+                    className="px-3 py-2 text-sm rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+                  >
+                    Save round
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Feedback Modal */}
+        {activeRound && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (e.target === e.currentTarget) setFeedbackRoundNumber(null);
+            }}
+          >
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {activeRound.feedback ? "Edit feedback" : "Complete round"}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Round {activeRound.roundNumber} · {activeRound.roundType}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setFeedbackRoundNumber(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  aria-label="Close"
+                  type="button"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rating
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const ratingValue = idx + 1;
+                      const isActive = ratingValue <= feedbackDraft.rating;
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() =>
+                            setFeedbackDraft((prev) => ({
+                              ...prev,
+                              rating: ratingValue,
+                            }))
+                          }
+                          className="p-1"
+                          aria-label={`Set rating to ${ratingValue}`}
+                        >
+                          <Star
+                            className={`w-6 h-6 ${
+                              isActive
+                                ? "text-yellow-500 fill-yellow-500"
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      );
+                    })}
+                    {feedbackDraft.rating > 0 && (
+                      <span className="ml-2 text-sm text-gray-600">
+                        {feedbackDraft.rating}/5
+                      </span>
+                    )}
+                  </div>
+                  {feedbackDraft.rating === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select 1-5 stars to save.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    What went well (one per line)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={feedbackDraft.prosText}
+                    onChange={(e) =>
+                      setFeedbackDraft((prev) => ({
+                        ...prev,
+                        prosText: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    What needs improvement (one per line)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={feedbackDraft.consText}
+                    onChange={(e) =>
+                      setFeedbackDraft((prev) => ({
+                        ...prev,
+                        consText: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-600 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Struggled topics
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {PREP_TOPICS.map((topic) => {
+                      const selected = feedbackDraft.struggledTopics.includes(topic);
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() =>
+                            setFeedbackDraft((prev) => ({
+                              ...prev,
+                              struggledTopics: selected
+                                ? prev.struggledTopics.filter((t) => t !== topic)
+                                : [...prev.struggledTopics, topic],
+                            }))
+                          }
+                          className={`text-xs px-2 py-1 rounded-full border transition-colors flex items-center gap-1 ${
+                            selected
+                              ? "bg-yellow-100 border-yellow-300 text-yellow-900"
+                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          {selected && <Check className="w-3 h-3" />}
+                          {topic}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={feedbackDraft.notes}
+                    onChange={(e) =>
+                      setFeedbackDraft((prev) => ({
+                        ...prev,
+                        notes: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Questions you remember (one per line)
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={feedbackDraft.questionsText}
+                    onChange={(e) =>
+                      setFeedbackDraft((prev) => ({
+                        ...prev,
+                        questionsText: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackRoundNumber(null)}
+                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rating = feedbackDraft.rating;
+                      if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+                      updateApplication(application.id, {
+                        rounds: [
+                          {
+                            roundNumber: activeRound.roundNumber,
+                            questionsAsked: linesToList(feedbackDraft.questionsText),
+                            feedback: {
+                              rating,
+                              pros: linesToList(feedbackDraft.prosText),
+                              cons: linesToList(feedbackDraft.consText),
+                              struggledTopics: feedbackDraft.struggledTopics,
+                              notes: feedbackDraft.notes,
+                            },
+                          },
+                        ],
+                      });
+
+                      setFeedbackRoundNumber(null);
+                    }}
+                    disabled={feedbackDraft.rating === 0}
+                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                      feedbackDraft.rating === 0
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    }`}
+                  >
+                    Save feedback
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (!portalTarget) return null;
+
+  return createPortal(modalContent, portalTarget);
+}

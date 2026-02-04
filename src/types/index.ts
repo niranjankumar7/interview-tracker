@@ -79,6 +79,13 @@ export interface InterviewRound {
     scheduledDate?: string;
     notes: string;
     questionsAsked: string[];
+    feedback?: {
+        rating: number; // 1-5 stars
+        pros: string[];
+        cons: string[];
+        struggledTopics: string[]; // List of topic names
+        notes: string;
+    };
 }
 
 export interface Sprint {
@@ -130,6 +137,20 @@ export interface UserProgress {
     longestStreak: number;
     lastActiveDate: string;
     totalTasksCompleted: number;
+}
+export type ExperienceLevel = 'Junior' | 'Mid' | 'Senior';
+
+export interface UserProfile {
+    name: string;
+    targetRole: string;
+    experienceLevel: ExperienceLevel;
+}
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export interface AppPreferences {
+    theme: ThemePreference;
+    studyRemindersEnabled: boolean;
 }
 
 // Track completed prep topics globally
