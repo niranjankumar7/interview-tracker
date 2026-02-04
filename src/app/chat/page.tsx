@@ -17,7 +17,6 @@ import {
   Flame,
   BarChart3,
 } from "lucide-react";
-import Link from "next/link";
 
 type View = "chat" | "pipeline" | "questions";
 

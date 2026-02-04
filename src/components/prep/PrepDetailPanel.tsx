@@ -52,8 +52,6 @@ export function PrepDetailPanel({
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
     const availableRounds = getAvailableRounds(roleType);
-    const template = getPrepTemplateByRole(roleType);
-
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
@@ -63,7 +61,6 @@ export function PrepDetailPanel({
 
     // Reset selected round when application changes
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- reset local selection when switching applications
         setSelectedRound(application.currentRound || "TechnicalRound1");
     }, [application.id, application.currentRound]);
 
@@ -73,7 +70,6 @@ export function PrepDetailPanel({
         const abortController = new AbortController();
 
         if (isOpen && application.company) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- loading state is driven by this fetch effect
             setIsLoadingScraped(true);
             getCompanyPrepData(application.company, application.role, roleType, selectedRound)
                 .then(data => {

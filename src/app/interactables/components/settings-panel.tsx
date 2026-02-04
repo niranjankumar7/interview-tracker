@@ -83,12 +83,9 @@ function SettingsPanelBase(props: SettingsProps) {
       changedFields.add("privacy.personalizationEnabled");
     }
 
-    console.log("Changed fields:", Array.from(changedFields));
-
     // Update state and ref
     // This interactable receives external prop updates from Tambo; keep local
     // form state in sync so inputs remain controlled.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettings(props);
     prevPropsRef.current = props;
 
@@ -97,7 +94,6 @@ function SettingsPanelBase(props: SettingsProps) {
       // Clear highlights after animation
       const timer = setTimeout(() => {
         setUpdatedFields(new Set());
-        console.log("Cleared animation fields");
       }, 1000);
       return () => clearTimeout(timer);
     }
