@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
-import { parseDateInput } from "@/lib/date-parsing";
+import { tryParseDateInput } from "@/lib/date-parsing";
 import { RoleType, Application } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
@@ -34,6 +34,7 @@ interface SprintSetupState {
     interviewDate: string;
     isSubmitted: boolean;
     isSubmitting: boolean;
+    errorMessage?: string;
 }
 
 export function SprintSetupCard({
@@ -49,6 +50,7 @@ export function SprintSetupCard({
             interviewDate: initialDate || getDefaultDate(),
             isSubmitted: false,
             isSubmitting: false,
+            errorMessage: undefined,
         }
     );
 
@@ -74,11 +76,19 @@ export function SprintSetupCard({
             return;
         }
 
-        setState({ ...state, isSubmitting: true });
+        const parsedDate = tryParseDateInput(state.interviewDate);
+        if (!parsedDate) {
+            setState({
+                ...state,
+                errorMessage:
+                    "Please provide an interview date like 'tomorrow', 'next Thursday', or a YYYY-MM-DD date.",
+            });
+            return;
+        }
+
+        setState({ ...state, isSubmitting: true, errorMessage: undefined });
 
         try {
-            const parsedDate = parseDateInput(state.interviewDate);
-
             // Create application
             const application: Application = {
                 id: Date.now().toString(),
@@ -153,7 +163,13 @@ export function SprintSetupCard({
                     <input
                         type="text"
                         value={state.company}
-                        onChange={(e) => setState({ ...state, company: e.target.value })}
+                        onChange={(e) =>
+                            setState({
+                                ...state,
+                                company: e.target.value,
+                                errorMessage: undefined,
+                            })
+                        }
                         placeholder="e.g., Google, Amazon, Microsoft"
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
@@ -167,7 +183,11 @@ export function SprintSetupCard({
                     <select
                         value={state.role}
                         onChange={(e) =>
-                            setState({ ...state, role: e.target.value as RoleType })
+                            setState({
+                                ...state,
+                                role: e.target.value as RoleType,
+                                errorMessage: undefined,
+                            })
                         }
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                     >
@@ -193,11 +213,18 @@ export function SprintSetupCard({
                         type="date"
                         value={formatDateForInput(state.interviewDate)}
                         onChange={(e) =>
-                            setState({ ...state, interviewDate: e.target.value })
+                            setState({
+                                ...state,
+                                interviewDate: e.target.value,
+                                errorMessage: undefined,
+                            })
                         }
                         min={format(new Date(), "yyyy-MM-dd")}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
+                    {state.errorMessage && (
+                        <p className="mt-2 text-sm text-red-600">{state.errorMessage}</p>
+                    )}
                 </div>
 
                 <button
@@ -219,6 +246,7 @@ function getDefaultDate(): string {
 
 function formatDateForInput(dateStr: string): string {
     if (dateStr.trim().length === 0) return "";
-    const parsed = parseDateInput(dateStr);
+    const parsed = tryParseDateInput(dateStr);
+    if (!parsed) return "";
     return format(parsed, "yyyy-MM-dd");
 }
