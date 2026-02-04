@@ -27,9 +27,12 @@ export function parseDateInput(dateString: string, baseDate: Date = new Date()):
         return base;
     }
 
-    const parsedISO = parseISO(raw);
-    if (!Number.isNaN(parsedISO.getTime())) {
-        return startOfDay(parsedISO);
+    const isoLike = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/;
+    if (isoLike.test(raw)) {
+        const parsedISO = parseISO(raw);
+        if (!Number.isNaN(parsedISO.getTime())) {
+            return startOfDay(parsedISO);
+        }
     }
 
     const lowered = raw.toLowerCase();
@@ -43,12 +46,14 @@ export function parseDateInput(dateString: string, baseDate: Date = new Date()):
         return addDays(base, Number(inDaysMatch[1]));
     }
 
+    const hasNext = lowered.includes("next ");
+
     for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
         if (!lowered.includes(DAYS_OF_WEEK[i])) continue;
 
         const currentDay = base.getDay();
         let daysUntil = i - currentDay;
-        if (daysUntil <= 0) daysUntil += 7;
+        if (daysUntil < 0 || (daysUntil === 0 && hasNext)) daysUntil += 7;
         return addDays(base, daysUntil);
     }
 

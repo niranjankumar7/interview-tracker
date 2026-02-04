@@ -153,6 +153,23 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 const struggledTopicMatchers =
                     struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
 
+                if (sprint.dailyPlans.length === 0) {
+                    return (
+                        <div
+                            key={sprint.id}
+                            className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
+                        >
+                            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-5">
+                                <h3 className="font-bold text-xl">{app?.company}</h3>
+                                <p className="text-sm opacity-90">{app?.role}</p>
+                            </div>
+                            <div className="p-5 text-sm text-gray-700">
+                                No daily plans are available for this sprint yet.
+                            </div>
+                        </div>
+                    );
+                }
+
                 const requestedPlan = sprint.dailyPlans.find((plan) =>
                     isSameDay(parseISO(plan.date), resolvedDate)
                 );
@@ -180,6 +197,8 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     (p) => p.day === planToShow.day
                 );
 
+                if (dayIndex === -1) return null;
+
                 const completedTasks = planToShow.blocks.reduce(
                     (acc, block) =>
                         acc + block.tasks.filter((t) => t.completed).length,
@@ -191,10 +210,16 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 );
 
                 const planDate = parseISO(planToShow.date);
-                const daysUntilInterview = Math.max(
-                    0,
-                    differenceInDays(parseISO(sprint.interviewDate), planDate)
+                const daysDiff = differenceInDays(
+                    parseISO(sprint.interviewDate),
+                    planDate
                 );
+                const interviewLabel =
+                    daysDiff < 0
+                        ? "Interview passed"
+                        : daysDiff === 0
+                            ? "Interview today"
+                            : `${daysDiff} days left`;
 
                 return (
                     <div
@@ -212,7 +237,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                                     <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
                                         <Target className="w-4 h-4" />
                                         <span className="font-semibold">
-                                            {daysUntilInterview} days left
+                                            {interviewLabel}
                                         </span>
                                     </div>
                                 </div>
