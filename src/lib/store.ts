@@ -90,27 +90,22 @@ export const useStore = create<AppState>()(
                     applications: state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
 
-                        const rounds = (app.rounds ?? []).slice();
-                        const existingIdx = rounds.findIndex(
+                        const existingRound = (app.rounds ?? []).some(
                             (r) => r.roundNumber === round.roundNumber
                         );
 
-                        if (existingIdx === -1) {
-                            rounds.push(round);
-                        } else {
+                        if (existingRound) {
                             if (process.env.NODE_ENV !== 'production') {
-                                console.warn(
-                                    'addInterviewRound: duplicate roundNumber; replacing',
-                                    {
-                                        applicationId,
-                                        roundNumber: round.roundNumber,
-                                    }
+                                throw new Error(
+                                    `addInterviewRound: duplicate roundNumber ${round.roundNumber} for application ${applicationId}`
                                 );
                             }
-                            rounds[existingIdx] = round;
+                            return app;
                         }
 
-                        rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+                        const rounds = [...(app.rounds ?? []), round].sort(
+                            (a, b) => a.roundNumber - b.roundNumber
+                        );
                         return { ...app, rounds };
                     }),
                 })),
