@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InterviewRoundType, RoleType, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
@@ -52,11 +52,12 @@ export function PrepDetailPanel({
     );
     const updateApplication = useStore((state) => state.updateApplication);
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
+    const sprints = useStore((state) => state.sprints);
 
-    const sprintForApplication = useStore((state) => {
+    const sprintForApplication = useMemo(() => {
         let latestSprint: Sprint | null = null;
 
-        for (const sprint of state.sprints) {
+        for (const sprint of sprints) {
             if (sprint.applicationId !== appId) continue;
 
             if (sprint.status === "active") return sprint;
@@ -66,7 +67,7 @@ export function PrepDetailPanel({
         }
 
         return latestSprint;
-    });
+    }, [appId, sprints]);
 
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
@@ -227,8 +228,10 @@ export function PrepDetailPanel({
 
     const today = startOfDay(new Date());
 
-    const daysUntilInterview = application.interviewDate
-        ? differenceInDays(startOfDay(parseISO(application.interviewDate)), today)
+    const interviewDate = safeParseISODate(application.interviewDate);
+
+    const daysUntilInterview = interviewDate
+        ? differenceInDays(startOfDay(interviewDate), today)
         : null;
 
     const sprintStatusSummary = sprintForApplication
