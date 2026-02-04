@@ -82,6 +82,8 @@ export function PrepDetailPanel({
     const activeScrapeAbortController = useRef<AbortController | null>(null);
     const scrapeRequestId = useRef(0);
     const lastSyncedApplicationId = useRef<string | null>(null);
+    const lastSavedJobDescriptionUrl = useRef<string>("");
+    const lastSavedNotes = useRef<string>("");
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -98,22 +100,21 @@ export function PrepDetailPanel({
         if (lastSyncedApplicationId.current === application.id) return;
 
         lastSyncedApplicationId.current = application.id;
-        setJobDescriptionUrlDraft(application.jobDescriptionUrl ?? "");
-        setNotesDraft(application.notes ?? "");
+        const jobDescriptionUrl = application.jobDescriptionUrl ?? "";
+        setJobDescriptionUrlDraft(jobDescriptionUrl);
+        setNotesDraft(application.notes);
+
+        lastSavedJobDescriptionUrl.current = jobDescriptionUrl;
+        lastSavedNotes.current = application.notes;
     }, [application, isOpen]);
 
     const saveApplicationEdits = useCallback(() => {
-        if (!application) return;
-
         const nextJobDescriptionUrl = jobDescriptionUrlDraft.trim();
         const nextNotes = notesDraft;
 
-        const prevJobDescriptionUrl = application.jobDescriptionUrl ?? "";
-        const prevNotes = application.notes ?? "";
-
         if (
-            nextJobDescriptionUrl === prevJobDescriptionUrl &&
-            nextNotes === prevNotes
+            nextJobDescriptionUrl === lastSavedJobDescriptionUrl.current &&
+            nextNotes === lastSavedNotes.current
         ) {
             return;
         }
@@ -122,7 +123,10 @@ export function PrepDetailPanel({
             jobDescriptionUrl: nextJobDescriptionUrl,
             notes: nextNotes,
         });
-    }, [appId, application, jobDescriptionUrlDraft, notesDraft, updateApplication]);
+
+        lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
+        lastSavedNotes.current = nextNotes;
+    }, [appId, jobDescriptionUrlDraft, notesDraft, updateApplication]);
 
     const handleClose = useCallback(() => {
         saveApplicationEdits();
@@ -285,10 +289,15 @@ export function PrepDetailPanel({
         const raw = jobDescriptionUrlDraft.trim();
         if (!raw) return null;
 
-        const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw);
+        const withScheme = hasScheme ? raw : `https://${raw}`;
 
         try {
-            return new URL(withScheme).toString();
+            const url = new URL(withScheme);
+            if (url.protocol !== "http:" && url.protocol !== "https:") {
+                return null;
+            }
+            return url.toString();
         } catch {
             return null;
         }
