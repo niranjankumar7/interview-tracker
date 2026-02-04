@@ -19,7 +19,10 @@ const DAYS_OF_WEEK = [
 * - Weekdays: `friday`, `next friday`, `next thursday`
 * - `in N days`
 */
-export function parseDateInput(dateString: string, baseDate: Date = new Date()): Date {
+export function tryParseDateInput(
+    dateString: string,
+    baseDate: Date = new Date()
+): Date | null {
     const raw = dateString.trim();
     const base = startOfDay(baseDate);
 
@@ -57,6 +60,9 @@ export function parseDateInput(dateString: string, baseDate: Date = new Date()):
         return addDays(base, daysUntil);
     }
 
-    // Default to 7 days from now.
-    return addDays(base, 7);
+    return null;
+}
+
+export function parseDateInput(dateString: string, baseDate: Date = new Date()): Date {
+    return tryParseDateInput(dateString, baseDate) ?? addDays(startOfDay(baseDate), 7);
 }

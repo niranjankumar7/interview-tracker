@@ -1,8 +1,8 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { parseDateInput } from "@/lib/date-parsing";
-import { differenceInDays, format, isAfter, isSameDay, parseISO } from "date-fns";
+import { tryParseDateInput } from "@/lib/date-parsing";
+import { differenceInDays, format, isSameDay, parseISO } from "date-fns";
 import {
     Calendar,
     CheckCircle2,
@@ -64,7 +64,24 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
     const applications = useStore((state) => state.applications);
     const completeTask = useStore((state) => state.completeTask);
 
-    const resolvedDate = useMemo(() => parseDateInput(targetDate), [targetDate]);
+    const resolvedDate = useMemo(() => tryParseDateInput(targetDate), [targetDate]);
+
+    if (!resolvedDate) {
+        return (
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-8 text-center max-w-md border border-red-200">
+                <div className="p-4 bg-red-200 rounded-full w-fit mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-red-700" />
+                </div>
+                <h3 className="font-semibold text-lg text-red-800 mb-2">
+                    Invalid Date
+                </h3>
+                <p className="text-red-700 text-sm">
+                    I couldn&apos;t understand &ldquo;{targetDate}&rdquo;. Try something like
+                    &ldquo;tomorrow&rdquo;, &ldquo;next Friday&rdquo;, or &ldquo;2026-02-05&rdquo;.
+                </p>
+            </div>
+        );
+    }
 
     const struggledTopicMatchersByAppId = useMemo(() => {
         // Precompute once per applications update to avoid per-task lowercasing and repeated scans.
@@ -178,24 +195,42 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 let guidanceMessage: string | null = null;
 
                 if (!planToShow) {
-                    const nextPlan = sprint.dailyPlans.find((plan) =>
-                        isAfter(parseISO(plan.date), resolvedDate)
-                    );
+                    let nextPlan: typeof requestedPlan = undefined;
+                    let nextPlanTime = Infinity;
+
+                    const resolvedTime = resolvedDate.getTime();
+
+                    for (const plan of sprint.dailyPlans) {
+                        const planTime = parseISO(plan.date).getTime();
+                        if (planTime > resolvedTime && planTime < nextPlanTime) {
+                            nextPlan = plan;
+                            nextPlanTime = planTime;
+                        }
+                    }
+
+                    let lastPlan = sprint.dailyPlans[0];
+                    let lastPlanTime = parseISO(lastPlan.date).getTime();
+
+                    for (const plan of sprint.dailyPlans.slice(1)) {
+                        const planTime = parseISO(plan.date).getTime();
+                        if (planTime > lastPlanTime) {
+                            lastPlan = plan;
+                            lastPlanTime = planTime;
+                        }
+                    }
 
                     if (nextPlan) {
                         planToShow = nextPlan;
                         guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. Showing the next available day: ${format(parseISO(nextPlan.date), "yyyy-MM-dd")}.`;
                     } else {
-                        planToShow = sprint.dailyPlans[sprint.dailyPlans.length - 1];
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. This sprint ends on ${planToShow ? format(parseISO(planToShow.date), "yyyy-MM-dd") : "an earlier date"}.`;
+                        planToShow = lastPlan;
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")}. This sprint ends on ${format(parseISO(lastPlan.date), "yyyy-MM-dd")}.`;
                     }
                 }
 
                 if (!planToShow) return null;
 
-                const dayIndex = sprint.dailyPlans.findIndex(
-                    (p) => p.day === planToShow.day
-                );
+                const dayIndex = sprint.dailyPlans.indexOf(planToShow);
 
                 if (dayIndex === -1) return null;
 
