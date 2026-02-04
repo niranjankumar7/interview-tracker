@@ -249,11 +249,22 @@ export function PrepDetailPanel({
                 totalTasks === 0
                     ? 0
                     : Math.round((completedTasks / totalTasks) * 100);
+            const clampedPercent = Math.max(0, Math.min(100, percent));
 
-            const daysLeft = differenceInDays(
+            const daysDelta = differenceInDays(
                 parseISO(sprintForApplication.interviewDate),
                 new Date()
             );
+
+            const overdueDays =
+                sprintForApplication.status === "expired" && daysDelta < 0
+                    ? Math.abs(daysDelta)
+                    : null;
+
+            const daysLeft =
+                sprintForApplication.status === "completed"
+                    ? 0
+                    : Math.max(0, daysDelta);
 
             const completedDays = sprintForApplication.dailyPlans.filter(
                 (d) => d.completed
@@ -262,8 +273,9 @@ export function PrepDetailPanel({
             return {
                 totalTasks,
                 completedTasks,
-                percent,
+                percent: clampedPercent,
                 daysLeft,
+                overdueDays,
                 completedDays,
             };
         })()
@@ -271,9 +283,15 @@ export function PrepDetailPanel({
 
     const jobDescriptionHref = (() => {
         const raw = jobDescriptionUrlDraft.trim();
-        if (!raw) return "";
-        if (/^https?:\/\//i.test(raw)) return raw;
-        return `https://${raw}`;
+        if (!raw) return null;
+
+        const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+        try {
+            return new URL(withScheme).toString();
+        } catch {
+            return null;
+        }
     })();
 
     const handleRoundChange = (round: InterviewRoundType) => {
@@ -389,7 +407,7 @@ export function PrepDetailPanel({
                                             onBlur={saveApplicationEdits}
                                             placeholder="https://..."
                                         />
-                                        {jobDescriptionHref && (
+                                        {jobDescriptionHref ? (
                                             <a
                                                 href={jobDescriptionHref}
                                                 target="_blank"
@@ -399,7 +417,7 @@ export function PrepDetailPanel({
                                             >
                                                 <ExternalLink className="h-4 w-4" />
                                             </a>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -442,9 +460,14 @@ export function PrepDetailPanel({
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-emerald-800">Days left</span>
+                                        <span className="text-sm text-emerald-800">
+                                            {sprintStatusSummary.overdueDays !== null
+                                                ? "Overdue"
+                                                : "Days left"}
+                                        </span>
                                         <span className="text-sm font-semibold text-emerald-900">
-                                            {Math.max(0, sprintStatusSummary.daysLeft)}
+                                            {sprintStatusSummary.overdueDays ??
+                                                sprintStatusSummary.daysLeft}
                                         </span>
                                     </div>
 
