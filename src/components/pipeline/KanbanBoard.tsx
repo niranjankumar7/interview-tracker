@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { generateSprint } from "@/lib/sprintGenerator";
 import { Application, ApplicationStatus, RoleType } from "@/types";
-import { addDays, differenceInDays, format, parseISO } from "date-fns";
+import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import {
     AlertTriangle,
     Briefcase,
@@ -273,8 +273,34 @@ export function KanbanBoard() {
                 return;
             }
 
+            const parsedExistingDate = parseISO(interviewDateIso);
+            const normalizedExistingDate = startOfDay(parsedExistingDate);
+            const normalizedToday = startOfDay(new Date());
+            const daysUntilInterview = differenceInDays(
+                normalizedExistingDate,
+                normalizedToday
+            );
+
+            if (
+                Number.isNaN(parsedExistingDate.getTime()) ||
+                daysUntilInterview < 0
+            ) {
+                setInterviewSetup({
+                    applicationId: app.id,
+                    interviewDate: format(
+                        addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
+                        "yyyy-MM-dd"
+                    ),
+                    roleType,
+                });
+                setInterviewSetupError(
+                    "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
+                );
+                return;
+            }
+
             updateApplication(appId, { status: "interview" });
-            ensureSprintForInterview(app.id, parseISO(interviewDateIso), roleType);
+            ensureSprintForInterview(app.id, parsedExistingDate, roleType);
             return;
         }
 
