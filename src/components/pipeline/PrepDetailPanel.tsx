@@ -60,6 +60,7 @@ export function PrepDetailPanel(props: {
   );
   const addInterviewRound = useStore((s) => s.addInterviewRound);
   const updateApplication = useStore((s) => s.updateApplication);
+  const upsertQuestionsFromRound = useStore((s) => s.upsertQuestionsFromRound);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
     null
@@ -727,11 +728,14 @@ export function PrepDetailPanel(props: {
                     onClick={() => {
                       const rating = feedbackDraft.rating;
                       if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+
+                      const questionTexts = linesToList(feedbackDraft.questionsText);
+
                       updateApplication(application.id, {
                         rounds: [
                           {
                             roundNumber: activeRound.roundNumber,
-                            questionsAsked: linesToList(feedbackDraft.questionsText),
+                            questionsAsked: questionTexts,
                             feedback: {
                               rating,
                               pros: linesToList(feedbackDraft.prosText),
@@ -742,6 +746,15 @@ export function PrepDetailPanel(props: {
                           },
                         ],
                       });
+
+                      if (questionTexts.length > 0) {
+                        upsertQuestionsFromRound({
+                          companyId: application.id,
+                          roundNumber: activeRound.roundNumber,
+                          roundType: activeRound.roundType,
+                          questionTexts,
+                        });
+                      }
 
                       setFeedbackRoundNumber(null);
                     }}

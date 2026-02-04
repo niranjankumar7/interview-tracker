@@ -14,6 +14,7 @@ import {
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+import { autoTagCategory } from '@/utils/categoryTagger';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -92,6 +93,19 @@ interface AppState {
 
     addQuestion: (question: Question) => void;
 
+    /**
+     * Upserts the provided question texts into the Question Bank for the given company.
+     *
+     * De-duplication is done by matching `companyId` + a normalized `questionText` (trimmed,
+     * collapsed whitespace, lower-cased).
+     */
+    upsertQuestionsFromRound: (params: {
+        companyId: string;
+        roundNumber: number;
+        roundType: InterviewRound['roundType'];
+        questionTexts: string[];
+    }) => void;
+
     completeTask: (
         sprintId: string,
         dayIndex: number,
@@ -145,6 +159,17 @@ function safeParseISO(value: string | undefined): Date | null {
     if (!value) return null;
     const parsed = parseISO(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeQuestionText(value: string): string {
+    return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function createQuestionId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export const useStore = create<AppState>()(
@@ -270,6 +295,46 @@ export const useStore = create<AppState>()(
                 set((state) => ({
                     questions: [...state.questions, question]
                 })),
+
+            upsertQuestionsFromRound: ({ companyId, roundNumber, roundType, questionTexts }) =>
+                set((state) => {
+                    const askedInRound = `Round ${roundNumber} · ${roundType}`;
+                    const nextQuestions = [...state.questions];
+
+                    for (const rawText of questionTexts) {
+                        const questionText = rawText.trim();
+                        if (!questionText) continue;
+
+                        const normalizedText = normalizeQuestionText(questionText);
+
+                        const existingIdx = nextQuestions.findIndex(
+                            (q) =>
+                                q.companyId === companyId &&
+                                normalizeQuestionText(q.questionText) === normalizedText
+                        );
+
+                        if (existingIdx === -1) {
+                            nextQuestions.push({
+                                id: createQuestionId(),
+                                companyId,
+                                questionText,
+                                category: autoTagCategory(questionText),
+                                askedInRound,
+                                dateAdded: new Date().toISOString(),
+                            });
+                            continue;
+                        }
+
+                        const existing = nextQuestions[existingIdx];
+                        nextQuestions[existingIdx] = {
+                            ...existing,
+                            category: autoTagCategory(questionText),
+                            askedInRound,
+                        };
+                    }
+
+                    return { questions: nextQuestions };
+                }),
 
             completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
                 const existingTask =
