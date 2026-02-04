@@ -86,6 +86,8 @@ function SettingsPanelBase(props: SettingsProps) {
     console.log("Changed fields:", Array.from(changedFields));
 
     // Update state and ref
+    // This interactable receives external prop updates from Tambo; keep local
+    // form state in sync so inputs remain controlled.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettings(props);
     prevPropsRef.current = props;

@@ -40,6 +40,7 @@ const createInitialProgress = (): UserProgress => ({
 const createResetProgress = (): UserProgress => ({
     currentStreak: 0,
     longestStreak: 0,
+    // Use epoch as a sentinel for a fully reset state.
     lastActiveDate: new Date(0).toISOString(),
     totalTasksCompleted: 0,
 });

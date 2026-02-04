@@ -26,6 +26,8 @@ function upsertById<T extends { id: string }>(
 }
 
 function normalizeCompletedTopics(topics: string[]): string[] {
+  // Topics are treated as stable identifiers; whitespace is trimmed and empty
+  // values are discarded.
   const seen = new Set<string>();
   const normalized: string[] = [];
 
@@ -170,7 +172,7 @@ export default function SettingsPage() {
     if (!isAnyModalOpen && wasModalOpenRef.current) {
       const el = lastFocusedElementRef.current;
       lastFocusedElementRef.current = null;
-      el?.focus();
+      if (el && document.contains(el)) el.focus();
     }
     wasModalOpenRef.current = isAnyModalOpen;
   }, [isAnyModalOpen]);
