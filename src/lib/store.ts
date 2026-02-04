@@ -3,9 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Application, InterviewRound, Sprint, Question, UserProgress } from '@/types';
 
 type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
-    Partial<Pick<InterviewRound, 'questionsAsked'>> & {
-        feedback?: InterviewRound['feedback'] | null;
-    };
+    Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
 
 type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
     rounds?: InterviewRoundPatch[];
@@ -13,10 +11,9 @@ type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
 
 function mergeRoundFeedback(
     prev: InterviewRound['feedback'] | undefined,
-    next: InterviewRound['feedback'] | null | undefined
+    next: InterviewRound['feedback'] | undefined
 ): InterviewRound['feedback'] | undefined {
-    if (next === undefined) return prev;
-    if (next === null) return undefined;
+    if (!next) return prev;
     if (!prev) return next;
     return {
         rating: next.rating ?? prev.rating,
@@ -41,9 +38,8 @@ interface AppState {
      * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
      * patch merged into an existing round matched by `roundNumber`.
      *
-     * To add new rounds, use `addInterviewRound`. To clear an existing `feedback` block, pass
-     * `feedback: null` for that `roundNumber`. If `feedback` is provided, it is merged field-by-
-     * field, so omitted fields preserve existing values.
+     * To add new rounds, use `addInterviewRound`. If `feedback` is provided, it is merged field-
+     * by-field, so omitted fields preserve existing values.
      */
     updateApplication: (
         id: string,
@@ -99,7 +95,7 @@ export const useStore = create<AppState>()(
                             if (process.env.NODE_ENV !== 'production') {
                                 throw new Error(message);
                             }
-                            console.warn(message);
+                            console.error(message);
                             return app;
                         }
 
