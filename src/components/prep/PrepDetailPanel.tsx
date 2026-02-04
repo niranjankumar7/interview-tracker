@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { InterviewRoundType, RoleType } from "@/types";
-import { useState, useEffect } from "react";
 import { Application, InterviewRoundType, RoleType } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
@@ -54,16 +52,6 @@ export function PrepDetailPanel({
 
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
-    // Determine role type - try to match from roleType or parse from role string
-    const roleType = application.roleType || inferRoleType(application.role);
-    const availableRounds = getAvailableRounds(roleType);
-    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
-        const rounds = getAvailableRounds(roleType);
-        const preferredRound = application.currentRound;
-        if (preferredRound && rounds.includes(preferredRound)) return preferredRound;
-
-        return rounds[0] ?? "TechnicalRound1";
-    });
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
@@ -72,8 +60,6 @@ export function PrepDetailPanel({
     // Only the latest scrape request is allowed to update local state.
     const activeScrapeAbortController = useRef<AbortController | null>(null);
     const scrapeRequestId = useRef(0);
-    const prepContent = getRoundPrepContent(roleType, selectedRound);
-    const availableRounds = getAvailableRounds(roleType);
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -123,25 +109,14 @@ export function PrepDetailPanel({
     const roleType: RoleType = application ? application.roleType || inferRoleType(application.role) : "SDE";
 
     const availableRounds = roleType ? getAvailableRounds(roleType) : [];
-    const defaultRound = availableRounds[0]?.value ?? SELECTED_ROUND_FALLBACK;
+    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
     const selectedRoundFromStore = application?.currentRound;
     const selectedRound =
-        selectedRoundFromStore && availableRounds.some((r) => r.value === selectedRoundFromStore)
+        selectedRoundFromStore && availableRounds.includes(selectedRoundFromStore)
             ? selectedRoundFromStore
             : defaultRound;
 
     const scrapeKey = isOpen && company && role ? `${appId}|${company}|${role}|${roleType}|${selectedRound}` : null;
-    // Reset selected round when application changes and keep it within the available rounds
-    useEffect(() => {
-        const rounds = getAvailableRounds(roleType);
-        const preferredRound = application.currentRound;
-        const nextSelectedRound =
-            preferredRound && rounds.includes(preferredRound)
-                ? preferredRound
-                : (rounds[0] ?? "TechnicalRound1");
-
-        setSelectedRound(nextSelectedRound);
-    }, [application.id, application.currentRound, roleType]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data

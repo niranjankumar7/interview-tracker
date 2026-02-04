@@ -1,9 +1,7 @@
 "use client";
 
-import { PrepDetailPanel as PrepGuidancePanel } from "@/components/prep";
-import { useStore } from "@/lib/store";
-import { ApplicationStatus } from "@/types";
 import { PrepDetailPanel } from "@/components/prep";
+import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -288,10 +286,6 @@ export function KanbanBoard() {
                                                     onDragStart={(e) => handleDragStart(e, app.id)}
                                                     onMouseDown={handleMouseDown}
                                                     onClick={(e) => handleCardClick(app.id, e)}
-                                                    className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
-                                                        ? "border-orange-300 ring-2 ring-orange-100"
-                                                        : "border-gray-200 hover:border-indigo-300"
-                                                    onClick={(e) => handleCardClick(app, e)}
                                                     className={`bg-card rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
                                                         ? "border-orange-300 ring-2 ring-orange-100 dark:border-orange-900 dark:ring-orange-950/40"
                                                         : "border-border hover:border-indigo-300"
@@ -385,9 +379,6 @@ export function KanbanBoard() {
             {isPrepPanelOpen && selectedAppId && (
                 <PrepDetailPanel
                     appId={selectedAppId}
-            {selectedApp && (
-                <PrepGuidancePanel
-                    application={selectedApp}
                     isOpen={isPrepPanelOpen}
                     onClose={handleClosePrepPanel}
                 />
