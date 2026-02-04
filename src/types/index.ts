@@ -10,9 +10,34 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
-export const ROLE_TYPES = ['SDE', 'QA', 'Data', 'PM'] as const;
+// Extended to 10 role types for comprehensive prep templates
+export const ROLE_TYPES = [
+    'SDE',
+    'SDET',
+    'ML',
+    'DevOps',
+    'Frontend',
+    'Backend',
+    'FullStack',
+    'Data',
+    'PM',
+    'MobileEngineer',
+] as const;
 
 export type RoleType = (typeof ROLE_TYPES)[number];
+
+// Interview round types for round-specific prep
+export const INTERVIEW_ROUND_TYPES = [
+    'HR',
+    'TechnicalRound1',
+    'TechnicalRound2',
+    'SystemDesign',
+    'Managerial',
+    'Assignment',
+    'Final',
+] as const;
+
+export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
 
 export const FOCUS_AREAS = ['DSA', 'SystemDesign', 'Behavioral', 'Review', 'Mock'] as const;
 
@@ -26,10 +51,6 @@ export const QUESTION_DIFFICULTIES = ['Easy', 'Medium', 'Hard'] as const;
 
 export type QuestionDifficulty = (typeof QUESTION_DIFFICULTIES)[number];
 
-export const INTERVIEW_ROUND_TYPES = ['Technical', 'HR', 'Managerial'] as const;
-
-export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
-
 export const SPRINT_STATUSES = ['active', 'completed', 'expired'] as const;
 
 export type SprintStatus = (typeof SPRINT_STATUSES)[number];
@@ -42,9 +63,11 @@ export interface Application {
     id: string;
     company: string;
     role: string;
+    roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string
     interviewDate?: string; // ISO date string
+    currentRound?: InterviewRoundType; // Current interview round for prep
     rounds: InterviewRound[];
     notes: string;
     createdAt: string;
@@ -107,4 +130,12 @@ export interface UserProgress {
     longestStreak: number;
     lastActiveDate: string;
     totalTasksCompleted: number;
+}
+
+// Track completed prep topics globally
+export interface CompletedTopic {
+    topicName: string;        // Normalized topic name
+    displayName?: string;     // Original display name (for UI)
+    completedAt: string;      // ISO date string
+    source: 'chat' | 'manual';
 }
