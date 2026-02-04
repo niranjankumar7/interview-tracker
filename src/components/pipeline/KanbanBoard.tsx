@@ -294,10 +294,6 @@ export function KanbanBoard() {
                                                             ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
                                                             : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
                                                             }`}>
-                                                        <div className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
-                                                            ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
-                                                            : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
-                                                            }`}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="w-3.5 h-3.5" />
                                                                 {format(parseISO(app.interviewDate), "MMM d")}
@@ -314,7 +310,6 @@ export function KanbanBoard() {
 
                                                     {/* Current Round Badge */}
                                                     {app.currentRound && (
-                                                        <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded inline-block dark:bg-indigo-950/30 dark:text-indigo-200">
                                                         <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded inline-block dark:bg-indigo-950/30 dark:text-indigo-200">
                                                             {app.currentRound
                                                                 .replace(/([A-Z])/g, " $1")
