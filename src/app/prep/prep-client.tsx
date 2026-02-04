@@ -14,7 +14,7 @@ export function PrepClient({
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-800">Prep Plan</h1>
-            <p className="text-sm text-gray-500">Today's tasks across your active sprints</p>
+            <p className="text-sm text-gray-500">Today&apos;s tasks across your active sprints</p>
           </div>
           <Link
             href="/chat"
