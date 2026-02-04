@@ -182,23 +182,23 @@ export function KanbanBoard() {
 
     return (
         <>
-            <div className="h-full bg-gray-50 p-6 overflow-x-auto">
+            <div className="h-full bg-background p-6 overflow-x-auto">
                 <div className="flex items-center gap-4 mb-4 min-w-max">
                     <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-semibold text-gray-800">Search</h2>
+                        <h2 className="text-lg font-semibold text-foreground">Search</h2>
                         <div className="relative w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Company or role…"
                                 aria-label="Search applications by company or role"
-                                className="w-full bg-white border border-gray-200 rounded-lg pl-10 pr-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full bg-background border border-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                         </div>
                     </div>
                     {applications.length > 0 && isSearching && (
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-muted-foreground">
                             Showing {matchCount} of {applications.length}
                         </div>
                     )}
@@ -211,16 +211,16 @@ export function KanbanBoard() {
                         return (
                             <div
                                 key={column.status}
-                                className="w-72 flex-shrink-0 flex flex-col bg-gray-100 rounded-xl"
+                                className="w-72 flex-shrink-0 flex flex-col bg-muted rounded-xl"
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, column.status)}
                             >
                                 {/* Column Header */}
-                                <div className="p-4 border-b border-gray-200">
+                                <div className="p-4 border-b border-border">
                                     <div className="flex items-center gap-2">
                                         <div className={`w-3 h-3 rounded-full ${column.color}`} />
-                                        <h3 className="font-semibold text-gray-700">{column.label}</h3>
-                                        <span className="ml-auto bg-white px-2 py-0.5 rounded-full text-sm text-gray-500">
+                                        <h3 className="font-semibold text-foreground">{column.label}</h3>
+                                        <span className="ml-auto bg-background px-2 py-0.5 rounded-full text-sm text-muted-foreground">
                                             {columnApps.length}
                                         </span>
                                     </div>
@@ -229,7 +229,7 @@ export function KanbanBoard() {
                                 {/* Cards Container */}
                                 <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                                     {columnApps.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-400 text-sm">
+                                        <div className="text-center py-8 text-muted-foreground text-sm">
                                             {isSearching
                                                 ? "No matches in this column for this search"
                                                 : "Drop applications here"}
@@ -249,23 +249,23 @@ export function KanbanBoard() {
                                                     onDragStart={(e) => handleDragStart(e, app.id)}
                                                     onMouseDown={handleMouseDown}
                                                     onClick={(e) => handleCardClick(app, e)}
-                                                    className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
-                                                        ? "border-orange-300 ring-2 ring-orange-100"
-                                                        : "border-gray-200 hover:border-indigo-300"}
-                                                        `}
+                                                    className={`bg-card rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
+                                                        ? "border-orange-300 ring-2 ring-orange-100 dark:border-orange-900 dark:ring-orange-950/40"
+                                                        : "border-border hover:border-indigo-300"
+                                                        }`}
                                                 >
                                                     {/* Click hint */}
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <ExternalLink className="w-4 h-4 text-indigo-400" />
+                                                        <ExternalLink className="w-4 h-4 text-indigo-400 dark:text-indigo-300" />
                                                     </div>
 
                                                     {/* Card Header */}
                                                     <div className="flex items-start justify-between mb-3">
                                                         <div className="flex items-center gap-2">
-                                                            <GripVertical className="w-4 h-4 text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing" />
+                                                            <GripVertical className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground/70 cursor-grab active:cursor-grabbing" />
                                                             <div>
-                                                                <h4 className="font-semibold text-gray-800 flex items-center gap-2">
-                                                                    <Building2 className="w-4 h-4 text-gray-500" />
+                                                                <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                                                    <Building2 className="w-4 h-4 text-muted-foreground" />
                                                                     {app.company}
                                                                 </h4>
                                                             </div>
@@ -283,18 +283,17 @@ export function KanbanBoard() {
                                                     </div>
 
                                                     {/* Role */}
-                                                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                                         <Briefcase className="w-3.5 h-3.5" />
                                                         {app.role}
                                                     </div>
 
                                                     {/* Interview Date with countdown */}
                                                     {app.interviewDate && (
-                                                        <div
-                                                            className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
-                                                                ? "bg-orange-50 text-orange-700"
-                                                                : "bg-purple-50 text-purple-600"}`}
-                                                        >
+                                                        <div className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
+                                                            ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
+                                                            : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
+                                                            }`}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="w-3.5 h-3.5" />
                                                                 {format(parseISO(app.interviewDate), "MMM d")}
@@ -311,7 +310,7 @@ export function KanbanBoard() {
 
                                                     {/* Current Round Badge */}
                                                     {app.currentRound && (
-                                                        <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded inline-block">
+                                                        <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded inline-block dark:bg-indigo-950/30 dark:text-indigo-200">
                                                             {app.currentRound
                                                                 .replace(/([A-Z])/g, " $1")
                                                                 .trim()}
@@ -319,7 +318,7 @@ export function KanbanBoard() {
                                                     )}
 
                                                     {/* Click to view prep hint */}
-                                                    <div className="mt-3 text-xs text-gray-400 group-hover:text-indigo-500 transition-colors">
+                                                    <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">
                                                         Click to view prep →
                                                     </div>
                                                 </div>

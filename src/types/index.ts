@@ -116,6 +116,20 @@ export interface UserProgress {
     lastActiveDate: string;
     totalTasksCompleted: number;
 }
+export type ExperienceLevel = 'Junior' | 'Mid' | 'Senior';
+
+export interface UserProfile {
+    name: string;
+    targetRole: string;
+    experienceLevel: ExperienceLevel;
+}
+
+export type ThemePreference = 'light' | 'dark' | 'system';
+
+export interface AppPreferences {
+    theme: ThemePreference;
+    studyRemindersEnabled: boolean;
+}
 
 // Track completed prep topics globally
 export interface CompletedTopic {
