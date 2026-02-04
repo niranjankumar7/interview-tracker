@@ -31,6 +31,7 @@ type TopicMatcher = {
 };
 
 function escapeRegExp(value: string): string {
+    // Escape topic text so it can be safely embedded in a RegExp.
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
@@ -38,6 +39,7 @@ function buildTopicMatcher(topic: string): TopicMatcher {
     const needle = topic.trim().toLowerCase();
 
     if (needle.length <= 3) {
+        // Avoid overly-permissive substring matches for short topics (e.g. "SQL" in "sequel").
         return {
             needle,
             regex: new RegExp(
@@ -56,6 +58,7 @@ export function TodaysPlanPanel({ showAll = true }: TodaysPlanPanelProps) {
     const progress = useStore((state) => state.progress);
 
     const struggledTopicMatchersByAppId = useMemo(() => {
+        // Precompute once per applications update to avoid per-task lowercasing and repeated scans.
         const result = new Map<string, TopicMatcher[]>();
 
         for (const app of applications) {

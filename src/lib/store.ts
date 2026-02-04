@@ -42,7 +42,8 @@ interface AppState {
      * patch merged into an existing round matched by `roundNumber`.
      *
      * To add new rounds, use `addInterviewRound`. To clear an existing `feedback` block, pass
-     * `feedback: null` for that `roundNumber`.
+     * `feedback: null` for that `roundNumber`. If `feedback` is provided, it is merged field-by-
+     * field, so omitted fields preserve existing values.
      */
     updateApplication: (
         id: string,
@@ -88,25 +89,28 @@ export const useStore = create<AppState>()(
                 set((state) => ({
                     applications: state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
-                        if (
-                            (app.rounds ?? []).some(
-                                (r) => r.roundNumber === round.roundNumber
-                            )
-                        ) {
+
+                        const rounds = (app.rounds ?? []).slice();
+                        const existingIdx = rounds.findIndex(
+                            (r) => r.roundNumber === round.roundNumber
+                        );
+
+                        if (existingIdx === -1) {
+                            rounds.push(round);
+                        } else {
                             if (process.env.NODE_ENV !== 'production') {
                                 console.warn(
-                                    'addInterviewRound: duplicate roundNumber; ignoring',
+                                    'addInterviewRound: duplicate roundNumber; replacing',
                                     {
                                         applicationId,
                                         roundNumber: round.roundNumber,
                                     }
                                 );
                             }
-                            return app;
+                            rounds[existingIdx] = round;
                         }
-                        const rounds = [...(app.rounds ?? []), round].sort(
-                            (a, b) => a.roundNumber - b.roundNumber
-                        );
+
+                        rounds.sort((a, b) => a.roundNumber - b.roundNumber);
                         return { ...app, rounds };
                     }),
                 })),

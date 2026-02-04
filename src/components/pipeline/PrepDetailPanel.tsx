@@ -112,6 +112,7 @@ export function PrepDetailPanel(props: {
   }, [isAddRoundOpen, nextRoundNumber]);
 
   const closeTopmostOverlay = useCallback(() => {
+    // Close priority: feedback modal > add round modal > panel.
     if (feedbackRoundNumber !== null) {
       setFeedbackRoundNumber(null);
       return;
@@ -131,22 +132,21 @@ export function PrepDetailPanel(props: {
       if (e.isComposing) return;
 
       const active = document.activeElement;
-      const isTextInput =
+      const isFormControl =
         active instanceof HTMLInputElement ||
         active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement ||
         (active instanceof HTMLElement && active.isContentEditable);
 
-      if (isTextInput && feedbackRoundNumber === null && !isAddRoundOpen) {
+      if (isFormControl) {
         return;
       }
-
-      e.preventDefault();
       closeTopmostOverlay();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closeTopmostOverlay, feedbackRoundNumber, isAddRoundOpen, isOpen]);
+  }, [closeTopmostOverlay, isOpen]);
 
   const activeRound = useMemo(() => {
     if (!application || feedbackRoundNumber === null) return undefined;
