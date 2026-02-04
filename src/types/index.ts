@@ -7,7 +7,28 @@ export type ApplicationStatus =
     | 'offer'
     | 'rejected';
 
-export type RoleType = 'SDE' | 'QA' | 'Data' | 'PM';
+// Extended to 10 role types for comprehensive prep templates
+export type RoleType =
+    | 'SDE'
+    | 'SDET'
+    | 'ML'
+    | 'DevOps'
+    | 'Frontend'
+    | 'Backend'
+    | 'FullStack'
+    | 'Data'
+    | 'PM'
+    | 'MobileEngineer';
+
+// Interview round types for round-specific prep
+export type InterviewRoundType =
+    | 'HR'
+    | 'TechnicalRound1'
+    | 'TechnicalRound2'
+    | 'SystemDesign'
+    | 'Managerial'
+    | 'Assignment'
+    | 'Final';
 
 export type FocusArea =
     | 'DSA'
@@ -27,9 +48,11 @@ export interface Application {
     id: string;
     company: string;
     role: string;
+    roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string
     interviewDate?: string; // ISO date string
+    currentRound?: InterviewRoundType; // Current interview round for prep
     rounds: InterviewRound[];
     notes: string;
     createdAt: string;
@@ -37,7 +60,7 @@ export interface Application {
 
 export interface InterviewRound {
     roundNumber: number;
-    roundType: 'Technical' | 'HR' | 'Managerial';
+    roundType: InterviewRoundType;
     scheduledDate?: string;
     notes: string;
     questionsAsked: string[];
@@ -99,4 +122,12 @@ export interface UserProgress {
     longestStreak: number;
     lastActiveDate: string;
     totalTasksCompleted: number;
+}
+
+// Track completed prep topics globally
+export interface CompletedTopic {
+    topicName: string;        // Normalized topic name
+    displayName?: string;     // Original display name (for UI)
+    completedAt: string;      // ISO date string
+    source: 'chat' | 'manual';
 }

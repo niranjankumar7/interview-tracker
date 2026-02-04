@@ -7,6 +7,7 @@ import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { useStore } from "@/lib/store";
 import { KanbanBoard, QuestionBankView } from "@/components/pipeline";
+import Link from "next/link";
 import {
   MessageSquare,
   Kanban,
@@ -14,6 +15,7 @@ import {
   RotateCcw,
   Database,
   Flame,
+  BarChart3,
 } from "lucide-react";
 
 type View = "chat" | "pipeline" | "questions";
@@ -39,7 +41,7 @@ export default function ChatPage() {
       tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}
       mcpServers={mcpServers}
     >
-      <div className="h-screen flex flex-col bg-gray-50">
+      <div className="flex flex-1 min-h-0 flex-col bg-gray-50">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">
@@ -80,6 +82,14 @@ export default function ChatPage() {
                   <span className="hidden sm:inline">{item.label}</span>
                 </button>
               ))}
+
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-800"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Link>
             </nav>
 
             {/* Action Buttons */}

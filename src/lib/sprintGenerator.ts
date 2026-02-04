@@ -88,20 +88,20 @@ function getSprintTemplate(roleType: RoleType, days: number): DayTemplate[] {
         }
     }
 
-    if (roleType === 'QA') {
+    if (roleType === 'SDET') {
         if (days >= 7) {
             return [
-                { focus: 'DSA', topics: ['Test Case Design'] },
-                { focus: 'DSA', topics: ['Bug Reporting'] },
-                { focus: 'SystemDesign', topics: ['Automation Basics'] },
-                { focus: 'SystemDesign', topics: ['Selenium', 'API Testing'] },
-                { focus: 'SystemDesign', topics: ['Performance Testing'] },
-                { focus: 'Behavioral', topics: ['STAR Stories'] },
-                { focus: 'Review', topics: ['Mock Scenarios'] },
+                { focus: 'DSA', topics: ['Test Case Design', 'Edge Cases'] },
+                { focus: 'DSA', topics: ['Bug Reporting', 'Root Cause Analysis'] },
+                { focus: 'SystemDesign', topics: ['Test Automation Architecture'] },
+                { focus: 'SystemDesign', topics: ['Selenium', 'API Testing', 'CI/CD'] },
+                { focus: 'SystemDesign', topics: ['Performance', 'Load Testing'] },
+                { focus: 'Behavioral', topics: ['STAR Stories', 'Quality Mindset'] },
+                { focus: 'Review', topics: ['Mock Scenarios', 'White-box Testing'] },
             ];
         }
         return [
-            { focus: 'Review', topics: ['QA Fundamentals'] },
+            { focus: 'Review', topics: ['SDET Fundamentals', 'Testing Best Practices'] },
         ];
     }
 
