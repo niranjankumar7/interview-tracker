@@ -12,9 +12,9 @@ import { z } from "zod";
 export const sprintSetupCardSchema = z.object({
     company: z.string().describe("The company name for the interview"),
     role: z
-        .enum(["SDE", "QA", "Data", "PM"])
+        .enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
         .optional()
-        .describe("The role type being interviewed for"),
+        .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)"),
     interviewDate: z
         .string()
         .optional()
@@ -180,9 +180,15 @@ export function SprintSetupCard({
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                     >
                         <option value="SDE">Software Development Engineer</option>
-                        <option value="QA">Quality Assurance</option>
-                        <option value="Data">Data Analyst / Scientist</option>
+                        <option value="SDET">Software Dev Engineer in Test</option>
+                        <option value="ML">Machine Learning Engineer</option>
+                        <option value="DevOps">DevOps / SRE</option>
+                        <option value="Frontend">Frontend Developer</option>
+                        <option value="Backend">Backend Developer</option>
+                        <option value="FullStack">Full Stack Developer</option>
+                        <option value="Data">Data Engineer / Analyst</option>
                         <option value="PM">Product Manager</option>
+                        <option value="MobileEngineer">Mobile Engineer</option>
                     </select>
                 </div>
 
