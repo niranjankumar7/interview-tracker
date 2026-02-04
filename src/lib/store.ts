@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Application, Sprint, Question, UserProgress } from '@/types';
+import { Application, Sprint, Question, UserProgress, CompletedTopic } from '@/types';
+import { normalizeTopic } from '@/lib/topic-matcher';
 
 interface AppState {
     // Data
@@ -8,6 +9,7 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    completedTopics: CompletedTopic[];
 
     // Actions
     addApplication: (app: Application) => void;
@@ -22,6 +24,11 @@ interface AppState {
     completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
+
+    // Topic progress tracking
+    markTopicComplete: (topicName: string, source?: 'chat' | 'manual') => void;
+    unmarkTopicComplete: (topicName: string) => void;
+    getTopicCompletion: (topicName: string) => CompletedTopic | undefined;
 
     // Utilities
     loadDemoData: () => void;
@@ -42,6 +49,7 @@ export const useStore = create<AppState>()(
             sprints: [],
             questions: [],
             progress: initialProgress,
+            completedTopics: [],
 
             addApplication: (app) =>
                 set((state) => ({
@@ -118,6 +126,34 @@ export const useStore = create<AppState>()(
                 set((state) => ({
                     progress: { ...state.progress, ...updates }
                 })),
+
+            // Topic progress tracking
+            markTopicComplete: (topicName, source = 'manual') => {
+                const normalized = normalizeTopic(topicName);
+                const existing = get().completedTopics.find(t => t.topicName === normalized);
+                if (!existing) {
+                    set((state) => ({
+                        completedTopics: [...state.completedTopics, {
+                            topicName: normalized,
+                            displayName: topicName, // Preserve original for display
+                            completedAt: new Date().toISOString(),
+                            source
+                        }]
+                    }));
+                }
+            },
+
+            unmarkTopicComplete: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                set((state) => ({
+                    completedTopics: state.completedTopics.filter(t => t.topicName !== normalized)
+                }));
+            },
+
+            getTopicCompletion: (topicName) => {
+                const normalized = normalizeTopic(topicName);
+                return get().completedTopics.find(t => t.topicName === normalized);
+            },
 
             loadDemoData: () => {
                 const today = new Date();
@@ -199,7 +235,8 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress
+                progress: initialProgress,
+                completedTopics: [],
             }),
         }),
         {

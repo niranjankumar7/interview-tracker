@@ -1,0 +1,1 @@
+export { PrepDetailPanel } from './PrepDetailPanel';
