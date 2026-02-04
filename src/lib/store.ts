@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isToday, isYesterday, parseISO } from 'date-fns';
 import {
     Application,
     Sprint,
@@ -38,6 +39,9 @@ interface AppState {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    hasHydrated: boolean;
+
+    setHasHydrated: (hasHydrated: boolean) => void;
 
     // Actions
     addApplication: (app: Application) => void;
@@ -90,6 +94,12 @@ const getInitialPreferences = (): AppPreferences => ({
     studyRemindersEnabled: false,
 });
 
+function safeParseISO(value: string | undefined): Date | null {
+    if (!value) return null;
+    const parsed = parseISO(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -100,6 +110,9 @@ export const useStore = create<AppState>()(
             profile: getInitialProfile(),
             preferences: getInitialPreferences(),
             completedTopics: [],
+            hasHydrated: false,
+
+            setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
             addApplication: (app) =>
                 set((state) => ({
@@ -136,7 +149,14 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) =>
+            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+                const existingTask =
+                    get()
+                        .sprints.find((sprint) => sprint.id === sprintId)
+                        ?.dailyPlans[dayIndex]?.blocks[blockIndex]?.tasks[taskIndex];
+
+                if (!existingTask || existingTask.completed) return;
+
                 set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -149,7 +169,7 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+                                    return { ...task, completed: true };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -160,17 +180,44 @@ export const useStore = create<AppState>()(
                             return { ...day, blocks, completed: dayCompleted };
                         });
 
-                        return { ...sprint, dailyPlans };
+                        const isSprintCompleted = dailyPlans.every((d) => d.completed);
+
+                        const nextStatus: Sprint["status"] =
+                            sprint.status === 'completed'
+                                ? 'completed'
+                                : isSprintCompleted
+                                    ? 'completed'
+                                    : sprint.status;
+
+                        return { ...sprint, dailyPlans, status: nextStatus };
                     });
+
+                    const now = new Date();
+                    const lastActive = safeParseISO(state.progress.lastActiveDate);
+
+                    let nextStreak = state.progress.currentStreak;
+                    if (lastActive && isToday(lastActive)) {
+                        nextStreak = Math.max(1, nextStreak);
+                    } else if (lastActive && isYesterday(lastActive)) {
+                        nextStreak = nextStreak + 1;
+                    } else {
+                        nextStreak = 1;
+                    }
+
+                    const nextLongest = Math.max(state.progress.longestStreak, nextStreak);
 
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
+                            currentStreak: nextStreak,
+                            longestStreak: nextLongest,
+                            lastActiveDate: now.toISOString(),
                             totalTasksCompleted: state.progress.totalTasksCompleted + 1
                         }
                     };
-                }),
+                });
+            },
 
             updateProgress: (updates) =>
                 set((state) => ({
@@ -333,6 +380,18 @@ export const useStore = create<AppState>()(
         }),
         {
             name: 'interview-prep-storage',
+            partialize: (state) => ({
+                applications: state.applications,
+                sprints: state.sprints,
+                questions: state.questions,
+                progress: state.progress,
+                profile: state.profile,
+                preferences: state.preferences,
+                completedTopics: state.completedTopics,
+            }),
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

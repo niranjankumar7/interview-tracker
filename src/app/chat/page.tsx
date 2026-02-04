@@ -14,6 +14,7 @@ import {
   BookOpen,
   Flame,
   Settings,
+  BarChart3,
 } from "lucide-react";
 
 type View = "chat" | "pipeline" | "questions";
@@ -80,6 +81,14 @@ export default function ChatPage() {
                   <span className="hidden sm:inline">{item.label}</span>
                 </button>
               ))}
+
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all text-muted-foreground hover:text-foreground"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Link>
             </nav>
 
             <Link

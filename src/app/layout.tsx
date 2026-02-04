@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { NotificationRoot } from "@/components/notifications/NotificationRoot";
 import { Footer } from "@/components/layout/Footer";
 import { ThemeProvider } from "@/components/theme-provider";
 
@@ -34,6 +35,7 @@ export default function RootLayout({
           </main>
         </ThemeProvider>
         <Footer />
+        <NotificationRoot />
       </body>
     </html>
   );
