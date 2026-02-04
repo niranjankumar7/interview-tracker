@@ -44,10 +44,11 @@ export function PrepDetailPanel({
     const roleType = application.roleType || inferRoleType(application.role);
     const availableRounds = useMemo(() => getAvailableRounds(roleType), [roleType]);
     const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
+        const rounds = getAvailableRounds(roleType);
         const preferredRound = application.currentRound;
-        if (preferredRound && availableRounds.includes(preferredRound)) return preferredRound;
+        if (preferredRound && rounds.includes(preferredRound)) return preferredRound;
 
-        return availableRounds[0] ?? "TechnicalRound1";
+        return rounds[0] ?? "TechnicalRound1";
     });
 
     // Scraper state

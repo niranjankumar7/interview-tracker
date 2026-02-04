@@ -354,7 +354,6 @@ export function KanbanBoard() {
 
                                                     {/* Current Round Badge */}
                                                     {roundBadge}
-                                                    {roundBadge}
 
                                                     {/* Click to view prep hint */}
                                                     <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">
