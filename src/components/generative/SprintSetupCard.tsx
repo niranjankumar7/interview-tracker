@@ -2,8 +2,9 @@
 
 import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
+import { parseDateInput } from "@/lib/date-parsing";
 import { RoleType, Application } from "@/types";
-import { format, parseISO, addDays } from "date-fns";
+import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Calendar, Briefcase, Building2, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
@@ -76,16 +77,7 @@ export function SprintSetupCard({
         setState({ ...state, isSubmitting: true });
 
         try {
-            // Parse the date - handle both ISO format and relative dates
-            let parsedDate: Date;
-            try {
-                parsedDate = parseISO(state.interviewDate);
-                if (isNaN(parsedDate.getTime())) {
-                    parsedDate = parseRelativeDate(state.interviewDate);
-                }
-            } catch {
-                parsedDate = parseRelativeDate(state.interviewDate);
-            }
+            const parsedDate = parseDateInput(state.interviewDate);
 
             // Create application
             const application: Application = {
@@ -226,46 +218,6 @@ function getDefaultDate(): string {
 }
 
 function formatDateForInput(dateStr: string): string {
-    try {
-        const date = parseISO(dateStr);
-        if (!isNaN(date.getTime())) {
-            return format(date, "yyyy-MM-dd");
-        }
-    } catch {
-        // Fall through to relative date parsing
-    }
-
-    const parsed = parseRelativeDate(dateStr);
+    const parsed = parseDateInput(dateStr);
     return format(parsed, "yyyy-MM-dd");
-}
-
-function parseRelativeDate(dateString: string): Date {
-    const today = new Date();
-    const lowered = dateString.toLowerCase().trim();
-
-    if (lowered === "today") return today;
-    if (lowered === "tomorrow") return addDays(today, 1);
-
-    // Handle "next thursday", "next monday", etc.
-    const daysOfWeek = [
-        "sunday",
-        "monday",
-        "tuesday",
-        "wednesday",
-        "thursday",
-        "friday",
-        "saturday",
-    ];
-
-    for (let i = 0; i < daysOfWeek.length; i++) {
-        if (lowered.includes(daysOfWeek[i])) {
-            const currentDay = today.getDay();
-            let daysUntil = i - currentDay;
-            if (daysUntil <= 0) daysUntil += 7;
-            return addDays(today, daysUntil);
-        }
-    }
-
-    // Default to 7 days from now
-    return addDays(today, 7);
 }
