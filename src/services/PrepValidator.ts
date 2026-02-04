@@ -1,8 +1,7 @@
 import type { CompletedTopic } from "@/types";
 import { normalizeTopic } from "@/lib/topic-matcher";
-import { useStore } from "@/lib/store";
 
-type TopicCompletionGetter = (topicName: string) => CompletedTopic | undefined;
+type GetCompletedTopic = (topicName: string) => CompletedTopic | undefined;
 
 const TOPIC_PREREQUISITES: Record<string, string[]> = {
     [normalizeTopic("Dynamic Programming")]: ["Recursion"],
@@ -15,8 +14,8 @@ function getDirectPrerequisites(topicName: string): string[] {
 }
 
 function getAllPrerequisites(topicName: string): string[] {
-    const seen = new Set<string>();
-    const prerequisites: string[] = [];
+    const expanded = new Set<string>();
+    const displayNamesByNormalized = new Map<string, Set<string>>();
     const stack = [...getDirectPrerequisites(topicName)];
 
     while (stack.length > 0) {
@@ -24,14 +23,26 @@ function getAllPrerequisites(topicName: string): string[] {
         if (!next) continue;
 
         const normalized = normalizeTopic(next);
-        if (seen.has(normalized)) continue;
-        seen.add(normalized);
-        prerequisites.push(next);
+        const displayNames = displayNamesByNormalized.get(normalized);
+        if (displayNames) {
+            displayNames.add(next);
+        } else {
+            displayNamesByNormalized.set(normalized, new Set([next]));
+        }
 
-        stack.push(...getDirectPrerequisites(next));
+        if (!expanded.has(normalized)) {
+            expanded.add(normalized);
+            stack.push(...getDirectPrerequisites(next));
+        }
     }
 
-    return prerequisites;
+    return Array.from(displayNamesByNormalized.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, displayNames]) => {
+            return Array.from(displayNames).sort((a, b) =>
+                a.localeCompare(b, undefined, { sensitivity: "base" })
+            )[0]!;
+        });
 }
 
 /**
@@ -42,8 +53,8 @@ function getAllPrerequisites(topicName: string): string[] {
 */
 export function getMissingPrerequisites(
     topicName: string,
-    getTopicCompletion: TopicCompletionGetter = useStore.getState().getTopicCompletion
+    getCompletedTopic: GetCompletedTopic
 ): string[] {
     const prerequisites = getAllPrerequisites(topicName);
-    return prerequisites.filter((p) => !getTopicCompletion(p));
+    return prerequisites.filter((p) => !getCompletedTopic(p));
 }
