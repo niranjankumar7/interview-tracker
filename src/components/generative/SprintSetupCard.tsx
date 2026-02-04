@@ -47,7 +47,7 @@ export function SprintSetupCard({
         {
             company: initialCompany || "",
             role: (initialRole as RoleType) || "SDE",
-            interviewDate: formatDateForInput(initialDate || getDefaultDate()),
+            interviewDate: normalizeDateInputValue(initialDate || getDefaultDate()),
             isSubmitted: false,
             isSubmitting: false,
             errorMessage: undefined,
@@ -73,6 +73,12 @@ export function SprintSetupCard({
 
     const handleConfirm = async () => {
         if (!state.company || !state.interviewDate) {
+            setState({
+                ...state,
+                errorMessage: !state.company
+                    ? "Please enter a company name."
+                    : "Please select an interview date.",
+            });
             return;
         }
 
@@ -245,7 +251,7 @@ function getDefaultDate(): string {
     return format(addDays(new Date(), 7), "yyyy-MM-dd");
 }
 
-function formatDateForInput(dateStr: string): string {
+function normalizeDateInputValue(dateStr: string): string {
     if (dateStr.trim().length === 0) return "";
     const parsed = tryParseDateInput(dateStr);
     if (!parsed) return "";
