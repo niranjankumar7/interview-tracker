@@ -35,6 +35,7 @@ function ConnectModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    if (typeof window === "undefined") return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
