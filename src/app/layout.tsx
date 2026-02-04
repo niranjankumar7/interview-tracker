@@ -3,6 +3,7 @@ import "./globals.css";
 import { NotificationRoot } from "@/components/notifications/NotificationRoot";
 import { Footer } from "@/components/layout/Footer";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CalendarSyncGate } from "@/components/calendar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
           </main>
         </ThemeProvider>
         <Footer />
+        <CalendarSyncGate />
         <NotificationRoot />
       </body>
     </html>

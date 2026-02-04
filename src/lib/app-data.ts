@@ -56,6 +56,15 @@ const interviewRoundSchema = z.object({
   scheduledDate: z.string().optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
+  feedback: z
+    .object({
+      rating: z.number(),
+      pros: z.array(z.string()),
+      cons: z.array(z.string()),
+      struggledTopics: z.array(z.string()),
+      notes: z.string(),
+    })
+    .optional(),
 });
 
 const applicationSchema = z.object({
@@ -70,6 +79,7 @@ const applicationSchema = z.object({
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
   createdAt: z.string(),
+  source: z.enum(["manual", "calendar"]).optional(),
 });
 
 const taskSchema = z.object({
@@ -132,6 +142,7 @@ const userProfileSchema = z.object({
 const appPreferencesSchema = z.object({
   theme: themePreferenceSchema,
   studyRemindersEnabled: z.boolean(),
+  calendarAutoSyncEnabled: z.boolean().default(false),
 });
 
 const completedTopicSchema = z.object({
@@ -139,6 +150,42 @@ const completedTopicSchema = z.object({
   displayName: z.string().optional(),
   completedAt: z.string(),
   source: z.enum(["chat", "manual"]),
+});
+
+const calendarConnectionSchema = z.object({
+  provider: z.enum(["google"]),
+  connected: z.boolean(),
+  readOnly: z.boolean(),
+  email: z.string().optional(),
+  connectedAt: z.string().optional(),
+  lastSyncAt: z.string().optional(),
+});
+
+const calendarEventSchema = z.object({
+  id: z.string(),
+  provider: z.enum(["google"]),
+  title: z.string(),
+  start: z.string(),
+  end: z.string().optional(),
+  organizer: z.string().optional(),
+  attendees: z.array(z.string()).optional(),
+  location: z.string().optional(),
+  meetingLink: z.string().optional(),
+  source: z.enum(["sync", "import", "demo"]).optional(),
+});
+
+const calendarSuggestionSchema = z.object({
+  id: z.string(),
+  eventId: z.string(),
+  title: z.string(),
+  company: z.string(),
+  role: z.string().optional(),
+  roleType: roleTypeSchema.optional(),
+  interviewDate: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+  reason: z.string(),
+  status: z.enum(["pending", "confirmed", "dismissed"]),
+  createdAt: z.string(),
 });
 
 export const appDataSnapshotSchema = z.object({
@@ -149,6 +196,9 @@ export const appDataSnapshotSchema = z.object({
   profile: userProfileSchema,
   preferences: appPreferencesSchema,
   completedTopics: z.array(completedTopicSchema),
+  calendar: calendarConnectionSchema.optional(),
+  calendarEvents: z.array(calendarEventSchema).optional(),
+  calendarSuggestions: z.array(calendarSuggestionSchema).optional(),
 });
 
 export const appDataExportSchema = z.object({

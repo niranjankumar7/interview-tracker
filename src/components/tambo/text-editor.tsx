@@ -240,7 +240,7 @@ function SuggestionPopover<T extends SuggestionItem>({
                   "flex items-start gap-2 px-2 py-2 text-sm rounded-md text-left",
                   "hover:bg-accent hover:text-accent-foreground transition-colors",
                   index === state.selectedIndex &&
-                    "bg-accent text-accent-foreground",
+                  "bg-accent text-accent-foreground",
                 )}
                 onClick={() => state.command?.(item)}
               >
@@ -306,11 +306,11 @@ function createResourceMentionConfig(
           editor: Editor,
           tiptapCommand: (attrs: { id: string; label: string }) => void,
         ) =>
-        (item: ResourceItem) => {
-          if (checkMentionExists(editor, item.name)) return;
-          tiptapCommand({ id: item.id, label: item.name });
-          onSelect(item);
-        };
+          (item: ResourceItem) => {
+            if (checkMentionExists(editor, item.name)) return;
+            tiptapCommand({ id: item.id, label: item.name });
+            onSelect(item);
+          };
 
       return {
         onStart: (props) => {
@@ -700,8 +700,8 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
         attributes: {
           class: cn(
             "tiptap",
-            "prose prose-sm max-w-none focus:outline-none",
-            "p-3 rounded-t-lg bg-transparent text-sm leading-relaxed",
+            "prose prose-sm dark:prose-invert max-w-none focus:outline-none",
+            "p-3 rounded-t-lg bg-transparent text-sm leading-relaxed text-foreground",
             "min-h-[82px] max-h-[40vh] overflow-y-auto",
             "break-words whitespace-pre-wrap",
             className,
@@ -747,13 +747,13 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
     useImperativeHandle(ref, () => {
       if (!editor) {
         return {
-          focus: () => {},
-          setContent: () => {},
-          appendText: () => {},
+          focus: () => { },
+          setContent: () => { },
+          appendText: () => { },
           getTextWithResourceURIs: () => ({ text: "", resourceNames: {} }),
           hasMention: () => false,
-          insertMention: () => {},
-          setEditable: () => {},
+          insertMention: () => { },
+          setEditable: () => { },
         };
       }
 

@@ -10,10 +10,16 @@ import {
     UserProfile,
     AppPreferences,
     CompletedTopic,
+    CalendarConnection,
+    CalendarEvent,
+    CalendarInterviewSuggestion,
+    RoleType,
 } from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+import { generateSprint } from '@/lib/sprintGenerator';
+import { buildCalendarSuggestions, mergeCalendarEvents } from '@/lib/calendar-sync';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -23,6 +29,9 @@ export type AppDataSnapshot = {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    calendar?: CalendarConnection;
+    calendarEvents?: CalendarEvent[];
+    calendarSuggestions?: CalendarInterviewSuggestion[];
 };
 
 export type AppDataExport = {
@@ -62,6 +71,9 @@ interface AppState {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    calendar: CalendarConnection;
+    calendarEvents: CalendarEvent[];
+    calendarSuggestions: CalendarInterviewSuggestion[];
     hasHydrated: boolean;
 
     setHasHydrated: (hasHydrated: boolean) => void;
@@ -113,6 +125,22 @@ interface AppState {
     resetData: () => void;
     exportData: () => AppDataExport;
     importData: (data: unknown) => void;
+
+    // Calendar sync
+    connectCalendar: (info: { email?: string }) => void;
+    disconnectCalendar: () => void;
+    syncCalendarEvents: (events: CalendarEvent[], source?: CalendarEvent["source"]) => void;
+    confirmCalendarSuggestion: (
+        id: string,
+        overrides?: {
+            company?: string;
+            role?: string;
+            roleType?: RoleType;
+            interviewDate?: string;
+            createSprint?: boolean;
+        }
+    ) => void;
+    dismissCalendarSuggestion: (id: string) => void;
 }
 
 const getInitialProgress = (): UserProgress => ({
@@ -139,6 +167,13 @@ const getInitialProfile = (): UserProfile => ({
 const getInitialPreferences = (): AppPreferences => ({
     theme: 'system',
     studyRemindersEnabled: false,
+    calendarAutoSyncEnabled: false,
+});
+
+const getInitialCalendar = (): CalendarConnection => ({
+    provider: 'google',
+    connected: false,
+    readOnly: true,
 });
 
 function safeParseISO(value: string | undefined): Date | null {
@@ -157,6 +192,9 @@ export const useStore = create<AppState>()(
             profile: getInitialProfile(),
             preferences: getInitialPreferences(),
             completedTopics: [],
+            calendar: getInitialCalendar(),
+            calendarEvents: [],
+            calendarSuggestions: [],
             hasHydrated: false,
 
             setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -356,6 +394,132 @@ export const useStore = create<AppState>()(
                     preferences: { ...state.preferences, ...updates }
                 })),
 
+            connectCalendar: ({ email }) =>
+                set((state) => ({
+                    calendar: {
+                        ...state.calendar,
+                        connected: true,
+                        readOnly: true,
+                        email: email?.trim() || state.calendar.email,
+                        connectedAt: new Date().toISOString(),
+                    },
+                })),
+
+            disconnectCalendar: () =>
+                set(() => ({
+                    calendar: getInitialCalendar(),
+                    calendarEvents: [],
+                    calendarSuggestions: [],
+                })),
+
+            syncCalendarEvents: (events, source = 'sync') =>
+                set((state) => {
+                    const normalizedEvents = events.map((event) => ({
+                        ...event,
+                        source: event.source ?? source,
+                    }));
+
+                    const mergedEvents = mergeCalendarEvents(
+                        state.calendarEvents,
+                        normalizedEvents
+                    );
+
+                    const newSuggestions = buildCalendarSuggestions(
+                        normalizedEvents,
+                        state.applications
+                    );
+
+                    const nextSuggestions = [...state.calendarSuggestions];
+                    for (const suggestion of newSuggestions) {
+                        const existing = nextSuggestions.find(
+                            (item) => item.eventId === suggestion.eventId
+                        );
+                        if (existing) continue;
+                        nextSuggestions.push(suggestion);
+                    }
+
+                    return {
+                        calendarEvents: mergedEvents,
+                        calendarSuggestions: nextSuggestions,
+                        calendar: {
+                            ...state.calendar,
+                            lastSyncAt: new Date().toISOString(),
+                        },
+                    };
+                }),
+
+            confirmCalendarSuggestion: (id, overrides = {}) => {
+                const state = get();
+                const suggestion = state.calendarSuggestions.find((s) => s.id === id);
+                if (!suggestion) return;
+
+                const company = (overrides.company ?? suggestion.company).trim() || suggestion.company;
+                const role = (overrides.role ?? suggestion.role ?? "Software Engineer").trim();
+                const interviewDate =
+                    overrides.interviewDate ?? suggestion.interviewDate;
+                const roleType = overrides.roleType ?? suggestion.roleType ?? "SDE";
+                const createSprint = overrides.createSprint ?? true;
+
+                const existingApp = state.applications.find(
+                    (app) => app.company.toLowerCase() === company.toLowerCase()
+                );
+
+                let applicationId = existingApp?.id;
+
+                if (!existingApp) {
+                    applicationId = Date.now().toString();
+                    state.addApplication({
+                        id: applicationId,
+                        company,
+                        role,
+                        roleType,
+                        status: "interview",
+                        applicationDate: new Date().toISOString(),
+                        interviewDate,
+                        rounds: [],
+                        notes: "",
+                        createdAt: new Date().toISOString(),
+                        source: "calendar",
+                    });
+                } else {
+                    state.updateApplication(existingApp.id, {
+                        interviewDate,
+                        status: "interview",
+                        role: existingApp.role || role,
+                        roleType: existingApp.roleType ?? roleType,
+                        source: existingApp.source ?? "calendar",
+                    });
+                }
+
+                if (applicationId && createSprint) {
+                    const hasActiveSprint = state.sprints.some(
+                        (sprint) =>
+                            sprint.applicationId === applicationId &&
+                            sprint.status === "active"
+                    );
+                    if (!hasActiveSprint) {
+                        const parsedDate = parseISO(interviewDate);
+                        const dateToUse = Number.isNaN(parsedDate.getTime())
+                            ? new Date()
+                            : parsedDate;
+                        state.addSprint(generateSprint(applicationId, dateToUse, roleType));
+                    }
+                }
+
+                set((state) => ({
+                    calendarSuggestions: state.calendarSuggestions.map((s) =>
+                        s.id === id ? { ...s, status: "confirmed" } : s
+                    ),
+                }));
+            },
+
+            dismissCalendarSuggestion: (id) =>
+                set((state) => ({
+                    calendarSuggestions: state.calendarSuggestions.map((s) =>
+                        s.id === id ? { ...s, status: "dismissed" } : s
+                    ),
+                })),
+
             // Topic progress tracking
             markTopicComplete: (topicName, source = 'manual') => {
                 const normalized = normalizeTopic(topicName);
@@ -452,6 +616,9 @@ export const useStore = create<AppState>()(
                     sprints: [],
                     questions: demoQuestions,
                     completedTopics: [],
+                    calendar: getInitialCalendar(),
+                    calendarEvents: [],
+                    calendarSuggestions: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -469,27 +636,61 @@ export const useStore = create<AppState>()(
                 profile: getInitialProfile(),
                 preferences: getInitialPreferences(),
                 completedTopics: [],
+                calendar: getInitialCalendar(),
+                calendarEvents: [],
+                calendarSuggestions: [],
             }),
 
             exportData: () => {
-                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
+                const {
+                    applications,
+                    sprints,
+                    questions,
+                    progress,
+                    profile,
+                    preferences,
+                    completedTopics,
+                    calendar,
+                    calendarEvents,
+                    calendarSuggestions,
+                } = get();
                 return {
                     version: APP_VERSION,
                     exportedAt: new Date().toISOString(),
-                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
+                    snapshot: {
+                        applications,
+                        sprints,
+                        questions,
+                        progress,
+                        profile,
+                        preferences,
+                        completedTopics,
+                        calendar,
+                        calendarEvents,
+                        calendarSuggestions,
+                    },
                 };
             },
 
             importData: (data) => {
                 const exportParse = appDataExportSchema.safeParse(data);
+                const applySnapshot = (snapshot: AppDataSnapshot) => {
+                    set({
+                        ...snapshot,
+                        calendar: snapshot.calendar ?? getInitialCalendar(),
+                        calendarEvents: snapshot.calendarEvents ?? [],
+                        calendarSuggestions: snapshot.calendarSuggestions ?? [],
+                    });
+                };
+
                 if (exportParse.success) {
-                    set(exportParse.data.snapshot);
+                    applySnapshot(exportParse.data.snapshot);
                     return;
                 }
 
                 const snapshotParse = appDataSnapshotSchema.safeParse(data);
                 if (snapshotParse.success) {
-                    set(snapshotParse.data);
+                    applySnapshot(snapshotParse.data);
                     return;
                 }
 
@@ -510,9 +711,16 @@ export const useStore = create<AppState>()(
                 profile: state.profile,
                 preferences: state.preferences,
                 completedTopics: state.completedTopics,
+                calendar: state.calendar,
+                calendarEvents: state.calendarEvents,
+                calendarSuggestions: state.calendarSuggestions,
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);
+                if (!state) return;
+                if (state.preferences.calendarAutoSyncEnabled === undefined) {
+                    state.updatePreferences({ calendarAutoSyncEnabled: false });
+                }
             },
         }
     )
