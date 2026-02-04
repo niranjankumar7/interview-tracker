@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
-import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
+import { ApplicationStatus } from "@/types";
 import { PrepDetailPanel } from "@/components/prep";
 import {
     Building2,
@@ -28,7 +28,7 @@ export function KanbanBoard() {
     const deleteApplication = useStore((state) => state.deleteApplication);
 
     // State for PrepDetailPanel
-    const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+    const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
     const [isPrepPanelOpen, setIsPrepPanelOpen] = useState(false);
 
     // Track mouse position to distinguish click from drag
@@ -55,7 +55,7 @@ export function KanbanBoard() {
         mouseDownPosition.current = { x: e.clientX, y: e.clientY };
     };
 
-    const handleCardClick = (app: Application, e: React.MouseEvent) => {
+    const handleCardClick = (appId: string, e: React.MouseEvent) => {
         // Don't open panel if clicking on interactive elements
         if ((e.target as HTMLElement).closest('button, a, input')) return;
 
@@ -71,20 +71,13 @@ export function KanbanBoard() {
         }
         mouseDownPosition.current = null;
 
-        setSelectedApp(app);
+        setSelectedAppId(appId);
         setIsPrepPanelOpen(true);
     };
 
     const handleClosePrepPanel = () => {
         setIsPrepPanelOpen(false);
-        setSelectedApp(null);
-    };
-
-    const handleUpdateRound = (round: InterviewRoundType) => {
-        if (selectedApp) {
-            updateApplication(selectedApp.id, { currentRound: round });
-            setSelectedApp({ ...selectedApp, currentRound: round });
-        }
+        setSelectedAppId(null);
     };
 
     // Calculate days until interview
@@ -138,7 +131,7 @@ export function KanbanBoard() {
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, app.id)}
                                                     onMouseDown={handleMouseDown}
-                                                    onClick={(e) => handleCardClick(app, e)}
+                                                    onClick={(e) => handleCardClick(app.id, e)}
                                                     className={`bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
                                                         ? "border-orange-300 ring-2 ring-orange-100"
                                                         : "border-gray-200 hover:border-indigo-300"
@@ -219,12 +212,11 @@ export function KanbanBoard() {
             </div>
 
             {/* Prep Detail Panel Modal */}
-            {selectedApp && (
+            {isPrepPanelOpen && selectedAppId && (
                 <PrepDetailPanel
-                    application={selectedApp}
+                    appId={selectedAppId}
                     isOpen={isPrepPanelOpen}
                     onClose={handleClosePrepPanel}
-                    onUpdateRound={handleUpdateRound}
                 />
             )}
         </>
