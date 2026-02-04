@@ -180,10 +180,10 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                     if (nextPlan) {
                         planToShow = nextPlan;
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")} in this sprint. Showing the next available day in this sprint: ${format(parseISO(nextPlan.date), "yyyy-MM-dd")}.`;
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. Showing the next available day in this sprint: ${format(parseISO(nextPlan.date), "EEE, MMM d, yyyy")}.`;
                     } else {
                         planToShow = lastPlan;
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "yyyy-MM-dd")} in this sprint. This is the last planned prep day in this sprint (${format(parseISO(lastPlan.date), "yyyy-MM-dd")}).`;
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. This is the last planned prep day in this sprint (${format(parseISO(lastPlan.date), "EEE, MMM d, yyyy")}).`;
                     }
                 }
 

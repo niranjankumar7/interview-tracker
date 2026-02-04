@@ -212,7 +212,7 @@ export function SprintSetupCard({
                     </label>
                     <input
                         type="date"
-                        value={formatDateForInput(state.interviewDate)}
+                        value={state.interviewDate}
                         onChange={(e) =>
                             setState({
                                 ...state,
