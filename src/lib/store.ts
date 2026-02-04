@@ -3,12 +3,13 @@ import { persist } from 'zustand/middleware';
 import { isToday, isYesterday, parseISO } from 'date-fns';
 import {
     Application,
+    InterviewRound,
     Sprint,
     Question,
     UserProgress,
-    CompletedTopic,
     UserProfile,
     AppPreferences,
+    CompletedTopic,
 } from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
@@ -30,6 +31,28 @@ export type AppDataExport = {
     snapshot: AppDataSnapshot;
 };
 
+type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
+    Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
+
+type ApplicationUpdate = Partial<Omit<Application, 'rounds'>> & {
+    rounds?: InterviewRoundPatch[];
+};
+
+function mergeRoundFeedback(
+    prev: InterviewRound['feedback'] | undefined,
+    next: InterviewRound['feedback'] | undefined
+): InterviewRound['feedback'] | undefined {
+    if (!next) return prev;
+    if (!prev) return next;
+    return {
+        rating: next.rating ?? prev.rating,
+        pros: next.pros ?? prev.pros,
+        cons: next.cons ?? prev.cons,
+        struggledTopics: next.struggledTopics ?? prev.struggledTopics,
+        notes: next.notes ?? prev.notes,
+    };
+}
+
 interface AppState {
     // Data
     applications: Application[];
@@ -45,7 +68,23 @@ interface AppState {
 
     // Actions
     addApplication: (app: Application) => void;
-    updateApplication: (id: string, updates: Partial<Application>) => void;
+
+    /**
+     * Attempts to add a new interview round. Returns `true` on success.
+     * Returns `false` if a round with the same `roundNumber` already exists.
+     */
+    addInterviewRound: (applicationId: string, round: InterviewRound) => boolean;
+    /**
+     * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
+     * patch merged into an existing round matched by `roundNumber`.
+     *
+     * To add new rounds, use `addInterviewRound`. If `feedback` is provided, it is merged field-
+     * by-field, so omitted fields preserve existing values.
+     */
+    updateApplication: (
+        id: string,
+        updates: ApplicationUpdate
+    ) => void;
     deleteApplication: (id: string) => void;
 
     addSprint: (sprint: Sprint) => void;
@@ -119,11 +158,86 @@ export const useStore = create<AppState>()(
                     applications: [...state.applications, app]
                 })),
 
+            addInterviewRound: (applicationId, round) => {
+                let didAdd = false;
+
+                set((state) => ({
+                    applications: state.applications.map((app) => {
+                        if (app.id !== applicationId) return app;
+
+                        const existingRound = (app.rounds ?? []).some(
+                            (r) => r.roundNumber === round.roundNumber
+                        );
+
+                        if (existingRound) {
+                            const message = `addInterviewRound: duplicate roundNumber ${round.roundNumber} for application ${applicationId}`;
+                            console.error(message, {
+                                applicationId,
+                                roundNumber: round.roundNumber,
+                                round,
+                            });
+                            return app;
+                        }
+
+                        didAdd = true;
+                        const rounds = [...(app.rounds ?? []), round].sort(
+                            (a, b) => a.roundNumber - b.roundNumber
+                        );
+                        return { ...app, rounds };
+                    }),
+                }));
+
+                return didAdd;
+            },
+
             updateApplication: (id, updates) =>
                 set((state) => ({
-                    applications: state.applications.map(app =>
-                        app.id === id ? { ...app, ...updates } : app
-                    )
+                    applications: state.applications.map((app) => {
+                        if (app.id !== id) return app;
+
+                        const { rounds: roundUpdates, ...topLevelUpdates } = updates;
+                        if (!roundUpdates || roundUpdates.length === 0) {
+                            return { ...app, ...topLevelUpdates };
+                        }
+
+                        const nextRounds = [...(app.rounds ?? [])];
+                        for (const roundUpdate of roundUpdates) {
+                            const idx = nextRounds.findIndex(
+                                (r) => r.roundNumber === roundUpdate.roundNumber
+                            );
+
+                            if (idx === -1) {
+                                if (process.env.NODE_ENV !== 'production') {
+                                    console.warn(
+                                        'updateApplication: tried to update missing round',
+                                        {
+                                            applicationId: id,
+                                            roundNumber: roundUpdate.roundNumber,
+                                        }
+                                    );
+                                }
+                                continue;
+                            }
+
+                            const prev = nextRounds[idx];
+                            nextRounds[idx] = {
+                                ...prev,
+                                ...roundUpdate,
+                                feedback: mergeRoundFeedback(
+                                    prev.feedback,
+                                    roundUpdate.feedback
+                                ),
+                            };
+                        }
+
+                        nextRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+                        return {
+                            ...app,
+                            ...topLevelUpdates,
+                            rounds: nextRounds,
+                        };
+                    }),
                 })),
 
             deleteApplication: (id) =>

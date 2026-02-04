@@ -1,6 +1,6 @@
 "use client";
 
-import { PrepDetailPanel } from "@/components/prep";
+import { PrepDetailPanel as PrepGuidancePanel } from "@/components/prep";
 import { useStore } from "@/lib/store";
 import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -10,11 +10,14 @@ import {
     Calendar,
     ExternalLink,
     GripVertical,
+    PanelRight,
     Search,
     Trash2,
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useMemo, useRef, useState, type DragEvent } from "react";
+
+import { PrepDetailPanel as RoundFeedbackPanel } from "./PrepDetailPanel";
 
 const statusColumns: { status: ApplicationStatus; label: string; color: string }[] = [
     { status: "applied", label: "Applied", color: "bg-gray-500" },
@@ -56,6 +59,9 @@ export function KanbanBoard() {
     // State for PrepDetailPanel
     const [selectedApp, setSelectedApp] = useState<Application | null>(null);
     const [isPrepPanelOpen, setIsPrepPanelOpen] = useState(false);
+    const [feedbackApplicationId, setFeedbackApplicationId] = useState<string | null>(
+        null
+    );
 
     // Track mouse position to distinguish click from drag
     const mouseDownPosition = useRef<{ x: number; y: number } | null>(null);
@@ -92,7 +98,11 @@ export function KanbanBoard() {
 
         const matches: { app: Application; rank: number }[] = [];
         for (const entry of indexedApplications) {
-            const rank = getSearchRank(entry.companyLower, entry.roleLower, normalizedQuery);
+            const rank = getSearchRank(
+                entry.companyLower,
+                entry.roleLower,
+                normalizedQuery
+            );
             if (rank === null) continue;
             matches.push({ app: entry.app, rank });
         }
@@ -130,7 +140,10 @@ export function KanbanBoard() {
         e.preventDefault();
     };
 
-    const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ApplicationStatus) => {
+    const handleDrop = (
+        e: DragEvent<HTMLDivElement>,
+        newStatus: ApplicationStatus
+    ) => {
         e.preventDefault();
         const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
         if (appId) {
@@ -321,6 +334,18 @@ export function KanbanBoard() {
                                                     <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">
                                                         Click to view prep →
                                                     </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setFeedbackApplicationId(app.id);
+                                                        }}
+                                                        className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
+                                                    >
+                                                        <PanelRight className="w-4 h-4" />
+                                                        Round feedback
+                                                    </button>
                                                 </div>
                                             );
                                         })
@@ -334,13 +359,19 @@ export function KanbanBoard() {
 
             {/* Prep Detail Panel Modal */}
             {selectedApp && (
-                <PrepDetailPanel
+                <PrepGuidancePanel
                     application={selectedApp}
                     isOpen={isPrepPanelOpen}
                     onClose={handleClosePrepPanel}
                     onUpdateRound={handleUpdateRound}
                 />
             )}
+
+            <RoundFeedbackPanel
+                applicationId={feedbackApplicationId}
+                isOpen={feedbackApplicationId !== null}
+                onClose={() => setFeedbackApplicationId(null)}
+            />
         </>
     );
 }
