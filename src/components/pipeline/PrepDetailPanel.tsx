@@ -65,6 +65,7 @@ export function PrepDetailPanel(props: {
     null
   );
   const [isAddRoundOpen, setIsAddRoundOpen] = useState(false);
+  const [addRoundError, setAddRoundError] = useState<string | null>(null);
 
   const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft>({
     rating: 0,
@@ -102,6 +103,7 @@ export function PrepDetailPanel(props: {
 
   useEffect(() => {
     if (!isAddRoundOpen) return;
+    setAddRoundError(null);
     setRoundDraft((prev) => ({
       ...prev,
       roundNumber: nextRoundNumber,
@@ -488,6 +490,12 @@ export function PrepDetailPanel(props: {
                   />
                 </div>
 
+                {addRoundError && (
+                  <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                    {addRoundError}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
@@ -509,7 +517,11 @@ export function PrepDetailPanel(props: {
                         questionsAsked: [],
                       };
 
-                      addInterviewRound(application.id, newRound);
+                      const didAdd = addInterviewRound(application.id, newRound);
+                      if (!didAdd) {
+                        setAddRoundError("Round number already exists.");
+                        return;
+                      }
                       setIsAddRoundOpen(false);
                     }}
                     className="px-3 py-2 text-sm rounded-lg bg-gray-900 text-white hover:bg-gray-800"

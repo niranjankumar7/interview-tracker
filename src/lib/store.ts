@@ -33,7 +33,7 @@ interface AppState {
 
     // Actions
     addApplication: (app: Application) => void;
-    addInterviewRound: (applicationId: string, round: InterviewRound) => void;
+    addInterviewRound: (applicationId: string, round: InterviewRound) => boolean;
     /**
      * Shallow-update an application. If `updates.rounds` is provided, each entry is treated as a
      * patch merged into an existing round matched by `roundNumber`.
@@ -81,7 +81,9 @@ export const useStore = create<AppState>()(
                     applications: [...state.applications, app]
                 })),
 
-            addInterviewRound: (applicationId, round) =>
+            addInterviewRound: (applicationId, round) => {
+                let didAdd = false;
+
                 set((state) => ({
                     applications: state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
@@ -95,16 +97,24 @@ export const useStore = create<AppState>()(
                             if (process.env.NODE_ENV !== 'production') {
                                 throw new Error(message);
                             }
-                            console.error(message);
+                            console.error(message, {
+                                applicationId,
+                                roundNumber: round.roundNumber,
+                                round,
+                            });
                             return app;
                         }
 
+                        didAdd = true;
                         const rounds = [...(app.rounds ?? []), round].sort(
                             (a, b) => a.roundNumber - b.roundNumber
                         );
                         return { ...app, rounds };
                     }),
-                })),
+                }));
+
+                return didAdd;
+            },
 
             updateApplication: (id, updates) =>
                 set((state) => ({
