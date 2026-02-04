@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Application, InterviewRoundType, RoleType } from "@/types";
+import { InterviewRoundType, RoleType, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
@@ -10,6 +10,8 @@ import {
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
 import { format, parseISO, differenceInDays } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
     X,
     Building2,
@@ -24,6 +26,7 @@ import {
     Target,
     Loader2,
     AlertTriangle,
+    ExternalLink,
 } from "lucide-react";
 import { getMissingPrerequisites } from "@/services/PrepValidator";
 
@@ -50,6 +53,21 @@ export function PrepDetailPanel({
     const updateApplication = useStore((state) => state.updateApplication);
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
+    const sprintForApplication = useStore((state) => {
+        let latestSprint: Sprint | null = null;
+
+        for (const sprint of state.sprints) {
+            if (sprint.applicationId !== appId) continue;
+
+            if (sprint.status === "active") return sprint;
+            if (!latestSprint || sprint.createdAt > latestSprint.createdAt) {
+                latestSprint = sprint;
+            }
+        }
+
+        return latestSprint;
+    });
+
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
 
@@ -57,9 +75,13 @@ export function PrepDetailPanel({
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
+    const [jobDescriptionUrlDraft, setJobDescriptionUrlDraft] = useState("");
+    const [notesDraft, setNotesDraft] = useState("");
+
     // Only the latest scrape request is allowed to update local state.
     const activeScrapeAbortController = useRef<AbortController | null>(null);
     const scrapeRequestId = useRef(0);
+    const lastSyncedApplicationId = useRef<string | null>(null);
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -71,16 +93,49 @@ export function PrepDetailPanel({
         setIsLoadingScraped(false);
     }, []);
 
+    useEffect(() => {
+        if (!isOpen || !application) return;
+        if (lastSyncedApplicationId.current === application.id) return;
+
+        lastSyncedApplicationId.current = application.id;
+        setJobDescriptionUrlDraft(application.jobDescriptionUrl ?? "");
+        setNotesDraft(application.notes ?? "");
+    }, [application, isOpen]);
+
+    const saveApplicationEdits = useCallback(() => {
+        if (!application) return;
+
+        const nextJobDescriptionUrl = jobDescriptionUrlDraft.trim();
+        const nextNotes = notesDraft;
+
+        const prevJobDescriptionUrl = application.jobDescriptionUrl ?? "";
+        const prevNotes = application.notes ?? "";
+
+        if (
+            nextJobDescriptionUrl === prevJobDescriptionUrl &&
+            nextNotes === prevNotes
+        ) {
+            return;
+        }
+
+        updateApplication(appId, {
+            jobDescriptionUrl: nextJobDescriptionUrl,
+            notes: nextNotes,
+        });
+    }, [appId, application, jobDescriptionUrlDraft, notesDraft, updateApplication]);
+
     const handleClose = useCallback(() => {
+        saveApplicationEdits();
         resetScrapeState();
 
         onClose();
-    }, [onClose, resetScrapeState]);
+    }, [onClose, resetScrapeState, saveApplicationEdits]);
 
     useEffect(() => {
         if (!isOpen) {
             resetScrapeState();
             setHadApplication(false);
+            lastSyncedApplicationId.current = null;
         }
     }, [isOpen, resetScrapeState]);
 
@@ -167,6 +222,59 @@ export function PrepDetailPanel({
     const daysUntilInterview = application.interviewDate
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
+
+    const sprintStatusSummary = sprintForApplication
+        ? (() => {
+            const totalTasks = sprintForApplication.dailyPlans.reduce(
+                (acc, day) =>
+                    acc +
+                    day.blocks.reduce(
+                        (blockAcc, block) => blockAcc + block.tasks.length,
+                        0
+                    ),
+                0
+            );
+            const completedTasks = sprintForApplication.dailyPlans.reduce(
+                (acc, day) =>
+                    acc +
+                    day.blocks.reduce(
+                        (blockAcc, block) =>
+                            blockAcc + block.tasks.filter((t) => t.completed).length,
+                        0
+                    ),
+                0
+            );
+
+            const percent =
+                totalTasks === 0
+                    ? 0
+                    : Math.round((completedTasks / totalTasks) * 100);
+
+            const daysLeft = differenceInDays(
+                parseISO(sprintForApplication.interviewDate),
+                new Date()
+            );
+
+            const completedDays = sprintForApplication.dailyPlans.filter(
+                (d) => d.completed
+            ).length;
+
+            return {
+                totalTasks,
+                completedTasks,
+                percent,
+                daysLeft,
+                completedDays,
+            };
+        })()
+        : null;
+
+    const jobDescriptionHref = (() => {
+        const raw = jobDescriptionUrlDraft.trim();
+        if (!raw) return "";
+        if (/^https?:\/\//i.test(raw)) return raw;
+        return `https://${raw}`;
+    })();
 
     const handleRoundChange = (round: InterviewRoundType) => {
         updateApplication(appId, { currentRound: round });
@@ -260,6 +368,117 @@ export function PrepDetailPanel({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="md:col-span-2 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                            <h3 className="font-semibold text-lg text-gray-800 mb-4">
+                                Application details
+                            </h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Job description URL
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="url"
+                                            value={jobDescriptionUrlDraft}
+                                            onChange={(e) =>
+                                                setJobDescriptionUrlDraft(e.target.value)
+                                            }
+                                            onBlur={saveApplicationEdits}
+                                            placeholder="https://..."
+                                        />
+                                        {jobDescriptionHref && (
+                                            <a
+                                                href={jobDescriptionHref}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50"
+                                                aria-label="Open job description"
+                                            >
+                                                <ExternalLink className="h-4 w-4" />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Notes
+                                    </label>
+                                    <Textarea
+                                        value={notesDraft}
+                                        onChange={(e) => setNotesDraft(e.target.value)}
+                                        onBlur={saveApplicationEdits}
+                                        placeholder="Add anything you want to remember about this application..."
+                                        className="min-h-[96px]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-5 border border-emerald-200">
+                            <h3 className="font-semibold text-lg text-emerald-900 mb-4 flex items-center gap-2">
+                                <Calendar className="w-5 h-5" />
+                                Prep plan
+                            </h3>
+
+                            {sprintForApplication && sprintStatusSummary ? (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-emerald-800">Sprint</span>
+                                        <span
+                                            className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                                sprintForApplication.status === "completed"
+                                                    ? "bg-emerald-200 text-emerald-900"
+                                                    : sprintForApplication.status === "expired"
+                                                        ? "bg-amber-200 text-amber-900"
+                                                        : "bg-emerald-600 text-white"
+                                                }`}
+                                        >
+                                            {sprintForApplication.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-emerald-800">Days left</span>
+                                        <span className="text-sm font-semibold text-emerald-900">
+                                            {Math.max(0, sprintStatusSummary.daysLeft)}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-emerald-800">Completed</span>
+                                        <span className="text-sm font-semibold text-emerald-900">
+                                            {sprintStatusSummary.percent}%
+                                        </span>
+                                    </div>
+
+                                    <div className="w-full bg-emerald-200 rounded-full h-2">
+                                        <div
+                                            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-300"
+                                            style={{
+                                                width: `${sprintStatusSummary.percent}%`,
+                                            }}
+                                        />
+                                    </div>
+
+                                    <p className="text-xs text-emerald-800">
+                                        {sprintStatusSummary.completedDays}/{
+                                            sprintForApplication.totalDays
+                                        } days • {sprintStatusSummary.completedTasks}/
+                                        {sprintStatusSummary.totalTasks} tasks
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-emerald-800">
+                                    No sprint yet. Create one to get a day-by-day plan.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
                     {prepContent ? (
                         <>
                             {/* Focus Areas */}
