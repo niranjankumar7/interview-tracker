@@ -101,11 +101,13 @@ export function PrepDetailPanel({
 
         lastSyncedApplicationId.current = application.id;
         const jobDescriptionUrl = application.jobDescriptionUrl ?? "";
+        const notes = application.notes ?? "";
+
         setJobDescriptionUrlDraft(jobDescriptionUrl);
-        setNotesDraft(application.notes);
+        setNotesDraft(notes);
 
         lastSavedJobDescriptionUrl.current = jobDescriptionUrl;
-        lastSavedNotes.current = application.notes;
+        lastSavedNotes.current = notes;
     }, [application, isOpen]);
 
     const saveApplicationEdits = useCallback(() => {
@@ -257,10 +259,12 @@ export function PrepDetailPanel({
                     : Math.round((completedTasks / totalTasks) * 100);
             const clampedPercent = Math.max(0, Math.min(100, percent));
 
-            const daysDelta = differenceInDays(
-                startOfDay(parseISO(sprintForApplication.interviewDate)),
-                today
+            const sprintInterviewDate = safeParseISODate(
+                sprintForApplication.interviewDate
             );
+            const daysDelta = sprintInterviewDate
+                ? differenceInDays(startOfDay(sprintInterviewDate), today)
+                : 0;
 
             const overdueDays =
                 sprintForApplication.status === "expired" && daysDelta < 0
@@ -738,6 +742,12 @@ export function PrepDetailPanel({
             </div>
         </div>
     );
+}
+
+function safeParseISODate(value: string | undefined): Date | null {
+    if (!value) return null;
+    const parsed = parseISO(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 // Helper function to infer role type from role string

@@ -69,7 +69,7 @@ const applicationSchema = z.object({
   interviewDate: z.string().optional(),
   currentRound: interviewRoundTypeSchema.optional(),
   rounds: z.array(interviewRoundSchema),
-  notes: z.string(),
+  notes: z.string().default(""),
   createdAt: z.string(),
 });
 
