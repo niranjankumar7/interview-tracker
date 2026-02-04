@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
-import { ApplicationStatus, InterviewRoundType } from "@/types";
+import { ApplicationStatus } from "@/types";
 import { PrepDetailPanel } from "@/components/prep";
 import {
     Building2,
@@ -78,12 +78,6 @@ export function KanbanBoard() {
     const handleClosePrepPanel = () => {
         setIsPrepPanelOpen(false);
         setSelectedAppId(null);
-    };
-
-    const handleUpdateRound = (round: InterviewRoundType) => {
-        if (selectedAppId) {
-            updateApplication(selectedAppId, { currentRound: round });
-        }
     };
 
     // Calculate days until interview
@@ -218,12 +212,11 @@ export function KanbanBoard() {
             </div>
 
             {/* Prep Detail Panel Modal */}
-            {selectedAppId && (
+            {isPrepPanelOpen && selectedAppId && (
                 <PrepDetailPanel
                     appId={selectedAppId}
                     isOpen={isPrepPanelOpen}
                     onClose={handleClosePrepPanel}
-                    onUpdateRound={handleUpdateRound}
                 />
             )}
         </>

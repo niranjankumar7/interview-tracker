@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { InterviewRoundType, RoleType } from "@/types";
 import {
     getRoundPrepContent,
@@ -28,88 +28,144 @@ interface PrepDetailPanelProps {
     appId: string;
     isOpen: boolean;
     onClose: () => void;
-    onUpdateRound?: (round: InterviewRoundType) => void;
 }
+
+// Delay close slightly to avoid flicker if the application list is briefly replaced.
+const CLOSE_ON_MISSING_APP_DELAY_MS = 200;
+
+// Used only when a role has no configured rounds (or `availableRounds[0]` is missing).
+const SELECTED_ROUND_FALLBACK: InterviewRoundType = "TechnicalRound1";
 
 export function PrepDetailPanel({
     appId,
     isOpen,
     onClose,
-    onUpdateRound,
 }: PrepDetailPanelProps) {
     const application = useStore((state) =>
         state.applications.find((app) => app.id === appId)
     );
     const updateApplication = useStore((state) => state.updateApplication);
+    const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
-    useEffect(() => {
-        if (isOpen && !application) {
-            onClose();
-        }
-    }, [application, isOpen, onClose]);
-
-    // Determine role type - try to match from roleType or parse from role string
-    const roleType: RoleType =
-        application?.roleType || (application ? inferRoleType(application.role) : "SDE");
-
-    const selectedRoundFallback: InterviewRoundType = "TechnicalRound1";
+    // Tracks whether the current `appId` has been found in the store at least once.
+    const [hadApplication, setHadApplication] = useState(false);
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
     const [isLoadingScraped, setIsLoadingScraped] = useState(false);
 
-    const availableRounds = getAvailableRounds(roleType);
-    const defaultRound = availableRounds[0]?.value ?? selectedRoundFallback;
+    // Only the latest scrape request is allowed to update local state.
+    const activeScrapeAbortController = useRef<AbortController | null>(null);
+    const scrapeRequestId = useRef(0);
+
+    const resetScrapeState = useCallback(() => {
+        if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
+            activeScrapeAbortController.current.abort();
+        }
+        activeScrapeAbortController.current = null;
+
+        setScrapedContent(null);
+        setIsLoadingScraped(false);
+    }, []);
+
+    const handleClose = useCallback(() => {
+        resetScrapeState();
+
+        onClose();
+    }, [onClose, resetScrapeState]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            resetScrapeState();
+            setHadApplication(false);
+        }
+    }, [isOpen, resetScrapeState]);
+
+    useEffect(() => {
+        setHadApplication(false);
+    }, [appId]);
+
+    useEffect(() => {
+        if (isOpen && application) {
+            setHadApplication(true);
+        }
+    }, [application, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || application || !hadApplication) return;
+
+        const timeout = setTimeout(() => {
+            handleClose();
+        }, CLOSE_ON_MISSING_APP_DELAY_MS);
+
+        return () => clearTimeout(timeout);
+    }, [application, appId, hadApplication, handleClose, isOpen]);
+
+    const company = application?.company ?? null;
+    const role = application?.role ?? null;
+    const roleType: RoleType = application ? application.roleType || inferRoleType(application.role) : "SDE";
+
+    const availableRounds = roleType ? getAvailableRounds(roleType) : [];
+    const defaultRound = availableRounds[0]?.value ?? SELECTED_ROUND_FALLBACK;
     const selectedRoundFromStore = application?.currentRound;
     const selectedRound =
-        selectedRoundFromStore &&
-            availableRounds.some((r) => r.value === selectedRoundFromStore)
+        selectedRoundFromStore && availableRounds.some((r) => r.value === selectedRoundFromStore)
             ? selectedRoundFromStore
             : defaultRound;
 
-    const prepContent = getRoundPrepContent(roleType, selectedRound);
-
-    // Access topic completion from global store (centralized matching logic)
-    const getTopicCompletion = useStore((state) => state.getTopicCompletion);
-
-    const daysUntilInterview = application?.interviewDate
-        ? differenceInDays(parseISO(application.interviewDate), new Date())
-        : null;
+    const scrapeKey = isOpen && company && role ? `${appId}|${company}|${role}|${roleType}|${selectedRound}` : null;
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
     useEffect(() => {
-        const abortController = new AbortController();
-
-        if (isOpen && application?.company) {
-            setIsLoadingScraped(true);
-            getCompanyPrepData(application.company, application.role, roleType, selectedRound)
-                .then(data => {
-                    if (!abortController.signal.aborted) {
-                        setScrapedContent(data);
-                    }
-                })
-                .catch(err => {
-                    if (!abortController.signal.aborted) {
-                        console.error('Error fetching scraped data:', err);
-                    }
-                })
-                .finally(() => {
-                    if (!abortController.signal.aborted) {
-                        setIsLoadingScraped(false);
-                    }
-                });
-        }
-
-        return () => abortController.abort();
-    }, [isOpen, application?.company, application?.role, roleType, selectedRound]);
-
-    const handleRoundChange = (round: InterviewRoundType) => {
-        if (onUpdateRound) {
-            onUpdateRound(round);
+        if (!scrapeKey || !company || !role) {
+            resetScrapeState();
             return;
         }
 
+        const abortController = new AbortController();
+        const requestId = (scrapeRequestId.current += 1);
+
+        activeScrapeAbortController.current?.abort();
+        activeScrapeAbortController.current = abortController;
+
+        setScrapedContent(null);
+
+        setIsLoadingScraped(true);
+        getCompanyPrepData(company, role, roleType, selectedRound)
+            .then((data) => {
+                if (abortController.signal.aborted) return;
+                if (scrapeRequestId.current !== requestId) return;
+                setScrapedContent(data);
+            })
+            .catch((err) => {
+                if (abortController.signal.aborted) return;
+                if (scrapeRequestId.current !== requestId) return;
+                console.error("Error fetching scraped data:", err);
+            })
+            .finally(() => {
+                if (abortController.signal.aborted) return;
+                if (scrapeRequestId.current !== requestId) return;
+                setIsLoadingScraped(false);
+            });
+
+        return () => {
+            abortController.abort();
+            if (activeScrapeAbortController.current === abortController) {
+                activeScrapeAbortController.current = null;
+            }
+        };
+    }, [company, resetScrapeState, role, roleType, scrapeKey, selectedRound]);
+
+    if (!isOpen || !application) return null;
+
+    const prepContent = getRoundPrepContent(roleType, selectedRound);
+
+    const daysUntilInterview = application.interviewDate
+        ? differenceInDays(parseISO(application.interviewDate), new Date())
+        : null;
+
+    const handleRoundChange = (round: InterviewRoundType) => {
         updateApplication(appId, { currentRound: round });
     };
 
@@ -124,8 +180,6 @@ export function PrepDetailPanel({
         }
         return { completed: false };
     };
-
-    if (!isOpen || !application) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -154,7 +208,7 @@ export function PrepDetailPanel({
                             </div>
                         </div>
                         <button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                         >
                             <X className="w-6 h-6" />
