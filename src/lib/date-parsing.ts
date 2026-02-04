@@ -27,7 +27,7 @@ export function tryParseDateInput(
     const base = startOfDay(baseDate);
 
     if (raw.length === 0) {
-        return base;
+        return null;
     }
 
     const isoLike = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/;

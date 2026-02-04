@@ -218,6 +218,7 @@ function getDefaultDate(): string {
 }
 
 function formatDateForInput(dateStr: string): string {
+    if (dateStr.trim().length === 0) return "";
     const parsed = parseDateInput(dateStr);
     return format(parsed, "yyyy-MM-dd");
 }
