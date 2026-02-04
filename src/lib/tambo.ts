@@ -15,6 +15,8 @@ import {
   todaysPlanPanelSchema,
   AddQuestionPanel,
   addQuestionPanelSchema,
+  PipelineSummaryPanel,
+  pipelineSummaryPanelSchema,
 } from "@/components/generative";
 import { useStore } from "@/lib/store";
 import type { TamboComponent } from "@tambo-ai/react";
@@ -401,6 +403,13 @@ export const components: TamboComponent[] = [
       "A component that allows users to add interview questions to their question bank. Use this when the user wants to add a question, mentions a question they were asked, or wants to save a question for later. Auto-detects the question category (DSA, System Design, Behavioral, SQL).",
     component: AddQuestionPanel,
     propsSchema: addQuestionPanelSchema,
+  },
+  {
+    name: "PipelineSummaryPanel",
+    description:
+      "A component that summarizes the user's job application pipeline. Use this when the user asks things like 'show my pipeline', 'show my interviews', or wants to see applications grouped by status with upcoming interview dates and a countdown. Supports an optional status filter.",
+    component: PipelineSummaryPanel,
+    propsSchema: pipelineSummaryPanelSchema,
   },
   // Add more components here
 ];
