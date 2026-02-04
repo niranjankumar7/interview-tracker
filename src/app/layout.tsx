@@ -4,6 +4,7 @@ import { NotificationRoot } from "@/components/notifications/NotificationRoot";
 import { Footer } from "@/components/layout/Footer";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CalendarSyncGate } from "@/components/calendar";
+import { TamboProviderWrapper } from "@/components/providers/tambo-provider-wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,9 +32,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main id="main-content" className="flex flex-1 min-h-0 flex-col">
-            {children}
-          </main>
+          <TamboProviderWrapper>
+            <main id="main-content" className="flex flex-1 min-h-0 flex-col">
+              {children}
+            </main>
+          </TamboProviderWrapper>
         </ThemeProvider>
         <Footer />
         <CalendarSyncGate />
