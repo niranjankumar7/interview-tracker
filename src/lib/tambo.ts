@@ -15,6 +15,8 @@ import {
   todaysPlanPanelSchema,
   AddQuestionPanel,
   addQuestionPanelSchema,
+  OfferDetailsPanel,
+  offerDetailsPanelSchema,
 } from "@/components/generative";
 import { useStore } from "@/lib/store";
 import type { TamboComponent } from "@tambo-ai/react";
@@ -401,6 +403,13 @@ export const components: TamboComponent[] = [
       "A component that allows users to add interview questions to their question bank. Use this when the user wants to add a question, mentions a question they were asked, or wants to save a question for later. Auto-detects the question category (DSA, System Design, Behavioral, SQL).",
     component: AddQuestionPanel,
     propsSchema: addQuestionPanelSchema,
+  },
+  {
+    name: "OfferDetailsPanel",
+    description:
+      "A component that captures and edits job offer details (CTC/base/bonus/equity, work mode, location, joining date, benefits, notes) and saves them into the matching application. Use this when the user says they received an offer or mentions compensation details like 'CTC 18 LPA, hybrid, Bangalore'.",
+    component: OfferDetailsPanel,
+    propsSchema: offerDetailsPanelSchema,
   },
   // Add more components here
 ];

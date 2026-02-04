@@ -58,21 +58,24 @@ export type SprintStatus = (typeof SPRINT_STATUSES)[number];
 export const BLOCK_TYPES = ['morning', 'evening', 'quick'] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
-export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
-export type FocusArea =
-    | 'DSA'
-    | 'SystemDesign'
-    | 'Behavioral'
-    | 'Review'
-    | 'Mock';
+export const WORK_MODES = ['WFH', 'Hybrid', 'Office'] as const;
 
-export type QuestionCategory =
-    | 'DSA'
-    | 'SystemDesign'
-    | 'Behavioral'
-    | 'SQL'
-    | 'Other';
+export type WorkMode = (typeof WORK_MODES)[number];
+
+export interface OfferDetails {
+    baseSalary?: number;
+    equity?: number | string;
+    bonus?: number;
+    currency?: string;
+    location?: string;
+    workMode?: WorkMode;
+    joiningDate?: string;
+    noticePeriod?: string;
+    benefits?: string[];
+    notes?: string;
+    totalCTC?: number;
+}
 
 export interface Application {
     id: string;
@@ -85,6 +88,7 @@ export interface Application {
     currentRound?: InterviewRoundType; // Current interview round for prep
     rounds: InterviewRound[];
     notes: string;
+    offerDetails?: OfferDetails;
     createdAt: string;
 }
 

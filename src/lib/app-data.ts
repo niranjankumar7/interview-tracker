@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WORK_MODES } from "@/types";
 
 const applicationStatusSchema = z.enum([
   "applied",
@@ -58,6 +59,24 @@ const interviewRoundSchema = z.object({
   questionsAsked: z.array(z.string()),
 });
 
+const workModeSchema = z.enum(WORK_MODES);
+
+const offerDetailsSchema = z
+  .object({
+    baseSalary: z.number().optional(),
+    equity: z.union([z.number(), z.string()]).optional(),
+    bonus: z.number().optional(),
+    currency: z.string().optional(),
+    location: z.string().optional(),
+    workMode: workModeSchema.optional(),
+    joiningDate: z.string().optional(),
+    noticePeriod: z.string().optional(),
+    benefits: z.array(z.string()).optional(),
+    notes: z.string().optional(),
+    totalCTC: z.number().optional(),
+  })
+  .strict();
+
 const applicationSchema = z.object({
   id: z.string(),
   company: z.string(),
@@ -69,6 +88,7 @@ const applicationSchema = z.object({
   currentRound: interviewRoundTypeSchema.optional(),
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
+  offerDetails: offerDetailsSchema.optional(),
   createdAt: z.string(),
 });
 
