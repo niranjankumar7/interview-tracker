@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Application, InterviewRoundType, RoleType } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
@@ -42,7 +42,7 @@ export function PrepDetailPanel({
 }: PrepDetailPanelProps) {
     // Determine role type - try to match from roleType or parse from role string
     const roleType = application.roleType || inferRoleType(application.role);
-    const availableRounds = useMemo(() => getAvailableRounds(roleType), [roleType]);
+    const availableRounds = getAvailableRounds(roleType);
     const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
         const rounds = getAvailableRounds(roleType);
         const preferredRound = application.currentRound;
@@ -66,14 +66,15 @@ export function PrepDetailPanel({
 
     // Reset selected round when application changes and keep it within the available rounds
     useEffect(() => {
+        const rounds = getAvailableRounds(roleType);
         const preferredRound = application.currentRound;
         const nextSelectedRound =
-            preferredRound && availableRounds.includes(preferredRound)
+            preferredRound && rounds.includes(preferredRound)
                 ? preferredRound
-                : (availableRounds[0] ?? "TechnicalRound1");
+                : (rounds[0] ?? "TechnicalRound1");
 
         setSelectedRound(nextSelectedRound);
-    }, [application.id, application.currentRound, availableRounds]);
+    }, [application.id, application.currentRound, roleType]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
