@@ -23,7 +23,9 @@ import {
     HelpCircle,
     Target,
     Loader2,
+    AlertTriangle,
 } from "lucide-react";
+import { getMissingPrerequisites } from "@/services/PrepValidator";
 
 interface PrepDetailPanelProps {
     application: Application;
@@ -215,11 +217,24 @@ export function PrepDetailPanel({
                                     Key Topics to Prepare
                                 </h3>
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    {prepContent.keyTopics.map((topic, idx) => {
+                                    {prepContent.keyTopics.map((topic) => {
                                         const completion = isTopicCompleted(topic.name);
+                                        const missingPrerequisites = completion.completed
+                                            ? getMissingPrerequisites(topic.name, getTopicCompletion)
+                                            : [];
+                                        const hasMissingPrerequisites = missingPrerequisites.length > 0;
+                                        const missingPrerequisitesLabel = hasMissingPrerequisites
+                                            ? `Missing prerequisite${missingPrerequisites.length === 1 ? "" : "s"}: ${missingPrerequisites.join(
+                                                ", "
+                                            )}`
+                                            : "";
+                                        const missingPrerequisitesTooltipId = `missing-prerequisites-${topic.name
+                                            .replace(/[^a-z0-9]+/gi, "-")
+                                            .toLowerCase()}`;
+
                                         return (
                                             <div
-                                                key={idx}
+                                                key={topic.name}
                                                 className={`rounded-xl p-4 border transition-all ${completion.completed
                                                     ? "bg-green-50 border-green-300 ring-2 ring-green-200"
                                                     : topic.priority === "high"
@@ -237,6 +252,25 @@ export function PrepDetailPanel({
                                                         <h4 className={`font-semibold ${completion.completed ? "text-green-800" : "text-gray-800"}`}>
                                                             {topic.name}
                                                         </h4>
+                                                        {completion.completed && hasMissingPrerequisites && (
+                                                            <span className="relative inline-flex items-center group">
+                                                                <button
+                                                                    type="button"
+                                                                    className="inline-flex items-center text-amber-600"
+                                                                    aria-describedby={missingPrerequisitesTooltipId}
+                                                                >
+                                                                    <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+                                                                    <span className="sr-only">{missingPrerequisitesLabel}</span>
+                                                                </button>
+                                                                <span
+                                                                    id={missingPrerequisitesTooltipId}
+                                                                    role="tooltip"
+                                                                    className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-max max-w-[240px] -translate-x-1/2 whitespace-normal rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                                                >
+                                                                    {missingPrerequisitesLabel}
+                                                                </span>
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {completion.completed ? (
                                                         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
