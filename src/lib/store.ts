@@ -7,9 +7,29 @@ import {
     Sprint,
     Question,
     UserProgress,
+    UserProfile,
+    AppPreferences,
     CompletedTopic,
 } from '@/types';
+import { APP_VERSION } from '@/lib/constants';
+import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+
+export type AppDataSnapshot = {
+    applications: Application[];
+    sprints: Sprint[];
+    questions: Question[];
+    progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
+    completedTopics: CompletedTopic[];
+};
+
+export type AppDataExport = {
+    version: string;
+    exportedAt: string;
+    snapshot: AppDataSnapshot;
+};
 
 type InterviewRoundPatch = Pick<InterviewRound, 'roundNumber'> &
     Partial<Pick<InterviewRound, 'feedback' | 'questionsAsked'>>;
@@ -39,6 +59,8 @@ interface AppState {
     sprints: Sprint[];
     questions: Question[];
     progress: UserProgress;
+    profile: UserProfile;
+    preferences: AppPreferences;
     completedTopics: CompletedTopic[];
     hasHydrated: boolean;
 
@@ -70,9 +92,16 @@ interface AppState {
 
     addQuestion: (question: Question) => void;
 
-    completeTask: (sprintId: string, dayIndex: number, blockIndex: number, taskIndex: number) => void;
+    completeTask: (
+        sprintId: string,
+        dayIndex: number,
+        blockIndex: number,
+        taskIndex: number
+    ) => void;
 
     updateProgress: (updates: Partial<UserProgress>) => void;
+    updateProfile: (updates: Partial<UserProfile>) => void;
+    updatePreferences: (updates: Partial<AppPreferences>) => void;
 
     // Topic progress tracking
     markTopicComplete: (topicName: string, source?: 'chat' | 'manual') => void;
@@ -82,14 +111,27 @@ interface AppState {
     // Utilities
     loadDemoData: () => void;
     resetData: () => void;
+    exportData: () => AppDataExport;
+    importData: (data: unknown) => void;
 }
 
-const initialProgress: UserProgress = {
+const getInitialProgress = (): UserProgress => ({
     currentStreak: 0,
     longestStreak: 0,
     lastActiveDate: new Date().toISOString(),
     totalTasksCompleted: 0,
-};
+});
+
+const getInitialProfile = (): UserProfile => ({
+    name: '',
+    targetRole: '',
+    experienceLevel: 'Mid',
+});
+
+const getInitialPreferences = (): AppPreferences => ({
+    theme: 'system',
+    studyRemindersEnabled: false,
+});
 
 function safeParseISO(value: string | undefined): Date | null {
     if (!value) return null;
@@ -103,7 +145,9 @@ export const useStore = create<AppState>()(
             applications: [],
             sprints: [],
             questions: [],
-            progress: initialProgress,
+            progress: getInitialProgress(),
+            profile: getInitialProfile(),
+            preferences: getInitialPreferences(),
             completedTopics: [],
             hasHydrated: false,
 
@@ -294,6 +338,16 @@ export const useStore = create<AppState>()(
                     progress: { ...state.progress, ...updates }
                 })),
 
+            updateProfile: (updates) =>
+                set((state) => ({
+                    profile: { ...state.profile, ...updates }
+                })),
+
+            updatePreferences: (updates) =>
+                set((state) => ({
+                    preferences: { ...state.preferences, ...updates }
+                })),
+
             // Topic progress tracking
             markTopicComplete: (topicName, source = 'manual') => {
                 const normalized = normalizeTopic(topicName);
@@ -302,7 +356,7 @@ export const useStore = create<AppState>()(
                     set((state) => ({
                         completedTopics: [...state.completedTopics, {
                             topicName: normalized,
-                            displayName: topicName, // Preserve original for display
+                            displayName: topicName,
                             completedAt: new Date().toISOString(),
                             source
                         }]
@@ -389,6 +443,7 @@ export const useStore = create<AppState>()(
                     applications: demoApplications,
                     sprints: [],
                     questions: demoQuestions,
+                    completedTopics: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -402,9 +457,40 @@ export const useStore = create<AppState>()(
                 applications: [],
                 sprints: [],
                 questions: [],
-                progress: initialProgress,
+                progress: getInitialProgress(),
+                profile: getInitialProfile(),
+                preferences: getInitialPreferences(),
                 completedTopics: [],
             }),
+
+            exportData: () => {
+                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
+                return {
+                    version: APP_VERSION,
+                    exportedAt: new Date().toISOString(),
+                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
+                };
+            },
+
+            importData: (data) => {
+                const exportParse = appDataExportSchema.safeParse(data);
+                if (exportParse.success) {
+                    set(exportParse.data.snapshot);
+                    return;
+                }
+
+                const snapshotParse = appDataSnapshotSchema.safeParse(data);
+                if (snapshotParse.success) {
+                    set(snapshotParse.data);
+                    return;
+                }
+
+                const issue = exportParse.error.issues[0] ?? snapshotParse.error.issues[0];
+                const defaultWhere = exportParse.error.issues[0] ? 'data' : 'snapshot';
+                const where = issue?.path?.length ? issue.path.join('.') : defaultWhere;
+                const message = issue?.message ?? 'File does not match expected export format';
+                throw new Error(`${where}: ${message}`);
+            },
         }),
         {
             name: 'interview-prep-storage',
@@ -413,6 +499,8 @@ export const useStore = create<AppState>()(
                 sprints: state.sprints,
                 questions: state.questions,
                 progress: state.progress,
+                profile: state.profile,
+                preferences: state.preferences,
                 completedTopics: state.completedTopics,
             }),
             onRehydrateStorage: () => (state) => {
