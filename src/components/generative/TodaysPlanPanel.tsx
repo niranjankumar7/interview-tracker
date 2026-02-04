@@ -44,10 +44,20 @@ export function TodaysPlanPanel({
     const activeSprints = sprints.filter((s) => s.status === "active");
 
     const orderedSprints = focusApplicationId
-        ? [
-            ...activeSprints.filter((s) => s.applicationId === focusApplicationId),
-            ...activeSprints.filter((s) => s.applicationId !== focusApplicationId),
-        ]
+        ? (() => {
+            const focused: typeof activeSprints = [];
+            const others: typeof activeSprints = [];
+
+            for (const sprint of activeSprints) {
+                if (sprint.applicationId === focusApplicationId) {
+                    focused.push(sprint);
+                } else {
+                    others.push(sprint);
+                }
+            }
+
+            return [...focused, ...others];
+        })()
         : activeSprints;
 
     if (activeSprints.length === 0) {

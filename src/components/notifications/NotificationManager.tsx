@@ -28,6 +28,7 @@ function readJsonRecord(key: string): Record<string, string> {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
 
     const out: Record<string, string> = {};
+    // Only keep string values; drop anything else to prevent corrupted storage from bypassing throttles.
     for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof v === "string") out[k] = v;
     }
@@ -87,6 +88,7 @@ export function NotificationManager() {
   const hasHydrated = useStore((s) => s.hasHydrated);
 
   const didRunInitialChecks = useRef(false);
+  const celebratedSprints = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!hasHydrated || didRunInitialChecks.current) return;
@@ -122,7 +124,7 @@ export function NotificationManager() {
           router.push(`/prep?applicationId=${encodeURIComponent(upcoming.app.id)}`);
         };
 
-        toast(`Upcoming Interview: ${upcoming.app.company} in ${timeLabel}.`, {
+        toast(`Upcoming Interview: ${upcoming.app.company} in ${timeLabel}. Select Prep to get ready.`, {
           action: { label: "Prep", onClick: goToPrep },
           cancel: {
             label: "Snooze",
@@ -183,6 +185,10 @@ export function NotificationManager() {
             continue;
           }
 
+          if (celebratedSprints.current.has(sprint.id)) {
+            continue;
+          }
+
           const company = state.applications.find((a) => a.id === sprint.applicationId)?.company;
           const goToPlan = () => {
             router.push(`/prep?applicationId=${encodeURIComponent(sprint.applicationId)}`);
@@ -195,6 +201,8 @@ export function NotificationManager() {
               onClick: () => snooze(notificationKey),
             },
           });
+
+          celebratedSprints.current.add(sprint.id);
         }
       }
     });
