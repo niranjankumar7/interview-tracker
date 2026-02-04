@@ -677,18 +677,12 @@ export const TextEditor = React.forwardRef<TamboEditor, TextEditorProps>(
             class:
               "mention resource inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground",
           },
-          suggestion: createResourceMentionConfig(
-            stableSearchResources,
-            handleResourceSelect,
-            resourceRef,
-          ),
+          // eslint-disable-next-line react-hooks/refs
+          suggestion: createResourceMentionConfig(stableSearchResources, handleResourceSelect, resourceRef),
           renderLabel: ({ node }) => `@${(node.attrs.label as string) ?? ""}`,
         }),
-        createPromptCommandExtension(
-          stableSearchPrompts,
-          handlePromptSelect,
-          promptRef,
-        ),
+        // eslint-disable-next-line react-hooks/refs
+        createPromptCommandExtension(stableSearchPrompts, handlePromptSelect, promptRef),
       ],
       content: value,
       editable: !disabled,

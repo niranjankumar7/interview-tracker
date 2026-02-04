@@ -17,10 +17,66 @@ function upsertById<T extends { id: string }>(
   existing: T[],
   incoming: T[],
 ): T[] {
+  // Incoming items win on ID collisions; existing ordering is preserved and new
+  // incoming IDs are appended.
   const byId = new Map<string, T>();
   for (const item of existing) byId.set(item.id, item);
   for (const item of incoming) byId.set(item.id, item);
   return Array.from(byId.values());
+}
+
+function normalizeCompletedTopics(topics: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const topic of topics) {
+    const value = topic.trim();
+    if (!value) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+
+  return normalized;
+}
+
+function trapFocusInModal(event: {
+  key: string;
+  shiftKey: boolean;
+  preventDefault: () => void;
+  currentTarget: HTMLElement;
+}) {
+  if (event.key !== "Tab") return;
+
+  const container = event.currentTarget;
+  const focusable = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      "a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])",
+    ),
+  ).filter((el) => el.tabIndex !== -1);
+
+  if (focusable.length === 0) return;
+
+  const active = document.activeElement;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (!active || !container.contains(active)) {
+    event.preventDefault();
+    first.focus();
+    return;
+  }
+
+  if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+    return;
+  }
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  }
 }
 
 function mergeProgress(existing: UserProgress, incoming: UserProgress): UserProgress {
@@ -88,6 +144,10 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const importCancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const resetCancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const importModalRef = useRef<HTMLDivElement | null>(null);
+  const resetModalRef = useRef<HTMLDivElement | null>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+  const wasModalOpenRef = useRef(false);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>("replace");
@@ -109,6 +169,16 @@ export default function SettingsPage() {
   useEffect(() => {
     if (pendingImport) importCancelButtonRef.current?.focus();
   }, [pendingImport]);
+
+  const isAnyModalOpen = Boolean(pendingImport) || isResetModalOpen;
+  useEffect(() => {
+    if (!isAnyModalOpen && wasModalOpenRef.current) {
+      const el = lastFocusedElementRef.current;
+      lastFocusedElementRef.current = null;
+      el?.focus();
+    }
+    wasModalOpenRef.current = isAnyModalOpen;
+  }, [isAnyModalOpen]);
 
   const applications = useStore((s) => s.applications);
   const sprints = useStore((s) => s.sprints);
@@ -157,6 +227,14 @@ export default function SettingsPage() {
     }
   };
 
+  const closeImportModal = () => {
+    setPendingImport(null);
+  };
+
+  const closeResetModal = () => {
+    setIsResetModalOpen(false);
+  };
+
   const confirmImport = () => {
     if (!pendingImport) return;
 
@@ -166,7 +244,7 @@ export default function SettingsPage() {
         kind: "success",
         message:
           pendingImport.mode === "replace"
-            ? "Imported backup (replaced existing data)."
+            ? "Imported backup (replaced tracker data)."
             : "Imported backup (merged with existing data).",
       });
     } catch (error) {
@@ -176,22 +254,23 @@ export default function SettingsPage() {
           : "Import failed due to an unexpected error.";
       setStatus({ kind: "error", message });
     } finally {
-      setPendingImport(null);
+      closeImportModal();
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const applyImportedBackup = (backup: StoreBackup, mode: ImportMode) => {
-    const completedTopics = backup.completedTopics;
+    const incomingCompletedTopics = normalizeCompletedTopics(backup.completedTopics);
 
     if (mode === "replace") {
-      // Replace mode trusts the backup as-is.
+      // Replace mode overwrites tracker data keys only; other persisted keys (if
+      // added in the future) are intentionally left untouched.
       useStore.setState({
         applications: backup.applications,
         sprints: backup.sprints,
         questions: backup.questions,
-        completedTopics,
+        completedTopics: incomingCompletedTopics,
         progress: backup.progress,
       });
       return;
@@ -208,9 +287,10 @@ export default function SettingsPage() {
       backup.questions,
     );
     // `completedTopics` is treated as a set of unique identifiers (order-independent).
-    const mergedCompletedTopics = Array.from(
-      new Set([...existing.completedTopics, ...completedTopics]),
-    );
+    const mergedCompletedTopics = normalizeCompletedTopics([
+      ...existing.completedTopics,
+      ...incomingCompletedTopics,
+    ]);
     const mergedProgress = mergeProgress(existing.progress, backup.progress);
 
     useStore.setState({
@@ -223,6 +303,8 @@ export default function SettingsPage() {
   };
 
   const importData = async () => {
+    setStatus(null);
+
     if (!selectedFile) {
       setStatus({ kind: "error", message: "Select a .json file to import." });
       return;
@@ -267,6 +349,8 @@ export default function SettingsPage() {
       return;
     }
 
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    setIsResetModalOpen(false);
     setPendingImport({ backup: result.data, mode: importMode });
   };
 
@@ -368,8 +452,8 @@ export default function SettingsPage() {
                       className="mt-1"
                     />
                     <span className="text-sm text-gray-700">
-                      <span className="font-medium">Replace</span> (overwrites
-                      existing data)
+                      <span className="font-medium">Replace tracker data</span> (applications, sprints,
+                      questions, topics, progress)
                     </span>
                   </label>
                   <label className="flex items-start gap-2">
@@ -382,9 +466,8 @@ export default function SettingsPage() {
                       className="mt-1"
                     />
                     <span className="text-sm text-gray-700">
-                      <span className="font-medium">Merge</span> (keeps existing
-                      data and upserts by id; items with matching ids can be
-                      overwritten)
+                      <span className="font-medium">Merge</span> (keeps existing data; incoming wins on
+                      id collisions)
                     </span>
                   </label>
                 </fieldset>
@@ -413,7 +496,13 @@ export default function SettingsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setIsResetModalOpen(true)}
+                onClick={() => {
+                  setStatus(null);
+                  setPendingImport(null);
+                  lastFocusedElementRef.current =
+                    document.activeElement as HTMLElement | null;
+                  setIsResetModalOpen(true);
+                }}
                 className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
               >
                 <TriangleAlert className="w-4 h-4" />
@@ -445,21 +534,34 @@ export default function SettingsPage() {
           aria-modal="true"
           aria-label="Import data confirmation"
         >
-          <div className="w-full max-w-md rounded-lg bg-white shadow-lg p-6">
+          <div
+            ref={importModalRef}
+            className="w-full max-w-md rounded-lg bg-white shadow-lg p-6"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeImportModal();
+                return;
+              }
+              trapFocusInModal(e);
+            }}
+          >
             <h2 className="text-lg font-semibold text-gray-900">
-              {pendingImport.mode === "replace" ? "Import and replace?" : "Import and merge?"}
+              {pendingImport.mode === "replace"
+                ? "Import and replace tracker data?"
+                : "Import and merge?"}
             </h2>
             <p className="text-sm text-gray-600 mt-2">
               {pendingImport.mode === "replace"
-                ? "This will overwrite your existing data. This cannot be undone."
-                : "This will merge the backup into your existing data. Items with matching ids can be overwritten. This cannot be undone."}
+                ? "This will overwrite your tracker data (applications, sprints, questions, topics, progress). This cannot be undone."
+                : "This will merge the backup into your existing data. Incoming items win on id collisions. This cannot be undone."}
             </p>
 
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 ref={importCancelButtonRef}
                 type="button"
-                onClick={() => setPendingImport(null)}
+                onClick={closeImportModal}
                 className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
                 Cancel
@@ -487,7 +589,18 @@ export default function SettingsPage() {
           aria-modal="true"
           aria-label="Reset all data confirmation"
         >
-          <div className="w-full max-w-md rounded-lg bg-white shadow-lg p-6">
+          <div
+            ref={resetModalRef}
+            className="w-full max-w-md rounded-lg bg-white shadow-lg p-6"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeResetModal();
+                return;
+              }
+              trapFocusInModal(e);
+            }}
+          >
             <h2 className="text-lg font-semibold text-gray-900">
               Are you sure?
             </h2>
@@ -500,7 +613,7 @@ export default function SettingsPage() {
               <button
                 ref={resetCancelButtonRef}
                 type="button"
-                onClick={() => setIsResetModalOpen(false)}
+                onClick={closeResetModal}
                 className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
                 Cancel
@@ -509,7 +622,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => {
                   resetData();
-                  setIsResetModalOpen(false);
+                  closeResetModal();
                   setStatus({ kind: "success", message: "All data reset." });
                 }}
                 className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700"

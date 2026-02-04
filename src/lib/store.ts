@@ -37,6 +37,13 @@ const createInitialProgress = (): UserProgress => ({
     totalTasksCompleted: 0,
 });
 
+const createResetProgress = (): UserProgress => ({
+    currentStreak: 0,
+    longestStreak: 0,
+    lastActiveDate: new Date(0).toISOString(),
+    totalTasksCompleted: 0,
+});
+
 export const useStore = create<AppState>()(
     persist(
         (set, get) => ({
@@ -204,7 +211,7 @@ export const useStore = create<AppState>()(
                 sprints: [],
                 questions: [],
                 completedTopics: [],
-                progress: createInitialProgress()
+                progress: createResetProgress()
             }),
         }),
         {

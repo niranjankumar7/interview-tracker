@@ -25,7 +25,7 @@ const interviewRoundSchema = z.object({
   scheduledDate: dateStringSchema.optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
-});
+}).strict();
 
 const applicationSchema = z.object({
   id: z.string(),
@@ -37,7 +37,7 @@ const applicationSchema = z.object({
   rounds: z.array(interviewRoundSchema),
   notes: z.string(),
   createdAt: dateStringSchema,
-});
+}).strict();
 
 const roleTypeSchema = z.enum(ROLE_TYPES);
 const focusAreaSchema = z.enum(FOCUS_AREAS);
@@ -47,7 +47,7 @@ const taskSchema = z.object({
   description: z.string(),
   completed: z.boolean(),
   category: z.string(),
-});
+}).strict();
 
 const blockSchema = z.object({
   id: z.string(),
@@ -55,7 +55,7 @@ const blockSchema = z.object({
   duration: z.string(),
   tasks: z.array(taskSchema),
   completed: z.boolean(),
-});
+}).strict();
 
 const dailyPlanSchema = z.object({
   day: z.number(),
@@ -63,7 +63,7 @@ const dailyPlanSchema = z.object({
   focus: focusAreaSchema,
   blocks: z.array(blockSchema),
   completed: z.boolean(),
-});
+}).strict();
 
 const sprintSchema = z.object({
   id: z.string(),
@@ -74,7 +74,7 @@ const sprintSchema = z.object({
   dailyPlans: z.array(dailyPlanSchema),
   status: z.enum(SPRINT_STATUSES),
   createdAt: dateStringSchema,
-});
+}).strict();
 
 const questionSchema = z.object({
   id: z.string(),
@@ -84,14 +84,14 @@ const questionSchema = z.object({
   difficulty: z.enum(QUESTION_DIFFICULTIES).optional(),
   askedInRound: z.string().optional(),
   dateAdded: dateStringSchema,
-});
+}).strict();
 
 const userProgressSchema = z.object({
   currentStreak: z.number(),
   longestStreak: z.number(),
   lastActiveDate: dateStringSchema,
   totalTasksCompleted: z.number(),
-});
+}).strict();
 
 export const storeBackupSchema = z.object({
   version: z.literal(1),
@@ -100,6 +100,6 @@ export const storeBackupSchema = z.object({
   questions: z.array(questionSchema),
   completedTopics: z.array(z.string()),
   progress: userProgressSchema,
-});
+}).strict();
 
 export type StoreBackup = z.infer<typeof storeBackupSchema>;
