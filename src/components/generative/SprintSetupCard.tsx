@@ -47,7 +47,7 @@ export function SprintSetupCard({
         {
             company: initialCompany || "",
             role: (initialRole as RoleType) || "SDE",
-            interviewDate: initialDate || getDefaultDate(),
+            interviewDate: formatDateForInput(initialDate || getDefaultDate()),
             isSubmitted: false,
             isSubmitting: false,
             errorMessage: undefined,
@@ -80,6 +80,7 @@ export function SprintSetupCard({
         if (!parsedDate) {
             setState({
                 ...state,
+                isSubmitting: false,
                 errorMessage:
                     "Please select a valid interview date.",
             });

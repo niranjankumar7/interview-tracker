@@ -13,6 +13,8 @@ const DAYS_OF_WEEK = [
 /**
 * Parses a user-provided date input into a concrete Date.
 *
+* All returned values are normalized to the start of day.
+*
 * Supports:
 * - ISO strings: `YYYY-MM-DD` or full ISO timestamps
 * - Relative strings: `today`, `tomorrow`, `yesterday`
