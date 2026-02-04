@@ -2,9 +2,11 @@
 
 import { PrepDetailPanel as PrepGuidancePanel } from "@/components/prep";
 import { useStore } from "@/lib/store";
+import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { Application, ApplicationStatus, InterviewRoundType } from "@/types";
 import { format, parseISO, differenceInDays } from "date-fns";
 import {
+    AlertTriangle,
     Briefcase,
     Building2,
     Calendar,
@@ -255,6 +257,35 @@ export function KanbanBoard() {
                                                 daysUntil <= 3 &&
                                                 daysUntil >= 0;
 
+                                            const roundTheme = app.currentRound
+                                                ? getInterviewRoundTheme(app.currentRound)
+                                                : undefined;
+
+                                            let roundBadge: React.ReactNode = null;
+                                            if (app.currentRound) {
+                                                if (roundTheme) {
+                                                    const RoundIcon = roundTheme.icon;
+                                                    roundBadge = (
+                                                        <div
+                                                            className={`mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${roundTheme.badgeClassName}`}
+                                                        >
+                                                            <RoundIcon className="w-3.5 h-3.5" />
+                                                            {roundTheme.label}
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    roundBadge = (
+                                                        <div
+                                                            className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-muted text-muted-foreground"
+                                                            title="Unknown interview round"
+                                                        >
+                                                            <AlertTriangle className="w-3.5 h-3.5" />
+                                                            Unknown: {app.currentRound}
+                                                        </div>
+                                                    );
+                                                }
+                                            }
+
                                             return (
                                                 <div
                                                     key={app.id}
@@ -322,13 +353,7 @@ export function KanbanBoard() {
                                                     )}
 
                                                     {/* Current Round Badge */}
-                                                    {app.currentRound && (
-                                                        <div className="mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded inline-block dark:bg-indigo-950/30 dark:text-indigo-200">
-                                                            {app.currentRound
-                                                                .replace(/([A-Z])/g, " $1")
-                                                                .trim()}
-                                                        </div>
-                                                    )}
+                                                    {roundBadge}
 
                                                     {/* Click to view prep hint */}
                                                     <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">

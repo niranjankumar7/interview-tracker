@@ -58,6 +58,21 @@ export type SprintStatus = (typeof SPRINT_STATUSES)[number];
 export const BLOCK_TYPES = ['morning', 'evening', 'quick'] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
+
+export type FocusArea =
+    | 'DSA'
+    | 'SystemDesign'
+    | 'Behavioral'
+    | 'Review'
+    | 'Mock';
+
+export type QuestionCategory =
+    | 'DSA'
+    | 'SystemDesign'
+    | 'Behavioral'
+    | 'SQL'
+    | 'Other';
 
 export interface Application {
     id: string;

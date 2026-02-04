@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Application, InterviewRoundType, RoleType } from "@/types";
+import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
-    getPrepTemplateByRole,
     getRoundPrepContent,
     getAvailableRounds,
 } from "@/data/prep-templates";
@@ -42,9 +42,14 @@ export function PrepDetailPanel({
 }: PrepDetailPanelProps) {
     // Determine role type - try to match from roleType or parse from role string
     const roleType = application.roleType || inferRoleType(application.role);
-    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(
-        application.currentRound || "TechnicalRound1"
-    );
+    const availableRounds = getAvailableRounds(roleType);
+    const [selectedRound, setSelectedRound] = useState<InterviewRoundType>(() => {
+        const rounds = getAvailableRounds(roleType);
+        const preferredRound = application.currentRound;
+        if (preferredRound && rounds.includes(preferredRound)) return preferredRound;
+
+        return rounds[0] ?? "TechnicalRound1";
+    });
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
@@ -52,6 +57,7 @@ export function PrepDetailPanel({
 
     const prepContent = getRoundPrepContent(roleType, selectedRound);
     const availableRounds = getAvailableRounds(roleType);
+
     // Access topic completion from global store (centralized matching logic)
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
 
@@ -59,10 +65,17 @@ export function PrepDetailPanel({
         ? differenceInDays(parseISO(application.interviewDate), new Date())
         : null;
 
-    // Reset selected round when application changes
+    // Reset selected round when application changes and keep it within the available rounds
     useEffect(() => {
-        setSelectedRound(application.currentRound || "TechnicalRound1");
-    }, [application.id, application.currentRound]);
+        const rounds = getAvailableRounds(roleType);
+        const preferredRound = application.currentRound;
+        const nextSelectedRound =
+            preferredRound && rounds.includes(preferredRound)
+                ? preferredRound
+                : (rounds[0] ?? "TechnicalRound1");
+
+        setSelectedRound(nextSelectedRound);
+    }, [application.id, application.currentRound, roleType]);
 
     // Fetch scraped data when panel opens
     // Uses AbortController to prevent stale responses from overwriting current data
@@ -163,18 +176,25 @@ export function PrepDetailPanel({
                 {/* Round Selector Tabs */}
                 <div className="border-b bg-gray-50 px-6 py-3">
                     <div className="flex gap-2 overflow-x-auto">
-                        {availableRounds.map((round) => (
-                            <button
-                                key={round.value}
-                                onClick={() => handleRoundChange(round.value)}
-                                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${selectedRound === round.value
-                                    ? "bg-indigo-600 text-white shadow-md"
-                                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-                                    }`}
-                            >
-                                {round.label}
-                            </button>
-                        ))}
+                        {availableRounds.map((roundType) => {
+                            const roundTheme = getInterviewRoundTheme(roundType);
+                            const RoundIcon = roundTheme.icon;
+                            const isSelected = selectedRound === roundType;
+
+                            return (
+                                <button
+                                    key={roundType}
+                                    onClick={() => handleRoundChange(roundType)}
+                                    className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex items-center gap-2 ${isSelected
+                                        ? roundTheme.tabActiveClassName
+                                        : roundTheme.tabInactiveClassName
+                                        }`}
+                                >
+                                    <RoundIcon className="w-4 h-4" />
+                                    {roundTheme.label}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
