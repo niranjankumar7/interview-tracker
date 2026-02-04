@@ -80,28 +80,19 @@ export const useStore = create<AppState>()(
 
             completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
                 const snapshot = get();
-                const snapshotTask = snapshot.sprints
+                const taskExists = snapshot.sprints
                     .find((s) => s.id === sprintId)
                     ?.dailyPlans?.[dayIndex]
                     ?.blocks?.[blockIndex]
                     ?.tasks?.[taskIndex];
 
-                if (!snapshotTask) {
+                if (!taskExists) {
                     return;
                 }
 
                 set((state) => {
-                    const targetSprint = state.sprints.find((s) => s.id === sprintId);
-                    const day = targetSprint?.dailyPlans[dayIndex];
-                    const block = day?.blocks[blockIndex];
-                    const task = block?.tasks[taskIndex];
-
-                    if (!targetSprint || !day || !block || !task) {
-                        return { sprints: state.sprints, progress: state.progress };
-                    }
-
-                    const nextCompleted = !task.completed;
-                    const delta = nextCompleted ? 1 : -1;
+                    let delta = 0;
+                    let didToggle = false;
 
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -114,7 +105,10 @@ export const useStore = create<AppState>()(
 
                                 const tasks = block.tasks.map((task, tIdx) => {
                                     if (tIdx !== taskIndex) return task;
-                                    return { ...task, completed: !task.completed };
+                                    const nextCompleted = !task.completed;
+                                    didToggle = true;
+                                    delta = nextCompleted ? 1 : -1;
+                                    return { ...task, completed: nextCompleted };
                                 });
 
                                 const blockCompleted = tasks.every(t => t.completed);
@@ -128,11 +122,15 @@ export const useStore = create<AppState>()(
                         return { ...sprint, dailyPlans };
                     });
 
+                    if (!didToggle) {
+                        return { sprints: state.sprints, progress: state.progress };
+                    }
+
                     return {
                         sprints,
                         progress: {
                             ...state.progress,
-                            lastActiveDate: nextCompleted ? new Date().toISOString() : state.progress.lastActiveDate,
+                            lastActiveDate: delta > 0 ? new Date().toISOString() : state.progress.lastActiveDate,
                             totalTasksCompleted: Math.max(0, state.progress.totalTasksCompleted + delta)
                         }
                     };

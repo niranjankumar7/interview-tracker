@@ -112,7 +112,10 @@ export default function DashboardPage() {
     const scheduleNextTick = () => {
       const current = new Date();
       const nextMidnight = startOfDay(addDays(current, 1));
-      const msUntilNextMidnight = Math.max(0, nextMidnight.getTime() - current.getTime() + 1000);
+      let msUntilNextMidnight = nextMidnight.getTime() - current.getTime();
+      if (msUntilNextMidnight <= 0) {
+        msUntilNextMidnight = 1000;
+      }
       timeoutId = setTimeout(() => {
         setNow(new Date());
         scheduleNextTick();
@@ -215,6 +218,7 @@ export default function DashboardPage() {
     const todayKey = format(today, "yyyy-MM-dd");
     let total = 0;
     for (const [key, count] of completedActivityCountsByDate.entries()) {
+      // Keys are normalized to yyyy-MM-dd, so lexicographic order matches chronological order.
       if (key < rangeStartKey || key > todayKey) {
         continue;
       }
