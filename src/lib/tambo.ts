@@ -43,6 +43,65 @@ function sanitizeCompanyName(name: string): string {
   return cleaned;
 }
 
+type StoreState = ReturnType<typeof useStore.getState>;
+type StoredApplication = StoreState["applications"][number];
+
+type OfferDetailsToolInput = {
+  currency?: string;
+  totalCTC?: number;
+  baseSalary?: number;
+  bonus?: number;
+  equity?: string | number;
+  joiningDate?: string;
+  location?: string;
+  workMode?: string;
+  notes?: string;
+};
+
+function hasOfferCompensation(details: OfferDetailsToolInput): boolean {
+  return (
+    details.totalCTC != null ||
+    details.baseSalary != null ||
+    details.bonus != null ||
+    details.equity != null
+  );
+}
+
+function normalizeOfferWorkMode(
+  raw: string | undefined
+): "WFH" | "Hybrid" | "Office" | undefined {
+  if (!raw) return undefined;
+
+  const wm = raw.toLowerCase();
+  if (wm.includes("remote") || wm.includes("wfh")) return "WFH";
+  if (wm.includes("hybrid")) return "Hybrid";
+  if (
+    wm.includes("office") ||
+    wm.includes("onsite") ||
+    wm.includes("on-site") ||
+    wm.includes("on site")
+  )
+    return "Office";
+
+  return undefined;
+}
+
+function findApplicationsByCompany(
+  applications: StoredApplication[],
+  company: string | undefined
+) {
+  const companyName = sanitizeCompanyName(company ?? "");
+  if (!companyName) {
+    return { ok: false, message: "Company name is required" } as const;
+  }
+
+  const matches = applications.filter(
+    (app) => sanitizeCompanyName(app.company).toLowerCase() === companyName.toLowerCase()
+  );
+
+  return { ok: true, companyName, matches } as const;
+}
+
 /**
  * tools
  *
@@ -379,25 +438,14 @@ export const tools: TamboTool[] = [
   {
     name: "updateOfferDetails",
     description:
-      "Save or update the job offer details for an application. Use this when the user explicitly provides compensation details (CTC, base, bonus, equity) to save them directly.",
+      "Save or update job offer details for an application. Prefer applicationId when known. If matching by company finds multiple applications, returns success=false with a candidates list. Sets status to offer only when compensation fields are provided (CTC/base/bonus/equity).",
     tool: (input: {
       applicationId?: string;
       company?: string;
-      offerDetails: {
-        currency?: string;
-        totalCTC?: number;
-        baseSalary?: number;
-        bonus?: number;
-        equity?: string | number;
-        joiningDate?: string;
-        location?: string;
-        workMode?: string;
-        notes?: string;
-      };
+      offerDetails: OfferDetailsToolInput;
     }) => {
       const state = useStore.getState();
-      const applications = state.applications;
-      const updateApplication = state.updateApplication;
+      const { applications, updateApplication } = state;
       const { applicationId, company, offerDetails } = input;
 
       let app = applicationId
@@ -412,66 +460,44 @@ export const tools: TamboTool[] = [
       }
 
       if (!app) {
-        const companyName = sanitizeCompanyName(company ?? "");
-        if (!companyName) {
-          return { success: false, message: "Company name is required" };
+        const companyResult = findApplicationsByCompany(applications, company);
+        if (!companyResult.ok) {
+          return { success: false, message: companyResult.message };
         }
 
-        const matches = applications.filter(
-          (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
-        );
-
-        if (matches.length === 0) {
+        if (companyResult.matches.length === 0) {
           return {
             success: false,
-            message: `Application for "${companyName}" not found. Please add the application first.`
+            message: `Application for "${companyResult.companyName}" not found. Please add the application first.`
           };
         }
 
-        if (matches.length > 1) {
+        if (companyResult.matches.length > 1) {
           return {
             success: false,
-            candidates: matches.map((candidate) => ({
+            candidates: companyResult.matches.map((candidate) => ({
               id: candidate.id,
               company: candidate.company,
               role: candidate.role,
               status: candidate.status,
             })),
-            message: `Multiple applications found for "${companyName}". Please specify the applicationId from the candidates list.`,
+            message: `Multiple applications found for "${companyResult.companyName}". Please specify the applicationId from the candidates list.`,
           };
         }
 
-        const match = matches[0];
+        const match = companyResult.matches[0];
         if (!match) {
           return {
             success: false,
-            message: `Application for "${companyName}" not found. Please add the application first.`
+            message: `Application for "${companyResult.companyName}" not found. Please add the application first.`
           };
         }
 
         app = match;
       }
 
-      const hasComp =
-        offerDetails.totalCTC != null ||
-        offerDetails.baseSalary != null ||
-        offerDetails.bonus != null ||
-        offerDetails.equity != null;
-
-      // Map workMode to expected format
-      let mappedWorkMode: "WFH" | "Hybrid" | "Office" | undefined = undefined;
-      if (offerDetails.workMode) {
-        const wm = offerDetails.workMode.toLowerCase();
-        if (wm.includes("remote") || wm.includes("wfh")) mappedWorkMode = "WFH";
-        else if (wm.includes("hybrid")) mappedWorkMode = "Hybrid";
-        else if (
-          wm.includes("office") ||
-          wm.includes("onsite") ||
-          wm.includes("on-site") ||
-          wm.includes("on site")
-        )
-          mappedWorkMode = "Office";
-      }
+      const hasComp = hasOfferCompensation(offerDetails);
+      const mappedWorkMode = normalizeOfferWorkMode(offerDetails.workMode);
 
       updateApplication(app.id, {
         ...(hasComp ? { status: "offer" } : {}),

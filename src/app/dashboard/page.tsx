@@ -38,16 +38,15 @@ import { AppHeader } from "@/components/layout/AppHeader";
 type StatusConfig = {
   status: ApplicationStatus;
   label: string;
-  badgeClassName: string;
   chartColorHex: string;
 };
 
 const statusConfigs: StatusConfig[] = [
-  { status: "applied", label: "Applied", badgeClassName: "text-gray-600 bg-gray-100", chartColorHex: "#6B7280" },
-  { status: "shortlisted", label: "Shortlisted", badgeClassName: "text-blue-600 bg-blue-100", chartColorHex: "#3B82F6" },
-  { status: "interview", label: "Interview", badgeClassName: "text-purple-600 bg-purple-100", chartColorHex: "#8B5CF6" },
-  { status: "offer", label: "Offer", badgeClassName: "text-green-600 bg-green-100", chartColorHex: "#22C55E" },
-  { status: "rejected", label: "Rejected", badgeClassName: "text-red-600 bg-red-100", chartColorHex: "#EF4444" },
+  { status: "applied", label: "Applied", chartColorHex: "#6B7280" },
+  { status: "shortlisted", label: "Shortlisted", chartColorHex: "#3B82F6" },
+  { status: "interview", label: "Interview", chartColorHex: "#8B5CF6" },
+  { status: "offer", label: "Offer", chartColorHex: "#22C55E" },
+  { status: "rejected", label: "Rejected", chartColorHex: "#EF4444" },
 ];
 
 function Card({
