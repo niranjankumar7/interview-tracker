@@ -7,6 +7,7 @@ import { RoleType, Application } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Calendar, Briefcase, Building2, CheckCircle2 } from "lucide-react";
+import { useEffect } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -34,7 +35,106 @@ interface SprintSetupState {
     interviewDate: string;
     isSubmitted: boolean;
     isSubmitting: boolean;
-    errorMessage?: string;
+    companyError?: string;
+    interviewDateError?: string;
+    formError?: string;
+    hydrated?: {
+        company: string;
+        role: RoleType;
+        interviewDate: string;
+    };
+}
+
+type HydratedSprintSetupState = {
+    company: string;
+    role: RoleType;
+    interviewDate: string;
+};
+
+function validateSprintSetupInput(state: SprintSetupState): {
+    company: string;
+    interviewDate: string;
+    parsedDate: Date | null;
+    companyError?: string;
+    interviewDateError?: string;
+} {
+    const company = state.company.trim();
+    const interviewDate = state.interviewDate.trim();
+
+    const companyError = company.length === 0 ? "Please enter a company name." : undefined;
+    const interviewDateMissingError =
+        interviewDate.length === 0 ? "Please select an interview date." : undefined;
+
+    const parsedDate = interviewDate.length > 0 ? tryParseDateInput(interviewDate) : null;
+    const interviewDateError =
+        interviewDateMissingError ??
+        (parsedDate ? undefined : "Please select a valid interview date.");
+
+    return {
+        company,
+        interviewDate,
+        parsedDate,
+        companyError,
+        interviewDateError,
+    };
+}
+
+function useSyncHydratedSprintSetupState(
+    hydrated: HydratedSprintSetupState,
+    state: SprintSetupState | undefined,
+    setState: (nextState: SprintSetupState) => void
+) {
+    // Sync rules:
+    // - Never overwrite state once a submission has started.
+    // - Seed `hydrated` from props on first render.
+    // - When props change, only overwrite the form if the user hasn't edited
+    //   since the last hydration.
+
+    useEffect(() => {
+        const nextHydrated = {
+            company: hydrated.company,
+            role: hydrated.role,
+            interviewDate: hydrated.interviewDate,
+        };
+
+        if (!state || state.isSubmitted || state.isSubmitting) {
+            return;
+        }
+
+        if (!state.hydrated) {
+            setState({ ...state, hydrated: nextHydrated });
+            return;
+        }
+
+        const prevHydrated = state.hydrated;
+
+        const hydratedChanged =
+            prevHydrated.company !== nextHydrated.company ||
+            prevHydrated.role !== nextHydrated.role ||
+            prevHydrated.interviewDate !== nextHydrated.interviewDate;
+        if (!hydratedChanged) return;
+
+        const stateMatchesPrevHydrated =
+            state.company === prevHydrated.company &&
+            state.role === prevHydrated.role &&
+            state.interviewDate === prevHydrated.interviewDate;
+
+        if (stateMatchesPrevHydrated) {
+            setState({
+                ...state,
+                company: nextHydrated.company,
+                role: nextHydrated.role,
+                interviewDate: nextHydrated.interviewDate,
+                companyError: undefined,
+                interviewDateError: undefined,
+                formError: undefined,
+                hydrated: nextHydrated,
+            });
+            return;
+        }
+
+        setState({ ...state, hydrated: nextHydrated });
+    }, [hydrated.company, hydrated.role, hydrated.interviewDate, setState, state]);
 }
 
 export function SprintSetupCard({
@@ -42,20 +142,43 @@ export function SprintSetupCard({
     role: initialRole,
     interviewDate: initialDate,
 }: SprintSetupCardProps) {
+    const hydratedCompany = initialCompany || "";
+    const hydratedRole: RoleType = initialRole ?? "SDE";
+    const hydratedInterviewDate = normalizeDateInputValue(
+        initialDate || getDefaultDate()
+    );
+
     const [state, setState] = useTamboComponentState<SprintSetupState>(
         "sprint-setup-card",
         {
-            company: initialCompany || "",
-            role: (initialRole as RoleType) || "SDE",
-            interviewDate: normalizeDateInputValue(initialDate || getDefaultDate()),
+            company: hydratedCompany,
+            role: hydratedRole,
+            interviewDate: hydratedInterviewDate,
             isSubmitted: false,
             isSubmitting: false,
-            errorMessage: undefined,
+            companyError: undefined,
+            interviewDateError: undefined,
+            formError: undefined,
+            hydrated: {
+                company: hydratedCompany,
+                role: hydratedRole,
+                interviewDate: hydratedInterviewDate,
+            },
         }
     );
 
     const addApplication = useStore((s) => s.addApplication);
     const addSprint = useStore((s) => s.addSprint);
+
+    useSyncHydratedSprintSetupState(
+        {
+            company: hydratedCompany,
+            role: hydratedRole,
+            interviewDate: hydratedInterviewDate,
+        },
+        state,
+        setState
+    );
 
     // Handle loading state
     if (!state) {
@@ -71,39 +194,40 @@ export function SprintSetupCard({
         );
     }
 
+    const validation = validateSprintSetupInput(state);
+
     const handleConfirm = async () => {
-        if (!state.company || !state.interviewDate) {
+        if (!validation.parsedDate || validation.companyError || validation.interviewDateError) {
             setState({
                 ...state,
-                errorMessage: !state.company
-                    ? "Please enter a company name."
-                    : "Please select an interview date.",
+                companyError: validation.companyError,
+                interviewDateError: validation.interviewDateError,
+                formError: undefined,
             });
             return;
         }
 
-        const parsedDate = tryParseDateInput(state.interviewDate);
-        if (!parsedDate) {
-            setState({
-                ...state,
-                isSubmitting: false,
-                errorMessage:
-                    "Please select a valid interview date.",
-            });
-            return;
-        }
+        const submittingState: SprintSetupState = {
+            ...state,
+            company: validation.company,
+            interviewDate: format(validation.parsedDate, "yyyy-MM-dd"),
+            isSubmitting: true,
+            companyError: undefined,
+            interviewDateError: undefined,
+            formError: undefined,
+        };
 
-        setState({ ...state, isSubmitting: true, errorMessage: undefined });
+        setState(submittingState);
 
         try {
             // Create application
             const application: Application = {
                 id: Date.now().toString(),
-                company: state.company,
+                company: validation.company,
                 role: state.role,
                 status: "interview",
                 applicationDate: new Date().toISOString(),
-                interviewDate: parsedDate.toISOString(),
+                interviewDate: validation.parsedDate.toISOString(),
                 rounds: [],
                 notes: "",
                 createdAt: new Date().toISOString(),
@@ -112,13 +236,21 @@ export function SprintSetupCard({
             addApplication(application);
 
             // Generate sprint
-            const sprint = generateSprint(application.id, parsedDate, state.role);
+            const sprint = generateSprint(application.id, validation.parsedDate, state.role);
             addSprint(sprint);
 
-            setState({ ...state, isSubmitted: true, isSubmitting: false });
+            setState({
+                ...submittingState,
+                isSubmitted: true,
+                isSubmitting: false,
+            });
         } catch (error) {
             console.error("Error creating sprint:", error);
-            setState({ ...state, isSubmitting: false });
+            setState({
+                ...submittingState,
+                isSubmitting: false,
+                formError: "Couldn't create the sprint. Please try again.",
+            });
         }
     };
 
@@ -144,6 +276,12 @@ export function SprintSetupCard({
             </div>
         );
     }
+    const hasValues =
+        validation.company.length > 0 && validation.interviewDate.length > 0;
+    const hasFieldErrors = Boolean(
+        state.companyError || state.interviewDateError || state.formError
+    );
+    const isFormValid = hasValues && !hasFieldErrors;
 
     return (
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-md">
@@ -174,12 +312,18 @@ export function SprintSetupCard({
                             setState({
                                 ...state,
                                 company: e.target.value,
-                                errorMessage: undefined,
+                                companyError: undefined,
+                                formError: undefined,
                             })
                         }
                         placeholder="e.g., Google, Amazon, Microsoft"
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
+                    {state.companyError && (
+                        <p className="mt-2 text-sm text-red-600">
+                            {state.companyError}
+                        </p>
+                    )}
                 </div>
 
                 <div>
@@ -193,7 +337,7 @@ export function SprintSetupCard({
                             setState({
                                 ...state,
                                 role: e.target.value as RoleType,
-                                errorMessage: undefined,
+                                formError: undefined,
                             })
                         }
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
@@ -223,23 +367,30 @@ export function SprintSetupCard({
                             setState({
                                 ...state,
                                 interviewDate: e.target.value,
-                                errorMessage: undefined,
+                                interviewDateError: undefined,
+                                formError: undefined,
                             })
                         }
                         min={format(new Date(), "yyyy-MM-dd")}
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
-                    {state.errorMessage && (
-                        <p className="mt-2 text-sm text-red-600">{state.errorMessage}</p>
+                    {state.interviewDateError && (
+                        <p className="mt-2 text-sm text-red-600">
+                            {state.interviewDateError}
+                        </p>
                     )}
                 </div>
 
+                {state.formError && (
+                    <p className="text-sm text-red-600">{state.formError}</p>
+                )}
+
                 <button
                     onClick={handleConfirm}
-                    disabled={!state.company || !state.interviewDate || state.isSubmitting}
+                    disabled={!isFormValid || state.isSubmitting}
                     className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
                 >
-                    {state.isSubmitting ? "Creating Sprint..." : "Create Sprint 🚀"}
+                    {state.isSubmitting ? "Creating Sprint..." : "Create Sprint"}
                 </button>
             </div>
         </div>

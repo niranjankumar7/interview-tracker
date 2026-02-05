@@ -14,7 +14,7 @@ import {
     Clock,
     Target,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -35,6 +35,30 @@ export const planForDatePanelSchema = z.object({
 interface PlanForDatePanelProps {
     targetDate: string;
     applicationId?: string;
+}
+
+function SprintMessageCard({
+    company,
+    role,
+    children,
+}: {
+    company?: string;
+    role?: string;
+    children: ReactNode;
+}) {
+    const hasHeader = Boolean(company || role);
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            {hasHeader && (
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-5">
+                    {company && <h3 className="font-bold text-xl">{company}</h3>}
+                    {role && <p className="text-sm opacity-90">{role}</p>}
+                </div>
+            )}
+            <div className="p-5 text-sm text-gray-700">{children}</div>
+        </div>
+    );
 }
 
 export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanelProps) {
@@ -132,6 +156,27 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 const struggledTopicMatchers =
                     struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
 
+                type DailyPlan = (typeof sprint.dailyPlans)[number];
+
+                const parsedDailyPlans = sprint.dailyPlans.map((plan, index) => {
+                    const parsedDate = parseISO(plan.date);
+                    const time = parsedDate.getTime();
+                    return {
+                        plan,
+                        parsedDate,
+                        time: Number.isNaN(time) ? null : time,
+                        index,
+                    };
+                });
+
+                const validDailyPlans = parsedDailyPlans.filter(
+                    (p): p is { plan: DailyPlan; parsedDate: Date; time: number; index: number } =>
+                        p.time !== null
+                );
+
+                const hasInvalidPlanDates =
+                    validDailyPlans.length !== parsedDailyPlans.length;
+
                 if (sprint.dailyPlans.length === 0) {
                     return (
                         <div
@@ -149,8 +194,35 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     );
                 }
 
-                const requestedPlan = sprint.dailyPlans.find((plan) =>
-                    isSameDay(parseISO(plan.date), resolvedDate)
+                if (validDailyPlans.length === 0) {
+                    if (
+                        hasInvalidPlanDates &&
+                        process.env.NODE_ENV !== "production"
+                    ) {
+                        console.warn(
+                            "PlanForDatePanel: sprint has invalid daily plan dates",
+                            {
+                                sprintId: sprint.id,
+                                dailyPlanDates: sprint.dailyPlans.map((p) => p.date),
+                            }
+                        );
+                    }
+
+                    return (
+                        <SprintMessageCard
+                            key={`${sprint.id}:message:no-valid-dates`}
+                            company={app?.company}
+                            role={app?.role}
+                        >
+                            {hasInvalidPlanDates
+                                ? "All days in this sprint have invalid dates and couldn't be shown."
+                                : "This sprint doesn't have any valid daily plan dates."}
+                        </SprintMessageCard>
+                    );
+                }
+
+                const requestedPlan = validDailyPlans.find(({ parsedDate }) =>
+                    isSameDay(parsedDate, resolvedDate)
                 );
 
                 let planToShow = requestedPlan;
@@ -160,45 +232,82 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     // Fallback is computed per-sprint (not globally across all sprints).
                     const resolvedTime = resolvedDate.getTime();
 
-                    const nextPlan = sprint.dailyPlans.reduce<typeof requestedPlan | undefined>(
-                        (closest, plan) => {
-                            const planTime = parseISO(plan.date).getTime();
-                            if (planTime <= resolvedTime) return closest;
-                            if (!closest) return plan;
+                    const nextPlan = validDailyPlans.reduce<
+                        (typeof validDailyPlans)[number] | null
+                    >((closest, plan) => {
+                        if (plan.time <= resolvedTime) {
+                            return closest;
+                        }
 
-                            const closestTime = parseISO(closest.date).getTime();
-                            return planTime < closestTime ? plan : closest;
-                        },
-                        undefined
-                    );
+                        if (!closest || plan.time < closest.time) {
+                            return plan;
+                        }
 
-                    const lastPlan = sprint.dailyPlans.reduce((latest, plan) => {
-                        const latestTime = parseISO(latest.date).getTime();
-                        const planTime = parseISO(plan.date).getTime();
-                        return planTime > latestTime ? plan : latest;
-                    }, sprint.dailyPlans[0]);
+                        return closest;
+                    }, null);
+
+                    const lastPlan = validDailyPlans.reduce<
+                        (typeof validDailyPlans)[number] | null
+                    >((latest, plan) => {
+                        if (!latest || plan.time > latest.time) {
+                            return plan;
+                        }
+
+                        return latest;
+                    }, null);
 
                     if (nextPlan) {
                         planToShow = nextPlan;
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. Showing the next available day in this sprint: ${format(parseISO(nextPlan.date), "EEE, MMM d, yyyy")}.`;
-                    } else {
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. Showing the next available day in this sprint: ${format(nextPlan.parsedDate, "EEE, MMM d, yyyy")}.`;
+                    } else if (lastPlan) {
                         planToShow = lastPlan;
-                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. This is the last planned prep day in this sprint (${format(parseISO(lastPlan.date), "EEE, MMM d, yyyy")}).`;
+                        guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. This is the last planned prep day in this sprint (${format(lastPlan.parsedDate, "EEE, MMM d, yyyy")}).`;
                     }
                 }
 
-                if (!planToShow) return null;
+                if (!planToShow) {
+                    // Show a per-sprint message instead of silently skipping the sprint.
+                    return (
+                        <SprintMessageCard
+                            key={`${sprint.id}:message:no-plan`}
+                            company={app?.company}
+                            role={app?.role}
+                        >
+                            {guidanceMessage ?? "No daily plan found for this sprint."}
+                        </SprintMessageCard>
+                    );
+                }
 
-                const dayIndex = sprint.dailyPlans.indexOf(planToShow);
+                const planDate = planToShow.parsedDate;
 
-                if (dayIndex === -1) return null;
+                const dayIndex = planToShow.index;
 
-                const completedTasks = planToShow.blocks.reduce(
+                if (dayIndex < 0 || dayIndex >= sprint.dailyPlans.length) {
+                    if (process.env.NODE_ENV !== "production") {
+                        console.error("PlanForDatePanel: invalid day index", {
+                            sprintId: sprint.id,
+                            dayIndex,
+                            plan: planToShow.plan,
+                        });
+                    }
+
+                    return (
+                        <SprintMessageCard
+                            key={`${sprint.id}:message:missing-plan`}
+                            company={app?.company}
+                            role={app?.role}
+                        >
+                            We couldn&apos;t load this day&apos;s plan for the sprint. Try refreshing the page or recreating the sprint.
+                        </SprintMessageCard>
+                    );
+                }
+
+                const completedTasks = planToShow.plan.blocks.reduce(
                     (acc, block) =>
                         acc + block.tasks.filter((t) => t.completed).length,
                     0
                 );
-                const totalTasks = planToShow.blocks.reduce(
+                const totalTasks = planToShow.plan.blocks.reduce(
                     (acc, block) => acc + block.tasks.length,
                     0
                 );
@@ -208,7 +317,6 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                         ? 0
                         : Math.round((completedTasks / totalTasks) * 100);
 
-                const planDate = parseISO(planToShow.date);
                 const interviewDate = parseISO(sprint.interviewDate);
                 const daysDiff = Number.isNaN(interviewDate.getTime())
                     ? null
@@ -249,12 +357,12 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                                 <div>
                                     <p className="text-sm opacity-80">Plan for</p>
                                     <p className="font-semibold">
-                                        {format(planDate, "yyyy-MM-dd")} · {planToShow.focus}
+                                        {format(planDate, "yyyy-MM-dd")} · {planToShow.plan.focus}
                                     </p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-3xl font-bold">
-                                        Day {planToShow.day}/{sprint.totalDays}
+                                        Day {planToShow.plan.day}/{sprint.totalDays}
                                     </p>
                                 </div>
                             </div>
@@ -286,7 +394,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                         {/* Blocks */}
                         <div className="p-5 space-y-4">
-                            {planToShow.blocks.map((block, blockIdx) => (
+                            {planToShow.plan.blocks.map((block, blockIdx) => (
                                 <div
                                     key={block.id}
                                     className={`rounded-lg p-4 ${block.completed

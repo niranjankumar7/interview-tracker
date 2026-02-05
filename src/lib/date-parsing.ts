@@ -10,6 +10,22 @@ const DAYS_OF_WEEK = [
     "saturday",
 ] as const;
 
+// Cap relative offsets to avoid absurd dates or overflow. Ten years is more than
+// enough for interview-planning scenarios.
+const MAX_IN_DAYS = 3650;
+
+const WEEKDAY_PATTERN =
+    /\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/;
+
+function safeAddDays(base: Date, days: number): Date | null {
+    if (!Number.isFinite(days) || days < 0 || days > MAX_IN_DAYS) {
+        return null;
+    }
+
+    const result = addDays(base, days);
+    return Number.isNaN(result.getTime()) ? null : result;
+}
+
 /**
 * Parses a user-provided date input into a concrete Date.
 *
@@ -18,8 +34,11 @@ const DAYS_OF_WEEK = [
 * Supports:
 * - ISO strings: `YYYY-MM-DD` or full ISO timestamps
 * - Relative strings: `today`, `tomorrow`, `yesterday`
-* - Weekdays: `friday`, `next friday`, `next thursday`
-* - `in N days`
+* - Weekdays (matched as standalone words): `friday`, `next friday`, `next thursday`
+* - `in N days` (bounded to a reasonable max)
+*
+* Notes:
+* - Only the first recognized weekday token is used.
 */
 export function tryParseDateInput(
     dateString: string,
@@ -48,18 +67,25 @@ export function tryParseDateInput(
 
     const inDaysMatch = lowered.match(/\bin\s+(\d+)\s+days?\b/);
     if (inDaysMatch) {
-        return addDays(base, Number(inDaysMatch[1]));
+        const days = Number(inDaysMatch[1]);
+        return safeAddDays(base, days) ?? null;
     }
 
-    const hasNext = lowered.includes("next ");
-
-    for (let i = 0; i < DAYS_OF_WEEK.length; i++) {
-        if (!lowered.includes(DAYS_OF_WEEK[i])) continue;
+    const weekdayMatch = lowered.match(WEEKDAY_PATTERN);
+    if (weekdayMatch) {
+        const hasNext = Boolean(weekdayMatch[1]);
+        const weekday = weekdayMatch[2] as (typeof DAYS_OF_WEEK)[number];
+        const i = DAYS_OF_WEEK.indexOf(weekday);
 
         const currentDay = base.getDay();
         let daysUntil = i - currentDay;
         if (daysUntil < 0 || (daysUntil === 0 && hasNext)) daysUntil += 7;
-        return addDays(base, daysUntil);
+        return safeAddDays(base, daysUntil) ?? null;
+    }
+
+    const fallbackISO = parseISO(raw);
+    if (!Number.isNaN(fallbackISO.getTime())) {
+        return startOfDay(fallbackISO);
     }
 
     return null;
