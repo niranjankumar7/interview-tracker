@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import { computeOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
 import type { ApplicationStatus, Sprint } from "@/types";
 import {
   addDays,
@@ -176,6 +177,49 @@ export default function DashboardPage() {
       }))
       .filter((d) => d.value > 0);
   }, [applications]);
+
+  const offerRows = useMemo(() => {
+    return applications
+      .filter((app) => app.status === "offer")
+      .map((app) => {
+        const currency = getOfferCurrency(app.offerDetails);
+        const total = computeOfferTotalCTC(app.offerDetails);
+        return {
+          app,
+          offer: app.offerDetails,
+          currency,
+          total,
+          sortValue: total ?? Number.NEGATIVE_INFINITY,
+        };
+      })
+      .sort((a, b) => {
+        if (a.currency !== b.currency) {
+          return a.currency.localeCompare(b.currency);
+        }
+        return b.sortValue - a.sortValue;
+      });
+  }, [applications]);
+
+  const offerCurrencies = useMemo(() => {
+    return Array.from(
+      new Set(offerRows.map((row) => row.currency.trim().toUpperCase())),
+    );
+  }, [offerRows]);
+
+  const canCompareOffers = offerCurrencies.length <= 1;
+
+  const bestOfferTotal = useMemo(() => {
+    if (!canCompareOffers) return null;
+
+    let best: number | null = null;
+    for (const row of offerRows) {
+      if (row.total === null) continue;
+      if (best === null || row.total > best) {
+        best = row.total;
+      }
+    }
+    return best;
+  }, [canCompareOffers, offerRows]);
 
   const upcomingInterviews = useMemo(() => {
     return applications
@@ -407,6 +451,86 @@ export default function DashboardPage() {
               </Card>
             </div>
           </div>
+
+          <Card
+            title="Offer comparison"
+            subtitle="Offers grouped by currency and sorted by total CTC (uses offerDetails.totalCTC when set, otherwise base+bonus(+numeric equity))"
+          >
+            {offerRows.length === 0 ? (
+              <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg p-10">
+                No offers yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                {!canCompareOffers && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                    Multiple currencies detected ({offerCurrencies.join(", ")}) — best offer highlighting is disabled.
+                  </div>
+                )}
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b">
+                      <th className="py-2 pr-4">Company</th>
+                      <th className="py-2 pr-4">Total CTC</th>
+                      <th className="py-2 pr-4">Base</th>
+                      <th className="py-2 pr-4">Bonus</th>
+                      <th className="py-2 pr-4">Equity</th>
+                      <th className="py-2 pr-4">Work mode</th>
+                      <th className="py-2 pr-4">Location</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {offerRows.map((row) => {
+                      const isBest =
+                        bestOfferTotal !== null && row.total !== null && row.total === bestOfferTotal;
+
+                      return (
+                        <tr
+                          key={row.app.id}
+                          className={isBest ? "bg-emerald-50" : undefined}
+                        >
+                          <td className="py-2 pr-4 font-medium text-gray-800">
+                            {row.app.company}
+                            {isBest && (
+                              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Best
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.total === null
+                              ? "—"
+                              : `${row.total.toLocaleString()} ${row.currency}`}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.offer?.baseSalary === undefined
+                              ? "—"
+                              : `${row.offer.baseSalary.toLocaleString()} ${row.currency}`}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.offer?.bonus === undefined
+                              ? "—"
+                              : `${row.offer.bonus.toLocaleString()} ${row.currency}`}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.offer?.equity === undefined
+                              ? "—"
+                              : String(row.offer.equity)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.offer?.workMode ?? "—"}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.offer?.location ?? "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
 
           <Card
             title="Study streak"

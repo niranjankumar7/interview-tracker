@@ -17,6 +17,8 @@ import {
   planForDatePanelSchema,
   AddQuestionPanel,
   addQuestionPanelSchema,
+  OfferDetailsPanel,
+  offerDetailsPanelSchema,
   PipelineSummaryPanel,
   pipelineSummaryPanelSchema,
 } from "@/components/generative";
@@ -419,6 +421,13 @@ export const components: TamboComponent[] = [
       "Summarizes the user's job application pipeline by status and highlights upcoming interviews with a countdown. Triggers: 'show my pipeline', 'show my interviews'. Optional status filter.",
     component: PipelineSummaryPanel,
     propsSchema: pipelineSummaryPanelSchema,
+  },
+  {
+    name: "OfferDetailsPanel",
+    description:
+      "A component that captures and edits job offer details (CTC/base/bonus/equity, work mode, location, joining date, benefits, notes) and saves them into the matching application. Use this when the user says they received an offer or mentions compensation details like 'CTC 18 LPA, hybrid, Bangalore'.",
+    component: OfferDetailsPanel,
+    propsSchema: offerDetailsPanelSchema,
   },
   // Add more components here
 ];

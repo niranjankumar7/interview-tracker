@@ -50,6 +50,24 @@ export const BLOCK_TYPES = ['morning', 'evening', 'quick'] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
 
+export const WORK_MODES = ['WFH', 'Hybrid', 'Office'] as const;
+
+export type WorkMode = (typeof WORK_MODES)[number];
+
+export interface OfferDetails {
+    baseSalary?: number;
+    equity?: number | string;
+    bonus?: number;
+    currency?: string;
+    location?: string;
+    workMode?: WorkMode;
+    joiningDate?: string;
+    noticePeriod?: string;
+    benefits?: string[];
+    notes?: string;
+    totalCTC?: number;
+}
+
 export interface Application {
     id: string;
     company: string;
@@ -62,6 +80,7 @@ export interface Application {
     currentRound?: InterviewRoundType; // Current interview round for prep
     rounds: InterviewRound[];
     notes: string;
+    offerDetails?: OfferDetails;
     createdAt: string;
 }
 
