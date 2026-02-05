@@ -106,13 +106,13 @@ interface AppState {
     addQuestion: (question: Question) => void;
 
     /**
-     * Upserts the provided question texts into the Question Bank for the given company.
+     * Upserts the provided question texts into the Question Bank for the given application.
      *
-     * De-duplication is done by matching `companyId` + a normalized `questionText` (trimmed,
+     * De-duplication is done by matching `applicationId` + a normalized `questionText` (trimmed,
      * collapsed whitespace, lower-cased).
      */
     upsertQuestionsFromRound: (params: {
-        companyId: string;
+        applicationId: string;
         roundNumber: number;
         roundType: InterviewRound['roundType'];
         questionTexts: string[];
@@ -219,14 +219,14 @@ function getAskedInRoundLabel(
     return `Round ${roundNumber}: ${roundType}`;
 }
 
-function getQuestionDedupeKey(companyId: string, normalizedText: string): string {
-    return `${companyId}|${normalizedText}`;
+function getQuestionDedupeKey(applicationId: string, normalizedText: string): string {
+    return `${applicationId}|${normalizedText}`;
 }
 
 function upsertQuestionsFromRoundInList(
     questions: Question[],
     params: {
-        companyId: string;
+        applicationId: string;
         roundNumber: number;
         roundType: InterviewRound['roundType'];
         questionTexts: string[];
@@ -251,7 +251,7 @@ function upsertQuestionsFromRoundInList(
         if (!questionText) continue;
 
         const key = getQuestionDedupeKey(
-            params.companyId,
+            params.applicationId,
             normalizeQuestionText(questionText)
         );
 
@@ -259,7 +259,7 @@ function upsertQuestionsFromRoundInList(
         if (existingIdx === undefined) {
             nextQuestions.push({
                 id: createQuestionId(),
-                companyId: params.companyId,
+                companyId: params.applicationId,
                 questionText,
                 category: autoTagCategory(questionText),
                 askedInRound,
@@ -420,7 +420,7 @@ export const useStore = create<AppState>()(
                     const questions =
                         questionTexts.length > 0
                             ? upsertQuestionsFromRoundInList(state.questions, {
-                                companyId: applicationId,
+                                applicationId,
                                 roundNumber,
                                 roundType,
                                 questionTexts,
@@ -453,10 +453,10 @@ export const useStore = create<AppState>()(
                     questions: [...state.questions, question]
                 })),
 
-            upsertQuestionsFromRound: ({ companyId, roundNumber, roundType, questionTexts }) =>
+            upsertQuestionsFromRound: ({ applicationId, roundNumber, roundType, questionTexts }) =>
                 set((state) => ({
                     questions: upsertQuestionsFromRoundInList(state.questions, {
-                        companyId,
+                        applicationId,
                         roundNumber,
                         roundType,
                         questionTexts,
