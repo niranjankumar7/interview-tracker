@@ -72,6 +72,12 @@ export function CalendarSyncGate() {
     setOpen(true);
   }, [pendingCount]);
 
+  useEffect(() => {
+    if (!open) return;
+    if (pendingCount > 0) return;
+    setOpen(false);
+  }, [open, pendingCount]);
+
   if (!open) return null;
 
   return <CalendarSyncReviewModalContainer open={open} onClose={() => setOpen(false)} />;

@@ -454,12 +454,13 @@ export const useStore = create<AppState>()(
                             );
 
                             if (pendingIndex !== -1) {
+                                const existing = nextSuggestions[pendingIndex];
                                 nextSuggestions[pendingIndex] = {
-                                    ...existingPending,
+                                    ...existing,
                                     ...suggestion,
-                                    id: existingPending.id,
-                                    status: existingPending.status,
-                                    createdAt: existingPending.createdAt,
+                                    id: existing.id,
+                                    status: existing.status,
+                                    createdAt: existing.createdAt,
                                 };
                             }
                             continue;
