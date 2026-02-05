@@ -59,7 +59,7 @@ export function PrepDetailPanel(props: {
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
   const addInterviewRound = useStore((s) => s.addInterviewRound);
-  const updateApplication = useStore((s) => s.updateApplication);
+  const saveRoundFeedback = useStore((s) => s.saveRoundFeedback);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
     null
@@ -727,20 +727,20 @@ export function PrepDetailPanel(props: {
                     onClick={() => {
                       const rating = feedbackDraft.rating;
                       if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
-                      updateApplication(application.id, {
-                        rounds: [
-                          {
-                            roundNumber: activeRound.roundNumber,
-                            questionsAsked: linesToList(feedbackDraft.questionsText),
-                            feedback: {
-                              rating,
-                              pros: linesToList(feedbackDraft.prosText),
-                              cons: linesToList(feedbackDraft.consText),
-                              struggledTopics: feedbackDraft.struggledTopics,
-                              notes: feedbackDraft.notes,
-                            },
-                          },
-                        ],
+
+                      const questionTexts = linesToList(feedbackDraft.questionsText);
+
+                      saveRoundFeedback({
+                        applicationId: application.id,
+                        roundNumber: activeRound.roundNumber,
+                        questionTexts,
+                        feedback: {
+                          rating,
+                          pros: linesToList(feedbackDraft.prosText),
+                          cons: linesToList(feedbackDraft.consText),
+                          struggledTopics: feedbackDraft.struggledTopics,
+                          notes: feedbackDraft.notes,
+                        },
                       });
 
                       setFeedbackRoundNumber(null);
