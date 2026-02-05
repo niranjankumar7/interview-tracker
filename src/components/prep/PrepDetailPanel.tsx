@@ -150,11 +150,10 @@ export function PrepDetailPanel({
     }, [flushApplicationEdits, isOpen]);
 
     const handleClose = useCallback(() => {
-        flushApplicationEdits();
         resetScrapeState();
 
         onClose();
-    }, [flushApplicationEdits, onClose, resetScrapeState]);
+    }, [onClose, resetScrapeState]);
 
     useEffect(() => {
         if (!isOpen) {
