@@ -201,7 +201,9 @@ export default function DashboardPage() {
   }, [applications]);
 
   const offerCurrencies = useMemo(() => {
-    return Array.from(new Set(offerRows.map((row) => row.currency)));
+    return Array.from(
+      new Set(offerRows.map((row) => row.currency.trim().toUpperCase())),
+    );
   }, [offerRows]);
 
   const canCompareOffers = offerCurrencies.length <= 1;
@@ -452,7 +454,7 @@ export default function DashboardPage() {
 
           <Card
             title="Offer comparison"
-            subtitle="All offers sorted by total CTC (uses offerDetails.totalCTC when set, otherwise base+bonus(+numeric equity))"
+            subtitle="Offers grouped by currency and sorted by total CTC (uses offerDetails.totalCTC when set, otherwise base+bonus(+numeric equity))"
           >
             {offerRows.length === 0 ? (
               <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg p-10">

@@ -89,9 +89,12 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   const initialCompany = props.company;
   const panelNonce = useMemo(() => createId(), []);
   const componentId = useMemo(() => {
-    const slugRaw = props.panelId || props.applicationId || initialCompany || "unknown";
+    const stableKey = props.panelId || props.applicationId;
+    const slugRaw = stableKey || initialCompany || "unknown";
     const slug = sanitizeCompanyName(slugRaw).toLowerCase() || "unknown";
-    return `offer-details-panel:${slug}:${panelNonce}`;
+    return stableKey
+      ? `offer-details-panel:${slug}`
+      : `offer-details-panel:${slug}:${panelNonce}`;
   }, [initialCompany, panelNonce, props.applicationId, props.panelId]);
 
   const [state, setState] = useTamboComponentState<OfferDetailsPanelState>(componentId, {
@@ -130,7 +133,8 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   }, [applications, resolvedApplicationId]);
 
   const needsApplicationSelection =
-    companyMatches.length > 1 && !state?.selectedApplicationId;
+    companyMatches.length > 1 &&
+    (state?.selectedApplicationId === undefined || state.selectedApplicationId === "");
 
   const offerDetails = state ? buildOfferDetailsFromState(state) : undefined;
   const offerTotalLabel = formatOfferTotalCTC(offerDetails) ?? "—";
