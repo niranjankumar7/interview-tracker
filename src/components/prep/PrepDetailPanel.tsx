@@ -56,28 +56,18 @@ export function PrepDetailPanel({
 
     const sprintForApplication = useMemo(() => {
         let latestSprint: Sprint | null = null;
-        let latestSprintCreatedAtTime: number | null = null;
+        let latestSprintCreatedAtTime = Number.NEGATIVE_INFINITY;
 
         for (const sprint of sprints) {
             if (sprint.applicationId !== appId) continue;
 
             if (sprint.status === "active") return sprint;
 
-            const createdAtTime = safeParseISODate(sprint.createdAt)?.getTime() ?? null;
+            const createdAtTime =
+                safeParseISODate(sprint.createdAt)?.getTime() ??
+                Number.NEGATIVE_INFINITY;
 
-            if (createdAtTime === null) {
-                if (!latestSprint) {
-                    latestSprint = sprint;
-                } else if (
-                    latestSprintCreatedAtTime === null &&
-                    sprint.createdAt > latestSprint.createdAt
-                ) {
-                    latestSprint = sprint;
-                }
-                continue;
-            }
-
-            if (latestSprintCreatedAtTime === null || createdAtTime > latestSprintCreatedAtTime) {
+            if (!latestSprint || createdAtTime > latestSprintCreatedAtTime) {
                 latestSprint = sprint;
                 latestSprintCreatedAtTime = createdAtTime;
             }
@@ -148,6 +138,13 @@ export function PrepDetailPanel({
         saveJobDescriptionUrl();
         saveNotes();
     }, [saveJobDescriptionUrl, saveNotes]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        return () => {
+            flushApplicationEdits();
+        };
+    }, [flushApplicationEdits, isOpen]);
 
     const handleClose = useCallback(() => {
         flushApplicationEdits();
@@ -254,13 +251,16 @@ export function PrepDetailPanel({
 
     const sprintStatusSummary = sprintForApplication
         ? (() => {
-            let totalTasks = 0;
-            let completedTasks = 0;
             let completedDays = 0;
 
             for (const day of sprintForApplication.dailyPlans) {
                 if (day.completed) completedDays += 1;
+            }
 
+            let totalTasks = 0;
+            let completedTasks = 0;
+
+            for (const day of sprintForApplication.dailyPlans) {
                 for (const block of day.blocks) {
                     totalTasks += block.tasks.length;
 
@@ -432,7 +432,7 @@ export function PrepDetailPanel({
                                             onChange={(e) =>
                                                 setJobDescriptionUrlDraft(e.target.value)
                                             }
-                                            onBlur={flushApplicationEdits}
+                                            onBlur={saveJobDescriptionUrl}
                                             placeholder="https://..."
                                         />
                                         {jobDescriptionHref ? (
@@ -456,7 +456,7 @@ export function PrepDetailPanel({
                                     <Textarea
                                         value={notesDraft}
                                         onChange={(e) => setNotesDraft(e.target.value)}
-                                        onBlur={flushApplicationEdits}
+                                        onBlur={saveNotes}
                                         placeholder="Add anything you want to remember about this application..."
                                         className="min-h-[96px]"
                                     />
@@ -764,6 +764,7 @@ function safeParseISODate(value: string | undefined): Date | null {
 }
 
 function normalizeNotesForSave(value: string): string {
+    // Preserve leading whitespace and internal formatting; trim only trailing whitespace.
     return value.trimEnd();
 }
 
