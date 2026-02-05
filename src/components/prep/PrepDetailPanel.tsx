@@ -56,13 +56,25 @@ export function PrepDetailPanel({
 
     const sprintForApplication = useMemo(() => {
         let latestSprint: Sprint | null = null;
+        let latestSprintCreatedAtTime: number | null = null;
 
         for (const sprint of sprints) {
             if (sprint.applicationId !== appId) continue;
 
             if (sprint.status === "active") return sprint;
-            if (!latestSprint || sprint.createdAt > latestSprint.createdAt) {
+
+            const createdAtTime = safeParseISODate(sprint.createdAt)?.getTime() ?? null;
+
+            if (createdAtTime === null) {
+                if (!latestSprint) {
+                    latestSprint = sprint;
+                }
+                continue;
+            }
+
+            if (latestSprintCreatedAtTime === null || createdAtTime > latestSprintCreatedAtTime) {
                 latestSprint = sprint;
+                latestSprintCreatedAtTime = createdAtTime;
             }
         }
 
@@ -101,8 +113,8 @@ export function PrepDetailPanel({
         if (lastSyncedApplicationId.current === application.id) return;
 
         lastSyncedApplicationId.current = application.id;
-        const jobDescriptionUrl = application.jobDescriptionUrl ?? "";
-        const notes = application.notes ?? "";
+        const jobDescriptionUrl = (application.jobDescriptionUrl ?? "").trim();
+        const notes = normalizeNotesForSave(application.notes ?? "");
 
         setJobDescriptionUrlDraft(jobDescriptionUrl);
         setNotesDraft(notes);
@@ -111,32 +123,33 @@ export function PrepDetailPanel({
         lastSavedNotes.current = notes;
     }, [application, isOpen]);
 
-    const saveApplicationEdits = useCallback(() => {
+    const saveJobDescriptionUrl = useCallback(() => {
         const nextJobDescriptionUrl = jobDescriptionUrlDraft.trim();
-        const nextNotes = notesDraft;
+        if (nextJobDescriptionUrl === lastSavedJobDescriptionUrl.current) return;
 
-        if (
-            nextJobDescriptionUrl === lastSavedJobDescriptionUrl.current &&
-            nextNotes === lastSavedNotes.current
-        ) {
-            return;
-        }
-
-        updateApplication(appId, {
-            jobDescriptionUrl: nextJobDescriptionUrl,
-            notes: nextNotes,
-        });
-
+        updateApplication(appId, { jobDescriptionUrl: nextJobDescriptionUrl });
         lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
+    }, [appId, jobDescriptionUrlDraft, updateApplication]);
+
+    const saveNotes = useCallback(() => {
+        const nextNotes = normalizeNotesForSave(notesDraft);
+        if (nextNotes === lastSavedNotes.current) return;
+
+        updateApplication(appId, { notes: nextNotes });
         lastSavedNotes.current = nextNotes;
-    }, [appId, jobDescriptionUrlDraft, notesDraft, updateApplication]);
+    }, [appId, notesDraft, updateApplication]);
+
+    const flushApplicationEdits = useCallback(() => {
+        saveJobDescriptionUrl();
+        saveNotes();
+    }, [saveJobDescriptionUrl, saveNotes]);
 
     const handleClose = useCallback(() => {
-        saveApplicationEdits();
+        flushApplicationEdits();
         resetScrapeState();
 
         onClose();
-    }, [onClose, resetScrapeState, saveApplicationEdits]);
+    }, [flushApplicationEdits, onClose, resetScrapeState]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -236,25 +249,21 @@ export function PrepDetailPanel({
 
     const sprintStatusSummary = sprintForApplication
         ? (() => {
-            const totalTasks = sprintForApplication.dailyPlans.reduce(
-                (acc, day) =>
-                    acc +
-                    day.blocks.reduce(
-                        (blockAcc, block) => blockAcc + block.tasks.length,
-                        0
-                    ),
-                0
-            );
-            const completedTasks = sprintForApplication.dailyPlans.reduce(
-                (acc, day) =>
-                    acc +
-                    day.blocks.reduce(
-                        (blockAcc, block) =>
-                            blockAcc + block.tasks.filter((t) => t.completed).length,
-                        0
-                    ),
-                0
-            );
+            let totalTasks = 0;
+            let completedTasks = 0;
+            let completedDays = 0;
+
+            for (const day of sprintForApplication.dailyPlans) {
+                if (day.completed) completedDays += 1;
+
+                for (const block of day.blocks) {
+                    totalTasks += block.tasks.length;
+
+                    for (const task of block.tasks) {
+                        if (task.completed) completedTasks += 1;
+                    }
+                }
+            }
 
             const percent =
                 totalTasks === 0
@@ -278,10 +287,6 @@ export function PrepDetailPanel({
                 sprintForApplication.status === "completed"
                     ? 0
                     : Math.max(0, daysDelta);
-
-            const completedDays = sprintForApplication.dailyPlans.filter(
-                (d) => d.completed
-            ).length;
 
             return {
                 totalTasks,
@@ -422,7 +427,7 @@ export function PrepDetailPanel({
                                             onChange={(e) =>
                                                 setJobDescriptionUrlDraft(e.target.value)
                                             }
-                                            onBlur={saveApplicationEdits}
+                                            onBlur={saveJobDescriptionUrl}
                                             placeholder="https://..."
                                         />
                                         {jobDescriptionHref ? (
@@ -446,7 +451,7 @@ export function PrepDetailPanel({
                                     <Textarea
                                         value={notesDraft}
                                         onChange={(e) => setNotesDraft(e.target.value)}
-                                        onBlur={saveApplicationEdits}
+                                        onBlur={saveNotes}
                                         placeholder="Add anything you want to remember about this application..."
                                         className="min-h-[96px]"
                                     />
@@ -751,6 +756,10 @@ function safeParseISODate(value: string | undefined): Date | null {
     if (!value) return null;
     const parsed = parseISO(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeNotesForSave(value: string): string {
+    return value.replace(/[ \t]+\n/g, "\n").trimEnd();
 }
 
 // Helper function to infer role type from role string
