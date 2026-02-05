@@ -733,7 +733,6 @@ export function PrepDetailPanel(props: {
                       saveRoundFeedback({
                         applicationId: application.id,
                         roundNumber: activeRound.roundNumber,
-                        roundType: activeRound.roundType,
                         questionTexts,
                         feedback: {
                           rating,

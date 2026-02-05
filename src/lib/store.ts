@@ -81,6 +81,8 @@ interface AppState {
      *
      * To add new rounds, use `addInterviewRound`. If `feedback` is provided, it is merged field-
      * by-field, so omitted fields preserve existing values.
+     *
+     * For saving round feedback/questions and syncing the Question Bank, prefer `saveRoundFeedback`.
      */
     updateApplication: (
         id: string,
@@ -96,7 +98,6 @@ interface AppState {
     saveRoundFeedback: (params: {
         applicationId: string;
         roundNumber: number;
-        roundType: InterviewRound['roundType'];
         feedback: InterviewRound['feedback'];
         questionTexts: string[];
     }) => void;
@@ -179,6 +180,8 @@ function normalizeQuestionText(value: string): string {
     return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
+// Keeps IDs stable-ish and reduces same-millisecond collision risk.
 let fallbackQuestionIdLastTime = 0;
 let fallbackQuestionIdCounter = 0;
 
@@ -385,8 +388,10 @@ export const useStore = create<AppState>()(
                     }),
                 })),
 
-            saveRoundFeedback: ({ applicationId, roundNumber, roundType, feedback, questionTexts }) =>
+            saveRoundFeedback: ({ applicationId, roundNumber, feedback, questionTexts }) =>
                 set((state) => {
+                    let targetRoundType: InterviewRound['roundType'] | null = null;
+
                     const applications = state.applications.map((app) => {
                         if (app.id !== applicationId) return app;
 
@@ -399,7 +404,6 @@ export const useStore = create<AppState>()(
                                     {
                                         applicationId,
                                         roundNumber,
-                                        roundType,
                                         availableRounds: (app.rounds ?? []).map((r) => ({
                                             roundNumber: r.roundNumber,
                                             roundType: r.roundType,
@@ -411,6 +415,7 @@ export const useStore = create<AppState>()(
                         }
 
                         const prev = nextRounds[idx];
+                        targetRoundType = prev.roundType;
                         nextRounds[idx] = {
                             ...prev,
                             questionsAsked: questionTexts,
@@ -426,11 +431,11 @@ export const useStore = create<AppState>()(
                     });
 
                     const questions =
-                        questionTexts.length > 0
+                        questionTexts.length > 0 && targetRoundType
                             ? upsertQuestionsFromRoundInList(state.questions, {
                                 applicationId,
                                 roundNumber,
-                                roundType,
+                                roundType: targetRoundType,
                                 questionTexts,
                             })
                             : state.questions;
