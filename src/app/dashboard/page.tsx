@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { ApplicationStatus, Sprint } from "@/types";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   addDays,
   differenceInDays,
@@ -62,10 +63,10 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-800">{title}</h2>
-        {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+    <section className="bg-card rounded-xl border border-border shadow-sm overflow-hidden text-card-foreground">
+      <div className="p-5 border-b border-border">
+        <h2 className="font-semibold text-foreground">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -230,23 +231,23 @@ export default function DashboardPage() {
   }, [completedActivityCountsByDate, today]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div className="min-h-screen bg-background flex flex-col transition-colors duration-300">
+      <header className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
               <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-gray-800">Dashboard</h1>
-              <p className="text-xs text-gray-500">Progress & analytics</p>
+              <h1 className="font-bold text-foreground">Dashboard</h1>
+              <p className="text-xs text-muted-foreground">Progress & analytics</p>
             </div>
           </div>
 
           {progress.currentStreak > 0 && (
-            <div className="hidden sm:flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-200">
+            <div className="hidden sm:flex items-center gap-2 bg-orange-50/10 px-3 py-1.5 rounded-full border border-orange-200/20">
               <Flame className="w-4 h-4 text-orange-500" />
-              <span className="text-sm font-medium text-orange-700">
+              <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
                 {progress.currentStreak} day streak
               </span>
             </div>
@@ -254,27 +255,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <nav className="flex bg-gray-100 rounded-lg p-1">
+          <nav className="flex bg-muted rounded-lg p-1">
             <Link
               href="/chat"
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all text-gray-600 hover:text-gray-800"
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all text-muted-foreground hover:text-foreground hover:bg-background/50"
             >
               <MessageSquare className="w-4 h-4" />
               <span className="hidden sm:inline">Chat</span>
             </Link>
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all bg-white text-blue-600 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all bg-background text-primary shadow-sm"
             >
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline">Dashboard</span>
             </Link>
           </nav>
 
-          <div className="flex items-center gap-1 ml-2 border-l pl-2 border-gray-200">
+          <div className="flex items-center gap-1 ml-2 border-l pl-2 border-border">
+            <ThemeToggle />
             <button
               onClick={loadDemoData}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-all"
               title="Load demo data"
             >
               <Database className="w-4 h-4" />
@@ -286,7 +288,7 @@ export default function DashboardPage() {
                   resetData();
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-all"
               title="Reset data"
             >
               <RotateCcw className="w-4 h-4" />
@@ -299,37 +301,37 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">Tasks completed</p>
-                <Target className="w-4 h-4 text-gray-400" />
+                <p className="text-sm text-muted-foreground">Tasks completed</p>
+                <Target className="w-4 h-4 text-muted-foreground/60" />
               </div>
-              <p className="text-2xl font-bold text-gray-800 mt-2">
+              <p className="text-2xl font-bold text-foreground mt-2">
                 {progress.totalTasksCompleted}
               </p>
-              <p className="text-xs text-gray-500 mt-1">All time</p>
+              <p className="text-xs text-muted-foreground mt-1">All time</p>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">Applications</p>
-                <BarChart3 className="w-4 h-4 text-gray-400" />
+                <p className="text-sm text-muted-foreground">Applications</p>
+                <BarChart3 className="w-4 h-4 text-muted-foreground/60" />
               </div>
-              <p className="text-2xl font-bold text-gray-800 mt-2">
+              <p className="text-2xl font-bold text-foreground mt-2">
                 {applications.length}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Tracked</p>
+              <p className="text-xs text-muted-foreground mt-1">Tracked</p>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">Upcoming interviews</p>
-                <Calendar className="w-4 h-4 text-gray-400" />
+                <p className="text-sm text-muted-foreground">Upcoming interviews</p>
+                <Calendar className="w-4 h-4 text-muted-foreground/60" />
               </div>
-              <p className="text-2xl font-bold text-gray-800 mt-2">
+              <p className="text-2xl font-bold text-foreground mt-2">
                 {upcomingInterviews.length}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Scheduled</p>
+              <p className="text-xs text-muted-foreground mt-1">Scheduled</p>
             </div>
           </div>
 
@@ -340,9 +342,9 @@ export default function DashboardPage() {
                 subtitle="Cumulative topics completed over the last 30 days"
               >
                 {!mounted ? (
-                  <div className="h-[240px] bg-gray-50 rounded-lg animate-pulse" />
+                  <div className="h-[240px] bg-muted/30 rounded-lg animate-pulse" />
                 ) : totalTopicsLast30 === 0 ? (
-                  <div className="h-[240px] flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded-lg">
                     No topics completed in the last 30 days
                   </div>
                 ) : (
@@ -379,7 +381,7 @@ export default function DashboardPage() {
                     No applications yet
                   </div>
                 ) : applicationPipelineData.length === 0 ? (
-                  <div className="h-[240px] flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg">
+                  <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded-lg">
                     Add statuses to see the pipeline breakdown
                   </div>
                 ) : (
@@ -413,7 +415,7 @@ export default function DashboardPage() {
             subtitle="Activity frequency over the last year"
           >
             {totalActivityLastYear === 0 ? (
-              <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg p-10">
+              <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded-lg p-10">
                 No study activity logged yet
               </div>
             ) : (
@@ -425,14 +427,14 @@ export default function DashboardPage() {
                         {week.map((cell) => {
                           const level =
                             cell.count === 0
-                              ? "bg-gray-100"
+                              ? "bg-muted"
                               : cell.count <= 1
-                                ? "bg-green-200"
+                                ? "bg-green-200 dark:bg-green-900/60"
                                 : cell.count <= 3
-                                  ? "bg-green-300"
+                                  ? "bg-green-300 dark:bg-green-800/80"
                                   : cell.count <= 6
-                                    ? "bg-green-400"
-                                    : "bg-green-500";
+                                    ? "bg-green-400 dark:bg-green-700"
+                                    : "bg-green-500 dark:bg-green-600";
 
                           const title = cell.isFuture
                             ? undefined
@@ -451,7 +453,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
+                  <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
                     <span>{format(heatmap.rangeStart, "MMM yyyy")}</span>
                     <span>{format(today, "MMM yyyy")}</span>
                   </div>
@@ -462,7 +464,7 @@ export default function DashboardPage() {
 
           <Card title="Next interviews" subtitle="Countdown to upcoming interviews">
             {upcomingInterviews.length === 0 ? (
-              <div className="flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg p-10">
+              <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/30 rounded-lg p-10">
                 No interviews scheduled
               </div>
             ) : (

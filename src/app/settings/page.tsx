@@ -35,6 +35,7 @@ import { NativeSelect } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { CalendarSyncCard } from "@/components/calendar";
 
 type ThemeOption = {
   id: ThemePreference;
@@ -258,6 +259,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <CalendarSyncCard />
 
         <Card>
           <CardHeader>

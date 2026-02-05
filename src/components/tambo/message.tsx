@@ -71,8 +71,8 @@ const messageVariants = cva("flex", {
       default: "",
       solid: [
         "[&>div>div:first-child]:shadow-md",
-        "[&>div>div:first-child]:bg-container/50",
-        "[&>div>div:first-child]:hover:bg-container",
+        "[&>div>div:first-child]:bg-muted",
+        "[&>div>div:first-child]:hover:bg-muted/80",
         "[&>div>div:first-child]:transition-all",
         "[&>div>div:first-child]:duration-200",
       ].join(" "),
@@ -594,7 +594,7 @@ const SamplingSubThread = ({
                   className={cn(
                     "whitespace-pre-wrap",
                     m.role === "assistant" &&
-                      "bg-muted/50 rounded-md p-2 inline-block w-fit",
+                    "bg-muted/50 rounded-md p-2 inline-block w-fit",
                   )}
                 >
                   {getSafeContent(m.content)}

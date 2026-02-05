@@ -58,21 +58,6 @@ export type SprintStatus = (typeof SPRINT_STATUSES)[number];
 export const BLOCK_TYPES = ['morning', 'evening', 'quick'] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
-export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
-
-export type FocusArea =
-    | 'DSA'
-    | 'SystemDesign'
-    | 'Behavioral'
-    | 'Review'
-    | 'Mock';
-
-export type QuestionCategory =
-    | 'DSA'
-    | 'SystemDesign'
-    | 'Behavioral'
-    | 'SQL'
-    | 'Other';
 
 export interface Application {
     id: string;
@@ -86,6 +71,7 @@ export interface Application {
     rounds: InterviewRound[];
     notes: string;
     createdAt: string;
+    source?: 'manual' | 'calendar';
 }
 
 export interface InterviewRound {
@@ -166,6 +152,7 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export interface AppPreferences {
     theme: ThemePreference;
     studyRemindersEnabled: boolean;
+    calendarAutoSyncEnabled: boolean;
 }
 
 // Track completed prep topics globally
@@ -174,4 +161,42 @@ export interface CompletedTopic {
     displayName?: string;     // Original display name (for UI)
     completedAt: string;      // ISO date string
     source: 'chat' | 'manual';
+}
+
+export type CalendarProvider = 'google';
+
+export interface CalendarConnection {
+    provider: CalendarProvider;
+    connected: boolean;
+    readOnly: boolean;
+    email?: string;
+    connectedAt?: string;
+    lastSyncAt?: string;
+}
+
+export interface CalendarEvent {
+    id: string;
+    provider: CalendarProvider;
+    title: string;
+    start: string;
+    end?: string;
+    organizer?: string;
+    attendees?: string[];
+    location?: string;
+    meetingLink?: string;
+    source?: 'sync' | 'import' | 'demo';
+}
+
+export interface CalendarInterviewSuggestion {
+    id: string;
+    eventId: string;
+    title: string;
+    company: string;
+    role?: string;
+    roleType?: RoleType;
+    interviewDate: string;
+    confidence: 'high' | 'medium' | 'low';
+    reason: string;
+    status: 'pending' | 'confirmed' | 'dismissed';
+    createdAt: string;
 }

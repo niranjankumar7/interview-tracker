@@ -10,10 +10,16 @@ import {
     UserProfile,
     AppPreferences,
     CompletedTopic,
+    CalendarConnection,
+    CalendarEvent,
+    CalendarInterviewSuggestion,
+    RoleType,
 } from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+import { generateSprint } from '@/lib/sprintGenerator';
+import { buildCalendarSuggestions, isValidCompanyName, mergeCalendarEvents } from '@/lib/calendar-sync';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -23,6 +29,9 @@ export type AppDataSnapshot = {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    calendar?: CalendarConnection;
+    calendarEvents?: CalendarEvent[];
+    calendarSuggestions?: CalendarInterviewSuggestion[];
 };
 
 export type AppDataExport = {
@@ -62,6 +71,9 @@ interface AppState {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    calendar: CalendarConnection;
+    calendarEvents: CalendarEvent[];
+    calendarSuggestions: CalendarInterviewSuggestion[];
     hasHydrated: boolean;
 
     setHasHydrated: (hasHydrated: boolean) => void;
@@ -113,6 +125,22 @@ interface AppState {
     resetData: () => void;
     exportData: () => AppDataExport;
     importData: (data: unknown) => void;
+
+    // Calendar sync
+    connectCalendar: (info: { email?: string }) => void;
+    disconnectCalendar: () => void;
+    syncCalendarEvents: (events: CalendarEvent[], source?: CalendarEvent["source"]) => void;
+    confirmCalendarSuggestion: (
+        id: string,
+        overrides?: {
+            company?: string;
+            role?: string;
+            roleType?: RoleType;
+            interviewDate?: string;
+            createSprint?: boolean;
+        }
+    ) => void;
+    dismissCalendarSuggestion: (id: string) => void;
 }
 
 const getInitialProgress = (): UserProgress => ({
@@ -139,12 +167,26 @@ const getInitialProfile = (): UserProfile => ({
 const getInitialPreferences = (): AppPreferences => ({
     theme: 'system',
     studyRemindersEnabled: false,
+    calendarAutoSyncEnabled: false,
+});
+
+const getInitialCalendar = (): CalendarConnection => ({
+    provider: 'google',
+    connected: false,
+    readOnly: true,
 });
 
 function safeParseISO(value: string | undefined): Date | null {
     if (!value) return null;
     const parsed = parseISO(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function createClientId(): string {
+    return (
+        globalThis.crypto?.randomUUID?.() ??
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    );
 }
 
 export const useStore = create<AppState>()(
@@ -157,6 +199,9 @@ export const useStore = create<AppState>()(
             profile: getInitialProfile(),
             preferences: getInitialPreferences(),
             completedTopics: [],
+            calendar: getInitialCalendar(),
+            calendarEvents: [],
+            calendarSuggestions: [],
             hasHydrated: false,
 
             setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -356,6 +401,230 @@ export const useStore = create<AppState>()(
                     preferences: { ...state.preferences, ...updates }
                 })),
 
+            connectCalendar: ({ email }) =>
+                set((state) => ({
+                    calendar: {
+                        ...state.calendar,
+                        connected: true,
+                        readOnly: true,
+                        email: email?.trim() || state.calendar.email,
+                        connectedAt: new Date().toISOString(),
+                    },
+                })),
+
+            disconnectCalendar: () =>
+                set(() => ({
+                    calendar: getInitialCalendar(),
+                    calendarEvents: [],
+                    calendarSuggestions: [],
+                })),
+
+            syncCalendarEvents: (events, source = 'sync') =>
+                set((state) => {
+                    const normalizedEvents = events.map((event) => ({
+                        ...event,
+                        source: event.source ?? source,
+                    }));
+
+                    const mergedEvents = mergeCalendarEvents(
+                        state.calendarEvents,
+                        normalizedEvents
+                    );
+
+                    const newSuggestions = buildCalendarSuggestions(
+                        normalizedEvents,
+                        state.applications
+                    );
+
+                    const nextSuggestions = [...state.calendarSuggestions];
+                    const existingIds = new Set(nextSuggestions.map((suggestion) => suggestion.id));
+
+                    for (const suggestion of newSuggestions) {
+                        const matches = nextSuggestions.filter(
+                            (item) => item.eventId === suggestion.eventId
+                        );
+
+                        const existingPending = matches.find(
+                            (item) => item.status === 'pending'
+                        );
+
+                        if (existingPending) {
+                            const pendingIndex = nextSuggestions.findIndex(
+                                (item) => item.id === existingPending.id
+                            );
+
+                            if (pendingIndex !== -1) {
+                                const existing = nextSuggestions[pendingIndex];
+                                nextSuggestions[pendingIndex] = {
+                                    ...existing,
+                                    ...suggestion,
+                                    id: existing.id,
+                                    status: existing.status,
+                                    createdAt: existing.createdAt,
+                                };
+                            }
+                            continue;
+                        }
+
+                        const existingDismissed = matches.find(
+                            (item) => item.status === 'dismissed'
+                        );
+                        if (existingDismissed) continue;
+
+                        const existingConfirmed = matches.find(
+                            (item) => item.status === 'confirmed'
+                        );
+
+                        if (existingConfirmed) {
+                            const didChange =
+                                existingConfirmed.interviewDate !== suggestion.interviewDate ||
+                                existingConfirmed.title !== suggestion.title;
+
+                            if (!didChange) continue;
+
+                            const createdAt = new Date().toISOString();
+                            const dateSegment = suggestion.interviewDate
+                                .replace(/[^0-9]/g, '')
+                                .slice(0, 14) || '0';
+                            const baseId = `${suggestion.id}@${dateSegment}`;
+                            let nextId = baseId;
+                            let suffix = 1;
+
+                            while (existingIds.has(nextId)) {
+                                nextId = `${baseId}-${suffix++}`;
+                            }
+
+                            existingIds.add(nextId);
+                            nextSuggestions.push({
+                                ...suggestion,
+                                id: nextId,
+                                status: 'pending',
+                                createdAt,
+                                reason: `Rescheduled: ${suggestion.reason}`,
+                            });
+                            continue;
+                        }
+
+                        if (existingIds.has(suggestion.id)) continue;
+
+                        existingIds.add(suggestion.id);
+                        nextSuggestions.push(suggestion);
+                    }
+
+                    return {
+                        calendarEvents: mergedEvents,
+                        calendarSuggestions: nextSuggestions,
+                        calendar: {
+                            ...state.calendar,
+                            lastSyncAt: new Date().toISOString(),
+                        },
+                    };
+                }),
+
+            confirmCalendarSuggestion: (id, overrides = {}) =>
+                set((state) => {
+                    const suggestion = state.calendarSuggestions.find((s) => s.id === id);
+                    if (!suggestion) return {};
+
+                    const companyInput = (overrides.company ?? suggestion.company).trim();
+                    if (!isValidCompanyName(companyInput)) {
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.warn(
+                                'confirmCalendarSuggestion: invalid company',
+                                {
+                                    suggestionId: id,
+                                    company: companyInput,
+                                }
+                            );
+                        }
+                        return {};
+                    }
+
+                    const company = companyInput;
+                    const role = (overrides.role ?? suggestion.role ?? 'Software Engineer').trim();
+                    const interviewDate = overrides.interviewDate ?? suggestion.interviewDate;
+                    const roleType = overrides.roleType ?? suggestion.roleType ?? 'SDE';
+                    const createSprint = overrides.createSprint ?? true;
+                    const nowIso = new Date().toISOString();
+
+                    const existingIndex = state.applications.findIndex(
+                        (app) => app.company.toLowerCase() === company.toLowerCase()
+                    );
+
+                    const nextApplications = [...state.applications];
+                    let applicationId: string;
+
+                    if (existingIndex === -1) {
+                        applicationId = createClientId();
+                        nextApplications.push({
+                            id: applicationId,
+                            company,
+                            role,
+                            roleType,
+                            status: 'interview',
+                            applicationDate: nowIso,
+                            interviewDate,
+                            rounds: [],
+                            notes: '',
+                            createdAt: nowIso,
+                            source: 'calendar',
+                        });
+                    } else {
+                        const existingApp = nextApplications[existingIndex];
+                        applicationId = existingApp.id;
+                        nextApplications[existingIndex] = {
+                            ...existingApp,
+                            interviewDate,
+                            status: 'interview',
+                            role: existingApp.role || role,
+                            roleType: existingApp.roleType ?? roleType,
+                            source: existingApp.source ?? 'calendar',
+                        };
+                    }
+
+                    const nextSprints = [...state.sprints];
+                    if (createSprint) {
+                        const hasActiveSprint = nextSprints.some(
+                            (sprint) =>
+                                sprint.applicationId === applicationId &&
+                                sprint.status === 'active'
+                        );
+
+                        if (!hasActiveSprint) {
+                            const parsedDate = safeParseISO(interviewDate);
+                            if (parsedDate) {
+                                nextSprints.push(
+                                    generateSprint(applicationId, parsedDate, roleType)
+                                );
+                            }
+                        }
+                    }
+
+                    return {
+                        applications: nextApplications,
+                        sprints: nextSprints,
+                        calendarSuggestions: state.calendarSuggestions.map((item) =>
+                            item.id === id
+                                ? {
+                                      ...item,
+                                      company,
+                                      role,
+                                      roleType,
+                                      interviewDate,
+                                      status: 'confirmed',
+                                  }
+                                : item
+                        ),
+                    };
+                }),
+
+            dismissCalendarSuggestion: (id) =>
+                set((state) => ({
+                    calendarSuggestions: state.calendarSuggestions.map((s) =>
+                        s.id === id ? { ...s, status: "dismissed" } : s
+                    ),
+                })),
+
             // Topic progress tracking
             markTopicComplete: (topicName, source = 'manual') => {
                 const normalized = normalizeTopic(topicName);
@@ -452,6 +721,9 @@ export const useStore = create<AppState>()(
                     sprints: [],
                     questions: demoQuestions,
                     completedTopics: [],
+                    calendar: getInitialCalendar(),
+                    calendarEvents: [],
+                    calendarSuggestions: [],
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -469,27 +741,61 @@ export const useStore = create<AppState>()(
                 profile: getInitialProfile(),
                 preferences: getInitialPreferences(),
                 completedTopics: [],
+                calendar: getInitialCalendar(),
+                calendarEvents: [],
+                calendarSuggestions: [],
             }),
 
             exportData: () => {
-                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
+                const {
+                    applications,
+                    sprints,
+                    questions,
+                    progress,
+                    profile,
+                    preferences,
+                    completedTopics,
+                    calendar,
+                    calendarEvents,
+                    calendarSuggestions,
+                } = get();
                 return {
                     version: APP_VERSION,
                     exportedAt: new Date().toISOString(),
-                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
+                    snapshot: {
+                        applications,
+                        sprints,
+                        questions,
+                        progress,
+                        profile,
+                        preferences,
+                        completedTopics,
+                        calendar,
+                        calendarEvents,
+                        calendarSuggestions,
+                    },
                 };
             },
 
             importData: (data) => {
                 const exportParse = appDataExportSchema.safeParse(data);
+                const applySnapshot = (snapshot: AppDataSnapshot) => {
+                    set({
+                        ...snapshot,
+                        calendar: snapshot.calendar ?? getInitialCalendar(),
+                        calendarEvents: snapshot.calendarEvents ?? [],
+                        calendarSuggestions: snapshot.calendarSuggestions ?? [],
+                    });
+                };
+
                 if (exportParse.success) {
-                    set(exportParse.data.snapshot);
+                    applySnapshot(exportParse.data.snapshot);
                     return;
                 }
 
                 const snapshotParse = appDataSnapshotSchema.safeParse(data);
                 if (snapshotParse.success) {
-                    set(snapshotParse.data);
+                    applySnapshot(snapshotParse.data);
                     return;
                 }
 
@@ -510,7 +816,26 @@ export const useStore = create<AppState>()(
                 profile: state.profile,
                 preferences: state.preferences,
                 completedTopics: state.completedTopics,
+                calendar: state.calendar,
+                calendarEvents: state.calendarEvents,
+                calendarSuggestions: state.calendarSuggestions,
             }),
+            merge: (persistedState, currentState) => {
+                const persisted = persistedState as Partial<AppState> | undefined;
+
+                return {
+                    ...currentState,
+                    ...persisted,
+                    preferences: {
+                        ...currentState.preferences,
+                        ...(persisted?.preferences ?? {}),
+                    },
+                    calendar: {
+                        ...currentState.calendar,
+                        ...(persisted?.calendar ?? {}),
+                    },
+                };
+            },
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);
             },
