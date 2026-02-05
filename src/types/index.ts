@@ -63,6 +63,7 @@ export interface Application {
     id: string;
     company: string;
     role: string;
+    jobDescriptionUrl?: string;
     roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string

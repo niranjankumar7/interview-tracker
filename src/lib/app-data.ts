@@ -62,13 +62,14 @@ const applicationSchema = z.object({
   id: z.string(),
   company: z.string(),
   role: z.string(),
+  jobDescriptionUrl: z.string().optional(),
   roleType: roleTypeSchema.optional(),
   status: applicationStatusSchema,
   applicationDate: z.string(),
   interviewDate: z.string().optional(),
   currentRound: interviewRoundTypeSchema.optional(),
   rounds: z.array(interviewRoundSchema),
-  notes: z.string(),
+  notes: z.string().default(""),
   createdAt: z.string(),
 });
 
