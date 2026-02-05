@@ -68,6 +68,11 @@ export function PrepDetailPanel({
             if (createdAtTime === null) {
                 if (!latestSprint) {
                     latestSprint = sprint;
+                } else if (
+                    latestSprintCreatedAtTime === null &&
+                    sprint.createdAt > latestSprint.createdAt
+                ) {
+                    latestSprint = sprint;
                 }
                 continue;
             }
@@ -427,7 +432,7 @@ export function PrepDetailPanel({
                                             onChange={(e) =>
                                                 setJobDescriptionUrlDraft(e.target.value)
                                             }
-                                            onBlur={saveJobDescriptionUrl}
+                                            onBlur={flushApplicationEdits}
                                             placeholder="https://..."
                                         />
                                         {jobDescriptionHref ? (
@@ -451,7 +456,7 @@ export function PrepDetailPanel({
                                     <Textarea
                                         value={notesDraft}
                                         onChange={(e) => setNotesDraft(e.target.value)}
-                                        onBlur={saveNotes}
+                                        onBlur={flushApplicationEdits}
                                         placeholder="Add anything you want to remember about this application..."
                                         className="min-h-[96px]"
                                     />
@@ -759,7 +764,7 @@ function safeParseISODate(value: string | undefined): Date | null {
 }
 
 function normalizeNotesForSave(value: string): string {
-    return value.replace(/[ \t]+\n/g, "\n").trimEnd();
+    return value.trimEnd();
 }
 
 // Helper function to infer role type from role string
