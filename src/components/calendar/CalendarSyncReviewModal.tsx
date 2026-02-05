@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { format, parseISO } from "date-fns";
 import { Calendar, Check, Info, X } from "lucide-react";
 import type { CalendarInterviewSuggestion } from "@/types";
+import { isValidCompanyName } from "@/lib/calendar-sync";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,9 +68,7 @@ function SuggestionCard({
   const interviewIso = toIsoDate(date);
   const companyValue = company.trim();
   const canConfirm =
-    Boolean(companyValue) &&
-    companyValue.toLowerCase() !== "unknown" &&
-    Boolean(interviewIso);
+    isValidCompanyName(companyValue) && Boolean(interviewIso);
   const parsedInterviewDate = parseISO(suggestion.interviewDate);
   const interviewLabel = Number.isNaN(parsedInterviewDate.getTime())
     ? suggestion.interviewDate.slice(0, 10)

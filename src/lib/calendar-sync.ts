@@ -46,6 +46,11 @@ const COMPANY_PATTERNS: RegExp[] = [
 
 const MAX_COMPANY_LENGTH = 40;
 
+export function isValidCompanyName(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.toLowerCase() !== "unknown";
+}
+
 function isPotentialInterview(title: string): boolean {
   const lower = title.toLowerCase();
   return INTERVIEW_KEYWORDS.some((keyword) => lower.includes(keyword));

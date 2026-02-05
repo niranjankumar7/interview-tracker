@@ -19,7 +19,7 @@ import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
 import { generateSprint } from '@/lib/sprintGenerator';
-import { buildCalendarSuggestions, mergeCalendarEvents } from '@/lib/calendar-sync';
+import { buildCalendarSuggestions, isValidCompanyName, mergeCalendarEvents } from '@/lib/calendar-sync';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -484,8 +484,8 @@ export const useStore = create<AppState>()(
                             const createdAt = new Date().toISOString();
                             const dateSegment = suggestion.interviewDate
                                 .replace(/[^0-9]/g, '')
-                                .slice(0, 14);
-                            const baseId = `${suggestion.id}@${dateSegment || Date.now()}`;
+                                .slice(0, 14) || '0';
+                            const baseId = `${suggestion.id}@${dateSegment}`;
                             let nextId = baseId;
                             let suffix = 1;
 
@@ -526,7 +526,7 @@ export const useStore = create<AppState>()(
                     if (!suggestion) return {};
 
                     const companyInput = (overrides.company ?? suggestion.company).trim();
-                    if (!companyInput || companyInput.toLowerCase() === 'unknown') {
+                    if (!isValidCompanyName(companyInput)) {
                         return {};
                     }
 
