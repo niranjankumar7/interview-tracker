@@ -439,7 +439,7 @@ export const tools: TamboTool[] = [
   {
     name: "updateOfferDetails",
     description:
-      "Save or update job offer details for an application. Prefer applicationId when known. If matching by company finds multiple applications, returns success=false with a candidates list. Sets status to offer only when compensation fields are provided (CTC/base/bonus/equity).",
+      "Save or update job offer details for an application. Prefer applicationId when known. If matching by company finds multiple applications, returns success=false with a candidates list; callers should prompt for an applicationId and retry. Sets status to offer only when compensation fields are provided (CTC/base/bonus/equity).",
     tool: (input: {
       applicationId?: string;
       company?: string;

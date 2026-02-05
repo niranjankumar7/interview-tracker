@@ -41,7 +41,7 @@ type StatusConfig = {
   chartColorHex: string;
 };
 
-const statusConfigs: StatusConfig[] = [
+const statusChartConfigs: StatusConfig[] = [
   { status: "applied", label: "Applied", chartColorHex: "#6B7280" },
   { status: "shortlisted", label: "Shortlisted", chartColorHex: "#3B82F6" },
   { status: "interview", label: "Interview", chartColorHex: "#8B5CF6" },
@@ -158,12 +158,12 @@ export default function DashboardPage() {
 
   const applicationPipelineData = useMemo(() => {
     const counts = new Map<ApplicationStatus, number>();
-    for (const config of statusConfigs) counts.set(config.status, 0);
+    for (const config of statusChartConfigs) counts.set(config.status, 0);
     for (const app of applications) {
       counts.set(app.status, (counts.get(app.status) ?? 0) + 1);
     }
 
-    return statusConfigs
+    return statusChartConfigs
       .map((cfg) => ({
         name: cfg.label,
         value: counts.get(cfg.status) ?? 0,
