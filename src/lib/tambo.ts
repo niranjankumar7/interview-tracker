@@ -13,6 +13,8 @@ import {
   sprintSetupCardSchema,
   TodaysPlanPanel,
   todaysPlanPanelSchema,
+  PlanForDatePanel,
+  planForDatePanelSchema,
   AddQuestionPanel,
   addQuestionPanelSchema,
 } from "@/components/generative";
@@ -394,6 +396,13 @@ export const components: TamboComponent[] = [
       "A component that shows the user's daily prep tasks. Use this when the user asks about today's plan, what they should study, what tasks they have, or wants to see their current sprint progress. Shows tasks organized by morning and evening blocks with checkboxes.",
     component: TodaysPlanPanel,
     propsSchema: todaysPlanPanelSchema,
+  },
+  {
+    name: "PlanForDatePanel",
+    description:
+      "A component that shows the user's prep tasks for a specific date. Supported patterns: 'today', 'tomorrow', weekday names (with optional 'next'), 'in N days', a YYYY-MM-DD date, or a full ISO timestamp (date part is used). Pass either the user's phrase or a normalized date string as the targetDate. Use this instead of TodaysPlanPanel when the user mentions any non-today date or asks for their plan on a particular day. If the exact date isn't available in a sprint, it shows the next available planned day for that sprint (or the last planned day if there is no future one), with guidance explaining the fallback.",
+    component: PlanForDatePanel,
+    propsSchema: planForDatePanelSchema,
   },
   {
     name: "AddQuestionPanel",
