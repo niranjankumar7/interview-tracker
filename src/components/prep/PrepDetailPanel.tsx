@@ -413,8 +413,8 @@ export function PrepDetailPanel({
     const offerTotalLabel = formatOfferTotalCTC(offerDetails) ?? "—";
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-background rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 border border-border">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
                     <div className="flex items-start justify-between">
@@ -462,40 +462,42 @@ export function PrepDetailPanel({
                 </div>
 
                 {/* Round Selector Tabs */}
-                <div className="border-b bg-gray-50 px-6 py-3">
-                    <div className="flex gap-2 overflow-x-auto">
-                        {availableRounds.map((roundType) => {
-                            const roundTheme = getInterviewRoundTheme(roundType);
-                            const RoundIcon = roundTheme.icon;
-                            const isSelected = selectedRound === roundType;
+                {application.status !== "offer" && (
+                    <div className="border-b border-border bg-muted/40 px-6 py-3">
+                        <div className="flex gap-2 overflow-x-auto">
+                            {availableRounds.map((roundType) => {
+                                const roundTheme = getInterviewRoundTheme(roundType);
+                                const RoundIcon = roundTheme.icon;
+                                const isSelected = selectedRound === roundType;
 
-                            return (
-                                <button
-                                    key={roundType}
-                                    onClick={() => handleRoundChange(roundType)}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex items-center gap-2 ${isSelected
-                                        ? roundTheme.tabActiveClassName
-                                        : roundTheme.tabInactiveClassName
-                                        }`}
-                                >
-                                    <RoundIcon className="w-4 h-4" />
-                                    {roundTheme.label}
-                                </button>
-                            );
-                        })}
+                                return (
+                                    <button
+                                        key={roundType}
+                                        onClick={() => handleRoundChange(roundType)}
+                                        className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex items-center gap-2 ${isSelected
+                                            ? roundTheme.tabActiveClassName
+                                            : roundTheme.tabInactiveClassName
+                                            }`}
+                                    >
+                                        <RoundIcon className="w-4 h-4" />
+                                        {roundTheme.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {application.status === "offer" ? (
-                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 border border-green-200">
-                            <h3 className="font-semibold text-lg text-emerald-900 mb-4 flex items-center gap-2">
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl p-5 border border-green-200 dark:border-green-800">
+                            <h3 className="font-semibold text-lg text-emerald-900 dark:text-emerald-100 mb-4 flex items-center gap-2">
                                 <Briefcase className="w-5 h-5" />
                                 Offer
                             </h3>
 
-                            <div className="text-sm text-emerald-800 mb-4">
+                            <div className="text-sm text-emerald-800 dark:text-emerald-200 mb-4">
                                 Total CTC:{" "}
                                 <span className="font-semibold">{offerTotalLabel}</span>
                             </div>
@@ -509,7 +511,7 @@ export function PrepDetailPanel({
                                             updateOfferDetails({ currency: e.target.value })
                                         }
                                         placeholder={offerCurrency}
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -524,7 +526,7 @@ export function PrepDetailPanel({
                                                     : undefined,
                                             })
                                         }
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     >
                                         <option value="">Select…</option>
                                         <option value="WFH">WFH</option>
@@ -544,7 +546,7 @@ export function PrepDetailPanel({
                                             })
                                         }
                                         placeholder="e.g., 18"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -559,7 +561,7 @@ export function PrepDetailPanel({
                                             })
                                         }
                                         placeholder="e.g., 14"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -574,7 +576,7 @@ export function PrepDetailPanel({
                                             })
                                         }
                                         placeholder="e.g., 2"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -592,7 +594,7 @@ export function PrepDetailPanel({
                                             })
                                         }
                                         placeholder="e.g., 10k RSUs or 1"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -604,7 +606,7 @@ export function PrepDetailPanel({
                                             updateOfferDetails({ location: e.target.value })
                                         }
                                         placeholder="e.g., Bangalore"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
 
@@ -628,7 +630,7 @@ export function PrepDetailPanel({
                                             updateOfferDetails({ noticePeriod: e.target.value })
                                         }
                                         placeholder="e.g., 30 days"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
                             </div>
@@ -645,7 +647,7 @@ export function PrepDetailPanel({
                                         onBlur={commitBenefits}
                                         rows={4}
                                         placeholder="One per line (or comma-separated)"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                     <div className="text-xs text-gray-500 mt-1">Saved on blur</div>
                                 </div>
@@ -659,7 +661,7 @@ export function PrepDetailPanel({
                                         }
                                         rows={4}
                                         placeholder="Any extra context"
-                                        className="w-full px-3 py-2 border border-green-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        className="w-full px-3 py-2 border border-green-200 dark:border-green-800 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-emerald-400"
                                     />
                                 </div>
                             </div>
@@ -667,14 +669,14 @@ export function PrepDetailPanel({
                     ) : null}
 
                     <div className="grid gap-4 md:grid-cols-3">
-                        <div className="md:col-span-2 bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                            <h3 className="font-semibold text-lg text-gray-800 mb-4">
+                        <div className="md:col-span-2 bg-card rounded-xl border border-border p-5 shadow-sm">
+                            <h3 className="font-semibold text-lg text-foreground mb-4">
                                 Application details
                             </h3>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-foreground mb-2">
                                         Job description URL
                                     </label>
                                     <div className="flex items-center gap-2">
@@ -692,7 +694,7 @@ export function PrepDetailPanel({
                                                 href={jobDescriptionHref}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white p-2 text-gray-600 transition-colors hover:bg-gray-50"
+                                                className="inline-flex items-center justify-center rounded-md border border-input bg-background p-2 text-muted-foreground transition-colors hover:bg-muted"
                                                 aria-label="Open job description"
                                             >
                                                 <ExternalLink className="h-4 w-4" />
@@ -702,7 +704,7 @@ export function PrepDetailPanel({
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-foreground mb-2">
                                         Notes
                                     </label>
                                     <Textarea
@@ -716,8 +718,8 @@ export function PrepDetailPanel({
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-5 border border-emerald-200">
-                            <h3 className="font-semibold text-lg text-emerald-900 mb-4 flex items-center gap-2">
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-5 border border-emerald-200 dark:border-emerald-800">
+                            <h3 className="font-semibold text-lg text-emerald-900 dark:text-emerald-100 mb-4 flex items-center gap-2">
                                 <Calendar className="w-5 h-5" />
                                 Prep plan
                             </h3>
@@ -725,14 +727,13 @@ export function PrepDetailPanel({
                             {sprintForApplication && sprintStatusSummary ? (
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-emerald-800">Sprint</span>
+                                        <span className="text-sm text-emerald-800 dark:text-emerald-200">Sprint</span>
                                         <span
-                                            className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                                sprintForApplication.status === "completed"
-                                                    ? "bg-emerald-200 text-emerald-900"
-                                                    : sprintForApplication.status === "expired"
-                                                        ? "bg-amber-200 text-amber-900"
-                                                        : "bg-emerald-600 text-white"
+                                            className={`text-xs px-2 py-1 rounded-full font-medium ${sprintForApplication.status === "completed"
+                                                ? "bg-emerald-200 text-emerald-900"
+                                                : sprintForApplication.status === "expired"
+                                                    ? "bg-amber-200 text-amber-900"
+                                                    : "bg-emerald-600 text-white"
                                                 }`}
                                         >
                                             {sprintForApplication.status}
@@ -740,25 +741,25 @@ export function PrepDetailPanel({
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-emerald-800">
+                                        <span className="text-sm text-emerald-800 dark:text-emerald-200">
                                             {sprintStatusSummary.overdueDays !== null
                                                 ? "Overdue"
                                                 : "Days left"}
                                         </span>
-                                        <span className="text-sm font-semibold text-emerald-900">
+                                        <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
                                             {sprintStatusSummary.overdueDays ??
                                                 sprintStatusSummary.daysLeft}
                                         </span>
                                     </div>
 
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-emerald-800">Completed</span>
-                                        <span className="text-sm font-semibold text-emerald-900">
+                                        <span className="text-sm text-emerald-800 dark:text-emerald-200">Completed</span>
+                                        <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
                                             {sprintStatusSummary.percent}%
                                         </span>
                                     </div>
 
-                                    <div className="w-full bg-emerald-200 rounded-full h-2">
+                                    <div className="w-full bg-emerald-200 dark:bg-emerald-800 rounded-full h-2">
                                         <div
                                             className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-300"
                                             style={{
@@ -767,7 +768,7 @@ export function PrepDetailPanel({
                                         />
                                     </div>
 
-                                    <p className="text-xs text-emerald-800">
+                                    <p className="text-xs text-emerald-800 dark:text-emerald-200">
                                         {sprintStatusSummary.completedDays}/{
                                             sprintForApplication.dailyPlans.length
                                         } days • {sprintStatusSummary.completedTasks}/
@@ -775,232 +776,234 @@ export function PrepDetailPanel({
                                     </p>
                                 </div>
                             ) : (
-                                <p className="text-sm text-emerald-800">
+                                <p className="text-sm text-emerald-800 dark:text-emerald-200">
                                     No sprint yet. Create one to get a day-by-day plan.
                                 </p>
                             )}
                         </div>
                     </div>
-                    {prepContent ? (
-                        <>
-                            {/* Focus Areas */}
-                            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5 border border-indigo-100">
-                                <h3 className="font-semibold text-lg text-indigo-900 mb-3 flex items-center gap-2">
-                                    <Target className="w-5 h-5" />
-                                    Focus Areas
-                                </h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {prepContent.focusAreas.map((area, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="bg-white px-3 py-1.5 rounded-full text-sm font-medium text-indigo-700 border border-indigo-200"
-                                        >
-                                            {area}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Time Allocation */}
-                            <div className="flex items-center gap-3 bg-amber-50 rounded-xl p-4 border border-amber-200">
-                                <Clock className="w-5 h-5 text-amber-600" />
-                                <span className="text-amber-800 font-medium">
-                                    Recommended: {prepContent.timeAllocation}
-                                </span>
-                            </div>
-
-                            {/* Key Topics */}
-                            <div>
-                                <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center gap-2">
-                                    <BookOpen className="w-5 h-5 text-indigo-600" />
-                                    Key Topics to Prepare
-                                </h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {prepContent.keyTopics.map((topic) => {
-                                        const completion = isTopicCompleted(topic.name);
-                                        const missingPrerequisites = completion.completed
-                                            ? getMissingPrerequisites(topic.name, getTopicCompletion)
-                                            : [];
-                                        const hasMissingPrerequisites = missingPrerequisites.length > 0;
-                                        const missingPrerequisitesLabel = hasMissingPrerequisites
-                                            ? `Missing prerequisite${missingPrerequisites.length === 1 ? "" : "s"}: ${missingPrerequisites.join(
-                                                ", "
-                                            )}`
-                                            : "";
-                                        const missingPrerequisitesTooltipId = `missing-prerequisites-${topic.name
-                                            .replace(/[^a-z0-9]+/gi, "-")
-                                            .toLowerCase()}`;
-
-                                        return (
-                                            <div
-                                                key={topic.name}
-                                                className={`rounded-xl p-4 border transition-all ${completion.completed
-                                                    ? "bg-green-50 border-green-300 ring-2 ring-green-200"
-                                                    : topic.priority === "high"
-                                                        ? "bg-red-50 border-red-200"
-                                                        : topic.priority === "medium"
-                                                            ? "bg-yellow-50 border-yellow-200"
-                                                            : "bg-gray-50 border-gray-200"
-                                                    }`}
+                    {application.status !== "offer" && (
+                        prepContent ? (
+                            <>
+                                {/* Focus Areas */}
+                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-5 border border-indigo-100 dark:border-indigo-800">
+                                    <h3 className="font-semibold text-lg text-indigo-900 dark:text-indigo-100 mb-3 flex items-center gap-2">
+                                        <Target className="w-5 h-5" />
+                                        Focus Areas
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {prepContent.focusAreas.map((area, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="bg-background px-3 py-1.5 rounded-full text-sm font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
                                             >
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        {completion.completed && (
-                                                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                                                        )}
-                                                        <h4 className={`font-semibold ${completion.completed ? "text-green-800" : "text-gray-800"}`}>
-                                                            {topic.name}
-                                                        </h4>
-                                                        {completion.completed && hasMissingPrerequisites && (
-                                                            <span className="relative inline-flex items-center group">
-                                                                <button
-                                                                    type="button"
-                                                                    className="inline-flex items-center text-amber-600"
-                                                                    aria-describedby={missingPrerequisitesTooltipId}
-                                                                >
-                                                                    <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-                                                                    <span className="sr-only">{missingPrerequisitesLabel}</span>
-                                                                </button>
-                                                                <span
-                                                                    id={missingPrerequisitesTooltipId}
-                                                                    role="tooltip"
-                                                                    className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-max max-w-[240px] -translate-x-1/2 whitespace-normal rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-                                                                >
-                                                                    {missingPrerequisitesLabel}
+                                                {area}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Time Allocation */}
+                                <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                                    <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                    <span className="text-amber-800 dark:text-amber-200 font-medium">
+                                        Recommended: {prepContent.timeAllocation}
+                                    </span>
+                                </div>
+
+                                {/* Key Topics */}
+                                <div>
+                                    <h3 className="font-semibold text-lg text-foreground mb-4 flex items-center gap-2">
+                                        <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                        Key Topics to Prepare
+                                    </h3>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {prepContent.keyTopics.map((topic) => {
+                                            const completion = isTopicCompleted(topic.name);
+                                            const missingPrerequisites = completion.completed
+                                                ? getMissingPrerequisites(topic.name, getTopicCompletion)
+                                                : [];
+                                            const hasMissingPrerequisites = missingPrerequisites.length > 0;
+                                            const missingPrerequisitesLabel = hasMissingPrerequisites
+                                                ? `Missing prerequisite${missingPrerequisites.length === 1 ? "" : "s"}: ${missingPrerequisites.join(
+                                                    ", "
+                                                )}`
+                                                : "";
+                                            const missingPrerequisitesTooltipId = `missing-prerequisites-${topic.name
+                                                .replace(/[^a-z0-9]+/gi, "-")
+                                                .toLowerCase()}`;
+
+                                            return (
+                                                <div
+                                                    key={topic.name}
+                                                    className={`rounded-xl p-4 border transition-all ${completion.completed
+                                                        ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-800 ring-2 ring-green-200 dark:ring-green-900"
+                                                        : topic.priority === "high"
+                                                            ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                                                            : topic.priority === "medium"
+                                                                ? "bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800"
+                                                                : "bg-muted/40 border-border"
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            {completion.completed && (
+                                                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                                            )}
+                                                            <h4 className={`font-semibold ${completion.completed ? "text-green-800" : "text-gray-800"}`}>
+                                                                {topic.name}
+                                                            </h4>
+                                                            {completion.completed && hasMissingPrerequisites && (
+                                                                <span className="relative inline-flex items-center group">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="inline-flex items-center text-amber-600"
+                                                                        aria-describedby={missingPrerequisitesTooltipId}
+                                                                    >
+                                                                        <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+                                                                        <span className="sr-only">{missingPrerequisitesLabel}</span>
+                                                                    </button>
+                                                                    <span
+                                                                        id={missingPrerequisitesTooltipId}
+                                                                        role="tooltip"
+                                                                        className="pointer-events-none absolute left-1/2 top-full z-10 mt-2 w-max max-w-[240px] -translate-x-1/2 whitespace-normal rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                                                    >
+                                                                        {missingPrerequisitesLabel}
+                                                                    </span>
                                                                 </span>
+                                                            )}
+                                                        </div>
+                                                        {completion.completed ? (
+                                                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                                                                ✓ Studied {completion.date}
+                                                            </span>
+                                                        ) : (
+                                                            <span
+                                                                className={`text-xs px-2 py-0.5 rounded-full font-medium ${topic.priority === "high"
+                                                                    ? "bg-red-100 text-red-700"
+                                                                    : topic.priority === "medium"
+                                                                        ? "bg-yellow-100 text-yellow-700"
+                                                                        : "bg-gray-100 text-gray-600"
+                                                                    }`}
+                                                            >
+                                                                {topic.priority} priority
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {completion.completed ? (
-                                                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
-                                                            ✓ Studied {completion.date}
-                                                        </span>
-                                                    ) : (
-                                                        <span
-                                                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${topic.priority === "high"
-                                                                ? "bg-red-100 text-red-700"
-                                                                : topic.priority === "medium"
-                                                                    ? "bg-yellow-100 text-yellow-700"
-                                                                    : "bg-gray-100 text-gray-600"
-                                                                }`}
-                                                        >
-                                                            {topic.priority} priority
-                                                        </span>
-                                                    )}
+                                                    <ul className="space-y-1">
+                                                        {topic.subtopics.map((sub, subIdx) => (
+                                                            <li
+                                                                key={subIdx}
+                                                                className={`text-sm flex items-start gap-2 ${completion.completed ? "text-green-700" : "text-gray-600"
+                                                                    }`}
+                                                            >
+                                                                <ChevronRight className={`w-4 h-4 shrink-0 mt-0.5 ${completion.completed ? "text-green-500" : "text-gray-400"
+                                                                    }`} />
+                                                                {sub}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
                                                 </div>
-                                                <ul className="space-y-1">
-                                                    {topic.subtopics.map((sub, subIdx) => (
-                                                        <li
-                                                            key={subIdx}
-                                                            className={`text-sm flex items-start gap-2 ${completion.completed ? "text-green-700" : "text-gray-600"
-                                                                }`}
-                                                        >
-                                                            <ChevronRight className={`w-4 h-4 shrink-0 mt-0.5 ${completion.completed ? "text-green-500" : "text-gray-400"
-                                                                }`} />
-                                                            {sub}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Common Questions */}
-                            <div>
-                                <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center gap-2">
-                                    <HelpCircle className="w-5 h-5 text-purple-600" />
-                                    Common Questions
-                                </h3>
-                                <div className="bg-white rounded-xl border border-gray-200 divide-y">
-                                    {prepContent.commonQuestions.map((question, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="p-3 flex items-start gap-3 hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span className="text-gray-400 font-mono text-sm w-6">
-                                                {(idx + 1).toString().padStart(2, "0")}
-                                            </span>
-                                            <span className="text-gray-700">{question}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Scraped Company-Specific Content */}
-                            {(isLoadingScraped || scrapedContent) && (
-                                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-5 border border-emerald-200">
-                                    <h3 className="font-semibold text-lg text-emerald-900 mb-3 flex items-center gap-2">
-                                        <Building2 className="w-5 h-5" />
-                                        {application.company}-Specific Insights
+                                {/* Common Questions */}
+                                <div>
+                                    <h3 className="font-semibold text-lg text-foreground mb-4 flex items-center gap-2">
+                                        <HelpCircle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                                        Common Questions
                                     </h3>
-                                    {isLoadingScraped ? (
-                                        <div className="flex items-center gap-3 text-emerald-700">
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>Fetching company-specific interview tips...</span>
-                                        </div>
-                                    ) : scrapedContent ? (
-                                        <div className="space-y-4">
-                                            {scrapedContent.companyTips.length > 0 && (
-                                                <div>
-                                                    <h4 className="font-medium text-emerald-800 mb-2">Tips:</h4>
-                                                    <ul className="space-y-2">
-                                                        {scrapedContent.companyTips.map((tip, idx) => (
-                                                            <li key={idx} className="flex items-start gap-2 text-sm text-emerald-700">
-                                                                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                                                                {tip}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            {scrapedContent.recentQuestions.length > 0 && (
-                                                <div>
-                                                    <h4 className="font-medium text-emerald-800 mb-2">Recent Questions:</h4>
-                                                    <ul className="space-y-2">
-                                                        {scrapedContent.recentQuestions.map((q, idx) => (
-                                                            <li key={idx} className="flex items-start gap-2 text-sm text-emerald-700">
-                                                                <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                                {q}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            <p className="text-xs text-emerald-600 mt-2">
-                                                Source: {scrapedContent.source} • Updated: {scrapedContent.fetchedAt}
-                                            </p>
-                                        </div>
-                                    ) : null}
+                                    <div className="bg-card rounded-xl border border-border divide-y divide-border">
+                                        {prepContent.commonQuestions.map((question, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="p-3 flex items-start gap-3 hover:bg-muted/50 transition-colors"
+                                            >
+                                                <span className="text-muted-foreground font-mono text-sm w-6">
+                                                    {(idx + 1).toString().padStart(2, "0")}
+                                                </span>
+                                                <span className="text-card-foreground">{question}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            )}
 
-                            {/* Tips */}
-                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-5 border border-blue-200">
-                                <h3 className="font-semibold text-lg text-blue-900 mb-3 flex items-center gap-2">
-                                    <Lightbulb className="w-5 h-5" />
-                                    Pro Tips
-                                </h3>
-                                <ul className="space-y-2">
-                                    {prepContent.tips.map((tip, idx) => (
-                                        <li
-                                            key={idx}
-                                            className="flex items-start gap-3 text-blue-800"
-                                        >
-                                            <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                                            {tip}
-                                        </li>
-                                    ))}
-                                </ul>
+                                {/* Scraped Company-Specific Content */}
+                                {(isLoadingScraped || scrapedContent) && (
+                                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-xl p-5 border border-emerald-200 dark:border-emerald-800">
+                                        <h3 className="font-semibold text-lg text-emerald-900 dark:text-emerald-100 mb-3 flex items-center gap-2">
+                                            <Building2 className="w-5 h-5" />
+                                            {application.company}-Specific Insights
+                                        </h3>
+                                        {isLoadingScraped ? (
+                                            <div className="flex items-center gap-3 text-emerald-700">
+                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                                <span>Fetching company-specific interview tips...</span>
+                                            </div>
+                                        ) : scrapedContent ? (
+                                            <div className="space-y-4">
+                                                {scrapedContent.companyTips.length > 0 && (
+                                                    <div>
+                                                        <h4 className="font-medium text-emerald-800 mb-2">Tips:</h4>
+                                                        <ul className="space-y-2">
+                                                            {scrapedContent.companyTips.map((tip, idx) => (
+                                                                <li key={idx} className="flex items-start gap-2 text-sm text-emerald-700">
+                                                                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                                                                    {tip}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {scrapedContent.recentQuestions.length > 0 && (
+                                                    <div>
+                                                        <h4 className="font-medium text-emerald-800 mb-2">Recent Questions:</h4>
+                                                        <ul className="space-y-2">
+                                                            {scrapedContent.recentQuestions.map((q, idx) => (
+                                                                <li key={idx} className="flex items-start gap-2 text-sm text-emerald-700">
+                                                                    <HelpCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                                    {q}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                <p className="text-xs text-emerald-600 mt-2">
+                                                    Source: {scrapedContent.source} • Updated: {scrapedContent.fetchedAt}
+                                                </p>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
+
+                                {/* Tips */}
+                                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
+                                    <h3 className="font-semibold text-lg text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                                        <Lightbulb className="w-5 h-5" />
+                                        Pro Tips
+                                    </h3>
+                                    <ul className="space-y-2">
+                                        {prepContent.tips.map((tip, idx) => (
+                                            <li
+                                                key={idx}
+                                                className="flex items-start gap-3 text-blue-800 dark:text-blue-200"
+                                            >
+                                                <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                                                {tip}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-12 text-muted-foreground">
+                                <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                                <p>No prep content available for this round.</p>
+                                <p className="text-sm mt-2">Try selecting a different round type above.</p>
                             </div>
-                        </>
-                    ) : (
-                        <div className="text-center py-12 text-gray-500">
-                            <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                            <p>No prep content available for this round.</p>
-                            <p className="text-sm mt-2">Try selecting a different round type above.</p>
-                        </div>
+                        )
                     )}
                 </div>
             </div>

@@ -43,6 +43,66 @@ function sanitizeCompanyName(name: string): string {
   return cleaned;
 }
 
+type StoreState = ReturnType<typeof useStore.getState>;
+type StoredApplication = StoreState["applications"][number];
+
+type OfferDetailsToolInput = {
+  currency?: string;
+  totalCTC?: number;
+  baseSalary?: number;
+  bonus?: number;
+  equity?: string | number;
+  joiningDate?: string;
+  location?: string;
+  workMode?: string;
+  notes?: string;
+};
+
+function hasOfferCompensation(details: OfferDetailsToolInput): boolean {
+  // Treat 0 as "provided" (e.g., zero bonus).
+  return (
+    details.totalCTC != null ||
+    details.baseSalary != null ||
+    details.bonus != null ||
+    details.equity != null
+  );
+}
+
+function normalizeOfferWorkMode(
+  raw: string | undefined
+): "WFH" | "Hybrid" | "Office" | undefined {
+  if (!raw) return undefined;
+
+  const wm = raw.toLowerCase();
+  if (wm.includes("remote") || wm.includes("wfh")) return "WFH";
+  if (wm.includes("hybrid")) return "Hybrid";
+  if (
+    wm.includes("office") ||
+    wm.includes("onsite") ||
+    wm.includes("on-site") ||
+    wm.includes("on site")
+  )
+    return "Office";
+
+  return undefined;
+}
+
+function findApplicationsByCompany(
+  applications: StoredApplication[],
+  company: string | undefined
+) {
+  const companyName = sanitizeCompanyName(company ?? "");
+  if (!companyName) {
+    return { ok: false, message: "Company name is required" } as const;
+  }
+
+  const matches = applications.filter(
+    (app) => sanitizeCompanyName(app.company).toLowerCase() === companyName.toLowerCase()
+  );
+
+  return { ok: true, companyName, matches } as const;
+}
+
 /**
  * tools
  *
@@ -374,6 +434,130 @@ export const tools: TamboTool[] = [
       updated: z.array(z.string()),
       failed: z.array(z.string()),
       count: z.number(),
+    }),
+  },
+  {
+    name: "updateOfferDetails",
+    description:
+      "Save or update job offer details for an application. Prefer applicationId when known. If matching by company finds multiple applications, returns success=false with a candidates list; callers should prompt for an applicationId and retry. Sets status to offer only when compensation fields are provided (CTC/base/bonus/equity).",
+    tool: (input: {
+      applicationId?: string;
+      company?: string;
+      offerDetails: OfferDetailsToolInput;
+    }) => {
+      const state = useStore.getState();
+      const { applications, updateApplication } = state;
+      const { applicationId, company, offerDetails } = input;
+
+      if (!applicationId && !company) {
+        return {
+          success: false,
+          message: "Either applicationId or company must be provided"
+        };
+      }
+
+      let app = applicationId
+        ? applications.find((candidate) => candidate.id === applicationId)
+        : undefined;
+
+      if (applicationId && !app) {
+        return {
+          success: false,
+          message: `Application with id "${applicationId}" not found.`
+        };
+      }
+
+      if (!app) {
+        const companyResult = findApplicationsByCompany(applications, company);
+        if (!companyResult.ok) {
+          return { success: false, message: companyResult.message };
+        }
+
+        if (companyResult.matches.length === 0) {
+          return {
+            success: false,
+            message: `Application for "${companyResult.companyName}" not found. Please add the application first.`
+          };
+        }
+
+        if (companyResult.matches.length > 1) {
+          return {
+            success: false,
+            candidates: companyResult.matches.map((candidate) => ({
+              id: candidate.id,
+              company: candidate.company,
+              role: candidate.role,
+              status: candidate.status,
+            })),
+            message: `Multiple applications found for "${companyResult.companyName}". Please specify the applicationId from the candidates list.`,
+          };
+        }
+
+        const match = companyResult.matches[0];
+        if (!match) {
+          return {
+            success: false,
+            message: `Application for "${companyResult.companyName}" not found. Please add the application first.`
+          };
+        }
+
+        app = match;
+      }
+
+      const hasComp = hasOfferCompensation(offerDetails);
+      const mappedWorkMode = normalizeOfferWorkMode(offerDetails.workMode);
+
+      updateApplication(app.id, {
+        ...(hasComp ? { status: "offer" } : {}),
+        offerDetails: {
+          ...app.offerDetails,
+          ...offerDetails,
+          workMode: mappedWorkMode || app.offerDetails?.workMode,
+          currency: offerDetails.currency || app.offerDetails?.currency || "INR",
+        }
+      });
+
+      return {
+        success: true,
+        company: app.company,
+        message:
+          `Successfully saved offer details for ${app.company}. ` +
+          `Total CTC: ${offerDetails.totalCTC ?? app.offerDetails?.totalCTC ?? "Not set"}`
+      };
+    },
+    inputSchema: z
+      .object({
+        applicationId: z.string().optional().describe("Application id (preferred when known)"),
+        company: z.string().optional().describe("Company name"),
+        offerDetails: z.object({
+          currency: z.string().optional().describe("Currency code (e.g. INR, USD)"),
+          totalCTC: z.number().optional().describe("Total CTC"),
+          baseSalary: z.number().optional().describe("Base salary"),
+          bonus: z.number().optional().describe("Bonus amount"),
+          equity: z.union([z.string(), z.number()]).optional().describe("Equity (number or string description)"),
+          joiningDate: z.string().optional().describe("Joining date (YYYY-MM-DD)"),
+          location: z.string().optional().describe("Location"),
+          workMode: z.string().optional().describe("Work mode (e.g. Remote, WFH, Hybrid, Office)"),
+          notes: z.string().optional().describe("Additional notes"),
+        }),
+      })
+      .refine((data) => Boolean(data.applicationId || data.company), {
+        message: "Either applicationId or company must be provided",
+      }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      company: z.string().optional(),
+      candidates: z
+        .array(
+          z.object({
+            id: z.string(),
+            company: z.string(),
+            role: z.string(),
+            status: z.enum(["applied", "shortlisted", "interview", "offer", "rejected"]),
+          })
+        )
+        .optional(),
+      message: z.string(),
     }),
   },
   // Add more tools here

@@ -183,18 +183,18 @@ export function PrepDetailPanel(props: {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+      <div className="bg-background rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+        <div className="sticky top-0 bg-background border-b border-border px-5 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-foreground">
               {application.company}
             </h2>
-            <p className="text-sm text-gray-500">{application.role}</p>
+            <p className="text-sm text-muted-foreground">{application.role}</p>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-muted rounded-lg"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -203,10 +203,10 @@ export function PrepDetailPanel(props: {
 
         <div className="p-5 space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Interview rounds</h3>
+            <h3 className="font-semibold text-foreground">Interview rounds</h3>
             <button
               onClick={() => setIsAddRoundOpen(true)}
-              className="text-sm px-3 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+              className="text-sm px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               type="button"
             >
               Add round
@@ -214,7 +214,7 @@ export function PrepDetailPanel(props: {
           </div>
 
           {rounds.length === 0 ? (
-            <div className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="text-sm text-muted-foreground bg-muted/40 border border-border rounded-lg p-4">
               No rounds tracked yet.
             </div>
           ) : (
@@ -239,25 +239,25 @@ export function PrepDetailPanel(props: {
                   return (
                     <div
                       key={round.roundNumber}
-                      className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
+                      className="bg-card border border-border rounded-xl p-4 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-gray-800">
+                            <h4 className="font-semibold text-foreground">
                               Round {round.roundNumber}
                             </h4>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                               {round.roundType}
                             </span>
                           </div>
 
                           {round.scheduledDate && (
-                            <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                               <Calendar className="w-4 h-4" />
                               {format(parseISO(round.scheduledDate), "MMM d, yyyy")}
                               {isFuture && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                                   upcoming
                                 </span>
                               )}
@@ -274,13 +274,12 @@ export function PrepDetailPanel(props: {
                               ? "Feedback can be added after the scheduled date"
                               : undefined
                           }
-                          className={`text-sm px-3 py-2 rounded-lg transition-colors ${
-                            isFuture
-                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                              : hasFeedback
+                          className={`text-sm px-3 py-2 rounded-lg transition-colors ${isFuture
+                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                            : hasFeedback
                               ? "bg-indigo-600 text-white hover:bg-indigo-700"
                               : "bg-emerald-600 text-white hover:bg-emerald-700"
-                          }`}
+                            }`}
                         >
                           {feedbackButtonLabel}
                         </button>
@@ -289,16 +288,16 @@ export function PrepDetailPanel(props: {
                       {(round.notes || questionsAsked.length > 0) && (
                         <div className="mt-4 space-y-3">
                           {round.notes && (
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-foreground">
                               <span className="font-medium">Round notes:</span>{" "}
                               {round.notes}
                             </div>
                           )}
 
                           {questionsAsked.length > 0 && (
-                            <div className="text-sm text-gray-700">
+                            <div className="text-sm text-foreground">
                               <div className="font-medium flex items-center gap-2 mb-1">
-                                <MessageSquareText className="w-4 h-4 text-gray-500" />
+                                <MessageSquareText className="w-4 h-4 text-muted-foreground" />
                                 Questions remembered
                               </div>
                               <ul className="list-disc pl-5 space-y-1">
@@ -312,21 +311,20 @@ export function PrepDetailPanel(props: {
                       )}
 
                       {feedback && (
-                        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div className="mt-4 bg-muted/30 border border-border rounded-lg p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-gray-800">
+                              <span className="text-sm font-semibold text-foreground">
                                 Feedback
                               </span>
                               <div className="flex items-center">
                                 {Array.from({ length: 5 }).map((_, idx) => (
                                   <Star
                                     key={idx}
-                                    className={`w-4 h-4 ${
-                                      idx < feedback.rating
-                                        ? "text-yellow-500 fill-yellow-500"
-                                        : "text-gray-300"
-                                    }`}
+                                    className={`w-4 h-4 ${idx < feedback.rating
+                                      ? "text-yellow-500 fill-yellow-500"
+                                      : "text-muted-foreground/30"
+                                      }`}
                                   />
                                 ))}
                               </div>
@@ -335,10 +333,10 @@ export function PrepDetailPanel(props: {
 
                           {pros.length > 0 && (
                             <div>
-                              <div className="text-sm font-medium text-gray-700 mb-1">
+                              <div className="text-sm font-medium text-foreground mb-1">
                                 What went well
                               </div>
-                              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                              <ul className="list-disc pl-5 text-sm text-foreground space-y-1">
                                 {pros.map((p, i) => (
                                   <li key={`${round.roundNumber}-pro-${i}`}>{p}</li>
                                 ))}
@@ -348,10 +346,10 @@ export function PrepDetailPanel(props: {
 
                           {cons.length > 0 && (
                             <div>
-                              <div className="text-sm font-medium text-gray-700 mb-1">
+                              <div className="text-sm font-medium text-foreground mb-1">
                                 What needs improvement
                               </div>
-                              <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                              <ul className="list-disc pl-5 text-sm text-foreground space-y-1">
                                 {cons.map((c, i) => (
                                   <li key={`${round.roundNumber}-con-${i}`}>{c}</li>
                                 ))}
@@ -369,7 +367,7 @@ export function PrepDetailPanel(props: {
                                 {struggledTopics.map((t) => (
                                   <span
                                     key={`${round.roundNumber}-topic-${t}`}
-                                    className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200"
+                                    className="text-xs px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-950/30 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-800"
                                   >
                                     {t}
                                   </span>
@@ -380,10 +378,10 @@ export function PrepDetailPanel(props: {
 
                           {feedbackNotes && (
                             <div>
-                              <div className="text-sm font-medium text-gray-700 mb-1">
+                              <div className="text-sm font-medium text-foreground mb-1">
                                 Notes
                               </div>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                              <p className="text-sm text-foreground whitespace-pre-wrap">
                                 {feedbackNotes}
                               </p>
                             </div>
@@ -406,14 +404,14 @@ export function PrepDetailPanel(props: {
               if (e.target === e.currentTarget) setIsAddRoundOpen(false);
             }}
           >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-background rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+              <div className="sticky top-0 bg-background border-b border-border px-5 py-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-foreground">
                   Add interview round
                 </h3>
                 <button
                   onClick={() => setIsAddRoundOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-muted rounded-lg"
                   aria-label="Close"
                   type="button"
                 >
@@ -424,19 +422,19 @@ export function PrepDetailPanel(props: {
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       Round number
                     </label>
                     <input
                       type="number"
                       value={roundDraft.roundNumber}
                       readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       Round type
                     </label>
                     <select
@@ -447,7 +445,7 @@ export function PrepDetailPanel(props: {
                           roundType: e.target.value as InterviewRound["roundType"],
                         }))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white"
+                      className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
                     >
                       <option value="HR">HR</option>
                       <option value="TechnicalRound1">Technical Round 1</option>
@@ -495,7 +493,7 @@ export function PrepDetailPanel(props: {
                 </div>
 
                 {addRoundError && (
-                  <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                  <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
                     {addRoundError}
                   </div>
                 )}
@@ -504,7 +502,7 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => setIsAddRoundOpen(false)}
-                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
                   >
                     Cancel
                   </button>
@@ -528,7 +526,8 @@ export function PrepDetailPanel(props: {
                       }
                       setIsAddRoundOpen(false);
                     }}
-                    className="px-3 py-2 text-sm rounded-lg bg-gray-900 text-white hover:bg-gray-800"
+
+                    className="px-3 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     Save round
                   </button>
@@ -547,19 +546,19 @@ export function PrepDetailPanel(props: {
               if (e.target === e.currentTarget) setFeedbackRoundNumber(null);
             }}
           >
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
+            <div className="bg-background rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border">
+              <div className="sticky top-0 bg-background border-b border-border px-5 py-4 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-foreground">
                     {activeRound.feedback ? "Edit feedback" : "Complete round"}
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     Round {activeRound.roundNumber} · {activeRound.roundType}
                   </p>
                 </div>
                 <button
                   onClick={() => setFeedbackRoundNumber(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  className="p-2 hover:bg-muted rounded-lg"
                   aria-label="Close"
                   type="button"
                 >
@@ -591,11 +590,10 @@ export function PrepDetailPanel(props: {
                           aria-label={`Set rating to ${ratingValue}`}
                         >
                           <Star
-                            className={`w-6 h-6 ${
-                              isActive
-                                ? "text-yellow-500 fill-yellow-500"
-                                : "text-gray-300"
-                            }`}
+                            className={`w-6 h-6 ${isActive
+                              ? "text-yellow-500 fill-yellow-500"
+                              : "text-gray-300"
+                              }`}
                           />
                         </button>
                       );
@@ -666,11 +664,10 @@ export function PrepDetailPanel(props: {
                                 : [...prev.struggledTopics, topic],
                             }))
                           }
-                          className={`text-xs px-2 py-1 rounded-full border transition-colors flex items-center gap-1 ${
-                            selected
-                              ? "bg-yellow-100 border-yellow-300 text-yellow-900"
-                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                          }`}
+                          className={`text-xs px-2 py-1 rounded-full border transition-colors flex items-center gap-1 ${selected
+                            ? "bg-yellow-100 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100"
+                            : "bg-card border-border text-muted-foreground hover:bg-muted"
+                            }`}
                         >
                           {selected && <Check className="w-3 h-3" />}
                           {topic}
@@ -718,7 +715,7 @@ export function PrepDetailPanel(props: {
                   <button
                     type="button"
                     onClick={() => setFeedbackRoundNumber(null)}
-                    className="px-3 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
                   >
                     Cancel
                   </button>
@@ -746,11 +743,10 @@ export function PrepDetailPanel(props: {
                       setFeedbackRoundNumber(null);
                     }}
                     disabled={feedbackDraft.rating === 0}
-                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                      feedbackDraft.rating === 0
-                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                        : "bg-indigo-600 text-white hover:bg-indigo-700"
-                    }`}
+                    className={`px-3 py-2 text-sm rounded-lg transition-colors ${feedbackDraft.rating === 0
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700"
+                      }`}
                   >
                     Save feedback
                   </button>

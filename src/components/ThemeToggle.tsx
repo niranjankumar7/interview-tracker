@@ -8,22 +8,20 @@ import { useStore } from "@/lib/store";
 import type { ThemePreference } from "@/types";
 
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  /*
+    Modify cycleTheme to toggle between light and dark using resolvedTheme.
+    This fixes the issue where cycling from Dark -> System -> Light required two clicks
+    (if System was Dark). Now it's always a binary toggle.
+  */
+  const { setTheme, theme, resolvedTheme } = useTheme();
 
   const updatePreferences = useStore((state) => state.updatePreferences);
 
   const cycleTheme = () => {
-    const currentTheme: ThemePreference =
-      theme === "light" || theme === "dark" || theme === "system"
-        ? theme
-        : "system";
-
-    const nextTheme: ThemePreference =
-      currentTheme === "light"
-        ? "dark"
-        : currentTheme === "dark"
-          ? "system"
-          : "light";
+    // If we are currently "dark" (either explicitly or via system), switch to light.
+    // Otherwise switch to dark.
+    const isDark = theme === "dark" || (theme === "system" && resolvedTheme === "dark");
+    const nextTheme: ThemePreference = isDark ? "light" : "dark";
 
     setTheme(nextTheme);
     updatePreferences({ theme: nextTheme });

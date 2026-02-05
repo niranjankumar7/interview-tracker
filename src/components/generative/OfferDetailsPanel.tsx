@@ -141,12 +141,12 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
   if (!state) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-lg animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-2/3 mb-4" />
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg max-w-lg animate-pulse">
+        <div className="h-6 bg-muted rounded w-2/3 mb-4" />
         <div className="space-y-3">
-          <div className="h-10 bg-gray-200 rounded" />
-          <div className="h-10 bg-gray-200 rounded" />
-          <div className="h-10 bg-gray-200 rounded" />
+          <div className="h-10 bg-muted rounded" />
+          <div className="h-10 bg-muted rounded" />
+          <div className="h-10 bg-muted rounded" />
         </div>
       </div>
     );
@@ -193,19 +193,19 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
   if (state.isSaved) {
     return (
-      <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-lg">
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl p-6 shadow-lg max-w-lg">
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2 bg-green-100 rounded-full">
-            <CheckCircle2 className="w-6 h-6 text-green-600" />
+          <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-full">
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <h3 className="font-semibold text-lg text-green-800">Offer saved</h3>
-            <p className="text-sm text-green-700">
+            <h3 className="font-semibold text-lg text-green-800 dark:text-green-300">Offer saved</h3>
+            <p className="text-sm text-green-700 dark:text-green-400">
               {normalizedCompany} • {offerTotalLabel}
             </p>
           </div>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           You can compare offers on the Dashboard.
         </p>
       </div>
@@ -213,26 +213,26 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-lg">
+    <div className="bg-card border border-border rounded-xl p-6 shadow-lg max-w-lg">
       <div className="flex items-center gap-3 mb-5">
-        <div className="p-2 bg-emerald-100 rounded-full">
-          <Briefcase className="w-5 h-5 text-emerald-700" />
+        <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 rounded-full">
+          <Briefcase className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
         </div>
         <div>
-          <h3 className="font-semibold text-lg text-gray-800">Offer details</h3>
-          <p className="text-sm text-gray-500">
+          <h3 className="font-semibold text-lg text-card-foreground">Offer details</h3>
+          <p className="text-sm text-muted-foreground">
             Review and save the compensation/perks for comparison
           </p>
         </div>
       </div>
 
-      <div className="text-sm text-emerald-800 mb-4">
+      <div className="text-sm text-emerald-800 dark:text-emerald-300 mb-4">
         Total CTC: <span className="font-semibold">{offerTotalLabel}</span>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
             <Building2 className="w-4 h-4" />
             Company
           </label>
@@ -247,15 +247,15 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
               })
             }
             placeholder="e.g., Google"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
           />
           {existingApplication ? (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Saving into existing application: {existingApplication.company}
             </p>
           ) : companyMatches.length > 1 ? (
             <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
                 Multiple applications found — select one
               </label>
               <select
@@ -266,7 +266,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
                     selectedApplicationId: e.target.value || undefined,
                   })
                 }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
+                className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground"
               >
                 <option value="">Select…</option>
                 {companyMatches.map((app) => (
@@ -282,18 +282,18 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
             <input
               type="text"
               value={state.currency ?? ""}
               onChange={(e) => setState({ ...state, currency: e.target.value })}
               placeholder={getOfferCurrency(offerDetails)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Work mode</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Work mode</label>
             <select
               value={state.workMode ?? ""}
               onChange={(e) =>
@@ -302,7 +302,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
                   workMode: e.target.value ? (e.target.value as WorkMode) : undefined,
                 })
               }
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground"
             >
               <option value="">Select…</option>
               <option value="WFH">WFH</option>
@@ -314,86 +314,86 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Total CTC</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Total CTC</label>
             <input
               type="number"
               value={state.totalCTC ?? ""}
               onChange={(e) => setState({ ...state, totalCTC: parseNumberField(e.target.value) })}
               placeholder="e.g., 18"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Location</label>
             <input
               type="text"
               value={state.location ?? ""}
               onChange={(e) => setState({ ...state, location: e.target.value })}
               placeholder="e.g., Bangalore"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Base salary</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Base salary</label>
             <input
               type="number"
               value={state.baseSalary ?? ""}
               onChange={(e) => setState({ ...state, baseSalary: parseNumberField(e.target.value) })}
               placeholder="e.g., 14"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Bonus</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Bonus</label>
             <input
               type="number"
               value={state.bonus ?? ""}
               onChange={(e) => setState({ ...state, bonus: parseNumberField(e.target.value) })}
               placeholder="e.g., 2"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Equity</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Equity</label>
           <input
             type="text"
             value={state.equity === undefined ? "" : String(state.equity)}
             onChange={(e) => setState({ ...state, equity: parseEquityField(e.target.value) })}
             placeholder="e.g., 10k RSUs"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Joining date</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Joining date</label>
             <input
               type="date"
               value={state.joiningDate ?? ""}
               onChange={(e) => setState({ ...state, joiningDate: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Notice period</label>
+            <label className="block text-sm font-medium text-foreground mb-2">Notice period</label>
             <input
               type="text"
               value={state.noticePeriod ?? ""}
               onChange={(e) => setState({ ...state, noticePeriod: e.target.value })}
               placeholder="e.g., 30 days"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Benefits</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Benefits</label>
           <textarea
             value={(state.benefits ?? []).join("\n")}
             onChange={(e) =>
@@ -407,18 +407,18 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
             }
             rows={3}
             placeholder="One per line (or comma-separated)"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+          <label className="block text-sm font-medium text-foreground mb-2">Notes</label>
           <textarea
             value={state.notes ?? ""}
             onChange={(e) => setState({ ...state, notes: e.target.value })}
             rows={3}
             placeholder="Any extra context"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+            className="w-full px-4 py-2.5 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-foreground placeholder:text-muted-foreground"
           />
         </div>
 
