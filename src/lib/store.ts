@@ -88,8 +88,10 @@ interface AppState {
     ) => void;
 
     /**
-     * Saves round feedback (and remembered questions) and syncs those questions into the
-     * Question Bank in a single persisted write.
+     * Saves round feedback and replaces `questionsAsked` for the round.
+     *
+     * If `questionTexts` is non-empty, those questions are also synced into the Question Bank
+     * in the same persisted write.
      */
     saveRoundFeedback: (params: {
         applicationId: string;
@@ -209,7 +211,8 @@ function createQuestionId(): string {
         fallbackQuestionIdCounter = 0;
     }
 
-    return `${now}-${fallbackQuestionIdCounter}`;
+    const randomSuffix = Math.random().toString(16).slice(2, 8);
+    return `${now}-${fallbackQuestionIdCounter}-${randomSuffix}`;
 }
 
 function getAskedInRoundLabel(
@@ -396,6 +399,11 @@ export const useStore = create<AppState>()(
                                     {
                                         applicationId,
                                         roundNumber,
+                                        roundType,
+                                        availableRounds: (app.rounds ?? []).map((r) => ({
+                                            roundNumber: r.roundNumber,
+                                            roundType: r.roundType,
+                                        })),
                                     }
                                 );
                             }
