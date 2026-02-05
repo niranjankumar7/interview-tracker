@@ -407,7 +407,7 @@ export const components: TamboComponent[] = [
   {
     name: "PipelineSummaryPanel",
     description:
-      "A component that summarizes the user's job application pipeline. Use this when the user asks things like 'show my pipeline', 'show my interviews', or wants to see applications grouped by status with upcoming interview dates and a countdown. Supports an optional status filter.",
+      "Summarizes the user's job application pipeline by status and highlights upcoming interviews with a countdown. Triggers: 'show my pipeline', 'show my interviews'. Optional status filter.",
     component: PipelineSummaryPanel,
     propsSchema: pipelineSummaryPanelSchema,
   },

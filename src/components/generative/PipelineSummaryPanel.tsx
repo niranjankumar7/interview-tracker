@@ -2,9 +2,9 @@
 
 import { useStore } from "@/lib/store";
 import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from "@/types";
-import { differenceInDays, format, parseISO, startOfDay } from "date-fns";
+import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import { Calendar, Briefcase, Building2 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 export const pipelineSummaryPanelSchema = z.object({
@@ -76,10 +76,12 @@ function getNextInterviewInfo(
     const interviewDate = getNextInterviewDate(app, now);
     if (!interviewDate) return null;
 
-    const daysLeft = differenceInDays(startOfDay(interviewDate), now);
+    const today = startOfDay(now);
+    const interviewDay = startOfDay(interviewDate);
+    const daysLeft = differenceInDays(interviewDay, today);
     if (daysLeft < 0) return null;
 
-    return { interviewDate, daysLeft };
+    return { interviewDate: interviewDay, daysLeft };
 }
 
 function formatInterviewDate(date: Date): string {
@@ -100,27 +102,60 @@ function getCountdownClass(daysLeft: number): string {
 
 export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
     const applications = useStore((s) => s.applications);
-    // Use start-of-day so "days left" behaves like calendar-day countdowns.
-    const now = useMemo(() => startOfDay(new Date()), []);
+    const [today, setToday] = useState(() => startOfDay(new Date()));
     const statusLabel = status ? STATUS_META[status]?.label ?? status : undefined;
+
+    useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+        const scheduleNextMidnightRefresh = () => {
+            const now = new Date();
+            const nextMidnight = startOfDay(addDays(now, 1));
+            const delayMs = nextMidnight.getTime() - now.getTime();
+
+            timeoutId = setTimeout(() => {
+                const newToday = startOfDay(new Date());
+                setToday(newToday);
+                scheduleNextMidnightRefresh();
+            }, delayMs);
+        };
+
+        scheduleNextMidnightRefresh();
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, []);
 
     const scopedApplications = useMemo(() => {
         if (!status) return applications;
         return applications.filter((app) => app.status === status);
     }, [applications, status]);
 
+    const nextInterviewInfoByAppId = useMemo(() => {
+        const infoById = new Map<string, { interviewDate: Date; daysLeft: number }>();
+
+        for (const application of scopedApplications) {
+            const info = getNextInterviewInfo(application, today);
+            if (!info) continue;
+            infoById.set(application.id, info);
+        }
+
+        return infoById;
+    }, [scopedApplications, today]);
+
     const upcomingInterviews = useMemo((): UpcomingInterview[] => {
         const upcoming: UpcomingInterview[] = [];
 
         for (const application of scopedApplications) {
-            const info = getNextInterviewInfo(application, now);
+            const info = nextInterviewInfoByAppId.get(application.id);
             if (!info) continue;
             upcoming.push({ application, ...info });
         }
 
         upcoming.sort((a, b) => a.interviewDate.getTime() - b.interviewDate.getTime());
         return upcoming;
-    }, [now, scopedApplications]);
+    }, [nextInterviewInfoByAppId, scopedApplications]);
 
     const groupedByStatus = useMemo(() => {
         const result = new Map<ApplicationStatus, Application[]>();
@@ -265,7 +300,7 @@ export function PipelineSummaryPanel({ status }: PipelineSummaryPanelProps) {
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {apps.map((app) => {
-                                            const info = getNextInterviewInfo(app, now);
+                                            const info = nextInterviewInfoByAppId.get(app.id);
 
                                             return (
                                                 <div
