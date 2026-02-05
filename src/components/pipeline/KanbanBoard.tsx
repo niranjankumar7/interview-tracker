@@ -18,7 +18,7 @@ import {
     Trash2,
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { PrepDetailPanel as RoundFeedbackPanel } from "./PrepDetailPanel";
 
@@ -60,6 +60,24 @@ const ROLE_TYPE_ORDER: RoleType[] = [
     "MobileEngineer",
 ];
 
+const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_TIME_PREFIX_RE = /^\d{4}-\d{2}-\d{2}T/;
+
+const parseInterviewDate = (value: string): Date | null => {
+    const parsed = parseISO(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return startOfDay(parsed);
+};
+
+const getInterviewDateOnly = (value: string): string | null => {
+    if (ISO_DATE_ONLY_RE.test(value)) return value;
+    if (ISO_DATE_TIME_PREFIX_RE.test(value)) return value.slice(0, 10);
+
+    const parsed = parseInterviewDate(value);
+    if (!parsed) return null;
+    return format(parsed, "yyyy-MM-dd");
+};
+
 // Rank search results so that:
 // 0: company starts with query
 // 1: company contains query
@@ -100,23 +118,35 @@ export function KanbanBoard() {
         applicationId: string;
         interviewDate: string;
         roleType: RoleType;
+        previousStatus: ApplicationStatus;
     } | null>(null);
     const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
         null
     );
+
+    const cancelInterviewSetup = useCallback(() => {
+        if (!interviewSetup) return;
+        if (interviewSetup.previousStatus !== "interview") {
+            updateApplication(interviewSetup.applicationId, {
+                status: interviewSetup.previousStatus,
+            });
+        }
+
+        setInterviewSetup(null);
+        setInterviewSetupError(null);
+    }, [interviewSetup, updateApplication]);
 
     useEffect(() => {
         if (!interviewSetup) return;
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
-            setInterviewSetup(null);
-            setInterviewSetupError(null);
+            cancelInterviewSetup();
         };
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [interviewSetup]);
+    }, [cancelInterviewSetup, interviewSetup]);
 
     // Track mouse position to distinguish click from drag
     const mouseDownPosition = useRef<{ x: number; y: number } | null>(null);
@@ -200,34 +230,58 @@ export function KanbanBoard() {
         interviewDate: Date,
         roleType: RoleType
     ) => {
-        const existingSprints = sprints.filter(
+        const relatedSprints = sprints.filter(
             (sprint) => sprint.applicationId === applicationId
         );
-        const existing = existingSprints[0];
+
+        const activeSprints = relatedSprints.filter(
+            (sprint) => sprint.status === "active"
+        );
+
+        const candidates = activeSprints.length > 0 ? activeSprints : relatedSprints;
+        const canonical = candidates
+            .slice()
+            .sort((a, b) => {
+                const aCreatedAt = new Date(a.createdAt).getTime();
+                const bCreatedAt = new Date(b.createdAt).getTime();
+
+                if (Number.isNaN(aCreatedAt) && Number.isNaN(bCreatedAt)) {
+                    return b.id.localeCompare(a.id);
+                }
+                if (Number.isNaN(aCreatedAt)) return 1;
+                if (Number.isNaN(bCreatedAt)) return -1;
+
+                const createdAtDelta = bCreatedAt - aCreatedAt;
+                if (createdAtDelta !== 0) return createdAtDelta;
+                return b.id.localeCompare(a.id);
+            })[0];
 
         const nextSprint = generateSprint(applicationId, interviewDate, roleType);
 
-        if (!existing) {
+        if (!canonical) {
             addSprint(nextSprint);
             return;
         }
 
-        const shouldReplace = window.confirm(
-            "An interview prep sprint already exists for this application. Regenerate it? This will replace your existing plan and reset any progress."
-        );
-        if (!shouldReplace) return;
-
-        if (existingSprints.length > 1) {
+        if (relatedSprints.length > 1) {
             console.warn(
-                "KanbanBoard: multiple sprints found for application; updating the first one",
+                "KanbanBoard: multiple sprints found for application; using canonical sprint",
                 {
                     applicationId,
-                    sprintIds: existingSprints.map((s) => s.id),
+                    sprintIds: relatedSprints.map((s) => s.id),
+                    canonicalSprintId: canonical.id,
                 }
             );
         }
 
-        updateSprint(existing.id, {
+        if (canonical.status === "active") {
+            const shouldReplace = window.confirm(
+                "An interview prep sprint already exists for this application. Regenerate it? This will replace your existing plan and reset any progress."
+            );
+            if (!shouldReplace) return;
+        }
+
+        updateSprint(canonical.id, {
             interviewDate: nextSprint.interviewDate,
             roleType: nextSprint.roleType,
             totalDays: nextSprint.totalDays,
@@ -236,7 +290,8 @@ export function KanbanBoard() {
             createdAt: nextSprint.createdAt,
         });
 
-        for (const duplicate of existingSprints.slice(1)) {
+        for (const duplicate of relatedSprints) {
+            if (duplicate.id === canonical.id) continue;
             if (duplicate.status !== "active") continue;
             updateSprint(duplicate.id, { status: "expired" });
         }
@@ -259,39 +314,45 @@ export function KanbanBoard() {
             const needsInterviewDetails = !interviewDateIso || !roleType;
 
             if (needsInterviewDetails) {
+                updateApplication(appId, { status: "interview" });
                 setInterviewSetupError(null);
+                const existingDateOnly = interviewDateIso
+                    ? getInterviewDateOnly(interviewDateIso)
+                    : null;
                 setInterviewSetup({
                     applicationId: app.id,
-                    interviewDate: interviewDateIso
-                        ? format(parseISO(interviewDateIso), "yyyy-MM-dd")
-                        : format(
-                              addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
-                              "yyyy-MM-dd"
-                          ),
+                    interviewDate:
+                        existingDateOnly ??
+                        format(
+                            addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
+                            "yyyy-MM-dd"
+                        ),
                     roleType: roleType ?? "SDE",
+                    previousStatus: app.status,
                 });
                 return;
             }
 
-            const parsedExistingDate = parseISO(interviewDateIso);
-            const normalizedExistingDate = startOfDay(parsedExistingDate);
+            const normalizedExistingDate = parseInterviewDate(interviewDateIso);
             const normalizedToday = startOfDay(new Date());
             const daysUntilInterview = differenceInDays(
-                normalizedExistingDate,
+                normalizedExistingDate ?? normalizedToday,
                 normalizedToday
             );
 
             if (
-                Number.isNaN(parsedExistingDate.getTime()) ||
+                !normalizedExistingDate ||
                 daysUntilInterview < 0
             ) {
+                updateApplication(appId, { status: "interview" });
                 setInterviewSetup({
                     applicationId: app.id,
                     interviewDate: format(
                         addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
                         "yyyy-MM-dd"
                     ),
-                    roleType,
+                    roleType: roleType ?? "SDE",
+                    previousStatus: app.status,
                 });
                 setInterviewSetupError(
                     "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
@@ -300,7 +361,7 @@ export function KanbanBoard() {
             }
 
             updateApplication(appId, { status: "interview" });
-            ensureSprintForInterview(app.id, parsedExistingDate, roleType);
+            ensureSprintForInterview(app.id, normalizedExistingDate, roleType);
             return;
         }
 
@@ -349,7 +410,9 @@ export function KanbanBoard() {
     // Calculate days until interview
     const getDaysUntilInterview = (interviewDate: string | undefined) => {
         if (!interviewDate) return null;
-        return differenceInDays(parseISO(interviewDate), new Date());
+        const parsed = parseInterviewDate(interviewDate);
+        if (!parsed) return null;
+        return differenceInDays(parsed, startOfDay(new Date()));
     };
 
     return (
@@ -409,6 +472,9 @@ export function KanbanBoard() {
                                     ) : (
                                         columnApps.map((app) => {
                                             const daysUntil = getDaysUntilInterview(app.interviewDate);
+                                            const parsedInterviewDate = app.interviewDate
+                                                ? parseInterviewDate(app.interviewDate)
+                                                : null;
                                             const isUrgent =
                                                 daysUntil !== null &&
                                                 daysUntil <= 3 &&
@@ -490,14 +556,14 @@ export function KanbanBoard() {
                                                     </div>
 
                                                     {/* Interview Date with countdown */}
-                                                    {app.interviewDate && (
+                                                    {parsedInterviewDate && (
                                                         <div className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
                                                             ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
                                                             : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
                                                             }`}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="w-3.5 h-3.5" />
-                                                                {format(parseISO(app.interviewDate), "MMM d")}
+                                                                {format(parsedInterviewDate, "MMM d")}
                                                             </div>
                                                             {daysUntil !== null && daysUntil >= 0 && (
                                                                 <span className="font-medium">
@@ -560,8 +626,7 @@ export function KanbanBoard() {
                     onClick={(e) => {
                         e.stopPropagation();
                         if (e.target === e.currentTarget) {
-                            setInterviewSetup(null);
-                            setInterviewSetupError(null);
+                            cancelInterviewSetup();
                         }
                     }}
                 >
@@ -578,8 +643,7 @@ export function KanbanBoard() {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    setInterviewSetup(null);
-                                    setInterviewSetupError(null);
+                                    cancelInterviewSetup();
                                 }}
                                 className="p-2 hover:bg-muted rounded-lg"
                                 aria-label="Close"
@@ -649,8 +713,7 @@ export function KanbanBoard() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setInterviewSetup(null);
-                                        setInterviewSetupError(null);
+                                        cancelInterviewSetup();
                                     }}
                                     className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
                                 >
@@ -667,23 +730,35 @@ export function KanbanBoard() {
                                             return;
                                         }
 
-                                        const parsedDate = parseISO(
+                                        const parsedDate = parseInterviewDate(
                                             interviewSetup.interviewDate
                                         );
-                                        if (Number.isNaN(parsedDate.getTime())) {
+                                        if (!parsedDate) {
                                             setInterviewSetupError(
                                                 "Interview date is invalid."
                                             );
                                             return;
                                         }
 
-                                        const interviewDateIso = parsedDate.toISOString();
+                                        const normalizedToday = startOfDay(new Date());
+                                        if (
+                                            differenceInDays(
+                                                parsedDate,
+                                                normalizedToday
+                                            ) < 0
+                                        ) {
+                                            setInterviewSetupError(
+                                                "Interview date must be today or later."
+                                            );
+                                            return;
+                                        }
 
                                         updateApplication(
                                             interviewSetup.applicationId,
                                             {
                                                 status: "interview",
-                                                interviewDate: interviewDateIso,
+                                                interviewDate:
+                                                    interviewSetup.interviewDate,
                                                 roleType: interviewSetup.roleType,
                                             }
                                         );
