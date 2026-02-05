@@ -35,13 +35,13 @@ import {
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 
-type StatusConfig = {
+type StatusChartConfig = {
   status: ApplicationStatus;
   label: string;
   chartColorHex: string;
 };
 
-const statusChartConfigs: StatusConfig[] = [
+const statusChartConfigs: StatusChartConfig[] = [
   { status: "applied", label: "Applied", chartColorHex: "#6B7280" },
   { status: "shortlisted", label: "Shortlisted", chartColorHex: "#3B82F6" },
   { status: "interview", label: "Interview", chartColorHex: "#8B5CF6" },
