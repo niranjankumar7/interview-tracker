@@ -57,7 +57,6 @@ export function PrepDetailPanel({
     const sprintForApplication = useMemo(() => {
         let latestSprint: Sprint | null = null;
         let latestSprintCreatedAtTime = Number.NEGATIVE_INFINITY;
-        let fallbackSprint: Sprint | null = null;
 
         for (const sprint of sprints) {
             if (sprint.applicationId !== appId) continue;
@@ -65,22 +64,17 @@ export function PrepDetailPanel({
             if (sprint.status === "active") return sprint;
 
             const createdAtDate = safeParseISODate(sprint.createdAt);
-            if (!createdAtDate) {
-                if (!fallbackSprint) {
-                    fallbackSprint = sprint;
-                }
-                continue;
-            }
+            if (!createdAtDate) continue;
 
             const createdAtTime = createdAtDate.getTime();
 
-            if (!latestSprint || createdAtTime > latestSprintCreatedAtTime) {
+            if (createdAtTime > latestSprintCreatedAtTime) {
                 latestSprint = sprint;
                 latestSprintCreatedAtTime = createdAtTime;
             }
         }
 
-        return latestSprint ?? fallbackSprint;
+        return latestSprint;
     }, [appId, sprints]);
 
     // Tracks whether the current `appId` has been found in the store at least once.
@@ -100,7 +94,6 @@ export function PrepDetailPanel({
     const lastSavedJobDescriptionUrl = useRef<string>("");
     // Notes are normalized via `normalizeNotesForSave` before saving/comparing.
     const lastSavedNotes = useRef<string>("");
-    const didFlushEdits = useRef(false);
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -151,17 +144,12 @@ export function PrepDetailPanel({
 
     useEffect(() => {
         if (!isOpen) return;
-
-        didFlushEdits.current = false;
         return () => {
-            if (didFlushEdits.current) return;
-            didFlushEdits.current = true;
             flushApplicationEdits();
         };
     }, [flushApplicationEdits, isOpen]);
 
     const handleClose = useCallback(() => {
-        didFlushEdits.current = true;
         flushApplicationEdits();
         resetScrapeState();
 
@@ -266,6 +254,7 @@ export function PrepDetailPanel({
 
     const sprintStatusSummary = sprintForApplication
         ? (() => {
+            // `completedDays` drives the calendar progress; task counts drive the overall percent.
             let completedDays = 0;
             let totalTasks = 0;
             let completedTasks = 0;
@@ -777,8 +766,8 @@ function safeParseISODate(value: string | undefined): Date | null {
 
 function normalizeNotesForSave(value: string): string {
     // Preserve leading whitespace and internal formatting (e.g., indentation),
-    // but trim trailing whitespace to avoid noisy diffs and unnecessary saves.
-    return value.trimEnd();
+    // but trim trailing spaces/tabs at the end of the note to avoid noisy diffs and unnecessary saves.
+    return value.replace(/[ \t]+$/u, "");
 }
 
 // Helper function to infer role type from role string
