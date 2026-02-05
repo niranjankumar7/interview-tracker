@@ -11,10 +11,15 @@ export function TamboProviderWrapper({
     children: React.ReactNode;
 }) {
     const mcpServers = useMcpServers();
+    const apiKey = process.env.NEXT_PUBLIC_TAMBO_API_KEY;
+
+    if (!apiKey) {
+        return <>{children}</>;
+    }
 
     return (
         <TamboProvider
-            apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+            apiKey={apiKey}
             components={components}
             tools={tools}
             tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL}

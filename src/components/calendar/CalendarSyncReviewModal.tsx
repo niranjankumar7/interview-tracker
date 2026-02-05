@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { format, parseISO } from "date-fns";
 import { Calendar, Check, Info, X } from "lucide-react";
@@ -65,7 +65,11 @@ function SuggestionCard({
   }, [suggestion.id, suggestion.company, suggestion.interviewDate, suggestion.role]);
 
   const interviewIso = toIsoDate(date);
-  const canConfirm = Boolean(company.trim()) && Boolean(interviewIso);
+  const companyValue = company.trim();
+  const canConfirm =
+    Boolean(companyValue) &&
+    companyValue.toLowerCase() !== "unknown" &&
+    Boolean(interviewIso);
   const parsedInterviewDate = parseISO(suggestion.interviewDate);
   const interviewLabel = Number.isNaN(parsedInterviewDate.getTime())
     ? suggestion.interviewDate.slice(0, 10)
@@ -148,7 +152,7 @@ function SuggestionCard({
           disabled={!canConfirm}
           onClick={() =>
             onConfirm(suggestion.id, {
-              company,
+              company: companyValue,
               role,
               interviewDate: interviewIso,
               createSprint,
@@ -171,11 +175,25 @@ export function CalendarSyncReviewModal({
   onDismiss,
 }: CalendarSyncReviewModalProps) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
+    if (typeof document === "undefined") return;
     setPortalTarget(document.body);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof window === "undefined") return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !portalTarget) return null;
 
@@ -188,10 +206,15 @@ export function CalendarSyncReviewModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div
+        className="bg-background rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className="sticky top-0 bg-background border-b border-border px-5 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">
               Confirm calendar interviews
             </h2>
             <p className="text-sm text-muted-foreground">

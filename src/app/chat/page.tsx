@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ApiKeyCheck } from "@/components/ApiKeyCheck";
 import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import { useStore } from "@/lib/store";
 import { KanbanBoard, QuestionBankView } from "@/components/pipeline";
@@ -96,7 +97,9 @@ export default function ChatPage() {
       <main className="flex-1 overflow-hidden">
         {currentView === "chat" && (
           <div className="h-full">
-            <MessageThreadFull />
+            <ApiKeyCheck>
+              <MessageThreadFull />
+            </ApiKeyCheck>
           </div>
         )}
         {currentView === "pipeline" && <KanbanBoard />}

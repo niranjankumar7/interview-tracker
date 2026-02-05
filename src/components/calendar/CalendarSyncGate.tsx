@@ -5,15 +5,39 @@ import { useStore } from "@/lib/store";
 import { createDemoCalendarEvents } from "@/lib/calendar-sync";
 import { CalendarSyncReviewModal } from "./CalendarSyncReviewModal";
 
-export function CalendarSyncGate() {
-  const calendar = useStore((s) => s.calendar);
-  const preferences = useStore((s) => s.preferences);
-  const syncCalendarEvents = useStore((s) => s.syncCalendarEvents);
+function CalendarSyncReviewModalContainer({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const suggestions = useStore((s) => s.calendarSuggestions);
   const confirmSuggestion = useStore((s) => s.confirmCalendarSuggestion);
   const dismissSuggestion = useStore((s) => s.dismissCalendarSuggestion);
 
-  const pendingCount = suggestions.filter((s) => s.status === "pending").length;
+  return (
+    <CalendarSyncReviewModal
+      isOpen={open}
+      suggestions={suggestions}
+      onClose={onClose}
+      onConfirm={confirmSuggestion}
+      onDismiss={dismissSuggestion}
+    />
+  );
+}
+
+export function CalendarSyncGate() {
+  const calendar = useStore((s) => s.calendar);
+  const preferences = useStore((s) => s.preferences);
+  const syncCalendarEvents = useStore((s) => s.syncCalendarEvents);
+  const pendingCount = useStore((s) =>
+    s.calendarSuggestions.reduce(
+      (count, suggestion) =>
+        suggestion.status === "pending" ? count + 1 : count,
+      0
+    )
+  );
   const [open, setOpen] = useState(false);
   const hasPrompted = useRef(false);
   const autoSyncRan = useRef(false);
@@ -48,13 +72,7 @@ export function CalendarSyncGate() {
     setOpen(true);
   }, [pendingCount]);
 
-  return (
-    <CalendarSyncReviewModal
-      isOpen={open}
-      suggestions={suggestions}
-      onClose={() => setOpen(false)}
-      onConfirm={confirmSuggestion}
-      onDismiss={dismissSuggestion}
-    />
-  );
+  if (!open) return null;
+
+  return <CalendarSyncReviewModalContainer open={open} onClose={() => setOpen(false)} />;
 }

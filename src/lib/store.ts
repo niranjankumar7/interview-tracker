@@ -449,12 +449,19 @@ export const useStore = create<AppState>()(
                         );
 
                         if (existingPending) {
-                            Object.assign(existingPending, {
-                                ...suggestion,
-                                id: existingPending.id,
-                                status: existingPending.status,
-                                createdAt: existingPending.createdAt,
-                            });
+                            const pendingIndex = nextSuggestions.findIndex(
+                                (item) => item.id === existingPending.id
+                            );
+
+                            if (pendingIndex !== -1) {
+                                nextSuggestions[pendingIndex] = {
+                                    ...existingPending,
+                                    ...suggestion,
+                                    id: existingPending.id,
+                                    status: existingPending.status,
+                                    createdAt: existingPending.createdAt,
+                                };
+                            }
                             continue;
                         }
 
@@ -475,12 +482,15 @@ export const useStore = create<AppState>()(
                             if (!didChange) continue;
 
                             const createdAt = new Date().toISOString();
-                            const baseId = `${suggestion.id}:${suggestion.interviewDate}`;
+                            const dateSegment = suggestion.interviewDate
+                                .replace(/[^0-9]/g, '')
+                                .slice(0, 14);
+                            const baseId = `${suggestion.id}@${dateSegment || Date.now()}`;
                             let nextId = baseId;
                             let suffix = 1;
 
                             while (existingIds.has(nextId)) {
-                                nextId = `${baseId}:${suffix++}`;
+                                nextId = `${baseId}-${suffix++}`;
                             }
 
                             existingIds.add(nextId);
@@ -515,9 +525,12 @@ export const useStore = create<AppState>()(
                     const suggestion = state.calendarSuggestions.find((s) => s.id === id);
                     if (!suggestion) return {};
 
-                    const company =
-                        (overrides.company ?? suggestion.company).trim() ||
-                        suggestion.company;
+                    const companyInput = (overrides.company ?? suggestion.company).trim();
+                    if (!companyInput || companyInput.toLowerCase() === 'unknown') {
+                        return {};
+                    }
+
+                    const company = companyInput;
                     const role = (overrides.role ?? suggestion.role ?? 'Software Engineer').trim();
                     const interviewDate = overrides.interviewDate ?? suggestion.interviewDate;
                     const roleType = overrides.roleType ?? suggestion.roleType ?? 'SDE';
