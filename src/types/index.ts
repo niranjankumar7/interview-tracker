@@ -27,17 +27,8 @@ export const ROLE_TYPES = [
 export type RoleType = (typeof ROLE_TYPES)[number];
 
 // Interview round types for round-specific prep
-export const INTERVIEW_ROUND_TYPES = [
-    'HR',
-    'TechnicalRound1',
-    'TechnicalRound2',
-    'SystemDesign',
-    'Managerial',
-    'Assignment',
-    'Final',
-] as const;
-
-export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+export { interviewRoundTypes, isInterviewRoundType } from './interviewRound';
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export const FOCUS_AREAS = ['DSA', 'SystemDesign', 'Behavioral', 'Review', 'Mock'] as const;
 
