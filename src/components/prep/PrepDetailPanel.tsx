@@ -57,15 +57,22 @@ export function PrepDetailPanel({
     const sprintForApplication = useMemo(() => {
         let latestSprint: Sprint | null = null;
         let latestSprintCreatedAtTime = Number.NEGATIVE_INFINITY;
+        let fallbackSprint: Sprint | null = null;
 
         for (const sprint of sprints) {
             if (sprint.applicationId !== appId) continue;
 
             if (sprint.status === "active") return sprint;
 
-            const createdAtTime =
-                safeParseISODate(sprint.createdAt)?.getTime() ??
-                Number.NEGATIVE_INFINITY;
+            const createdAtDate = safeParseISODate(sprint.createdAt);
+            if (!createdAtDate) {
+                if (!fallbackSprint) {
+                    fallbackSprint = sprint;
+                }
+                continue;
+            }
+
+            const createdAtTime = createdAtDate.getTime();
 
             if (!latestSprint || createdAtTime > latestSprintCreatedAtTime) {
                 latestSprint = sprint;
@@ -73,7 +80,7 @@ export function PrepDetailPanel({
             }
         }
 
-        return latestSprint;
+        return latestSprint ?? fallbackSprint;
     }, [appId, sprints]);
 
     // Tracks whether the current `appId` has been found in the store at least once.
@@ -91,7 +98,9 @@ export function PrepDetailPanel({
     const scrapeRequestId = useRef(0);
     const lastSyncedApplicationId = useRef<string | null>(null);
     const lastSavedJobDescriptionUrl = useRef<string>("");
+    // Notes are normalized via `normalizeNotesForSave` before saving/comparing.
     const lastSavedNotes = useRef<string>("");
+    const didFlushEdits = useRef(false);
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -109,13 +118,13 @@ export function PrepDetailPanel({
 
         lastSyncedApplicationId.current = application.id;
         const jobDescriptionUrl = (application.jobDescriptionUrl ?? "").trim();
-        const notes = normalizeNotesForSave(application.notes ?? "");
+        const notes = application.notes ?? "";
 
         setJobDescriptionUrlDraft(jobDescriptionUrl);
         setNotesDraft(notes);
 
         lastSavedJobDescriptionUrl.current = jobDescriptionUrl;
-        lastSavedNotes.current = notes;
+        lastSavedNotes.current = normalizeNotesForSave(notes);
     }, [application, isOpen]);
 
     const saveJobDescriptionUrl = useCallback(() => {
@@ -134,6 +143,7 @@ export function PrepDetailPanel({
         lastSavedNotes.current = nextNotes;
     }, [appId, notesDraft, updateApplication]);
 
+    // Idempotent: safe to call multiple times during close/unmount.
     const flushApplicationEdits = useCallback(() => {
         saveJobDescriptionUrl();
         saveNotes();
@@ -141,12 +151,17 @@ export function PrepDetailPanel({
 
     useEffect(() => {
         if (!isOpen) return;
+
+        didFlushEdits.current = false;
         return () => {
+            if (didFlushEdits.current) return;
+            didFlushEdits.current = true;
             flushApplicationEdits();
         };
     }, [flushApplicationEdits, isOpen]);
 
     const handleClose = useCallback(() => {
+        didFlushEdits.current = true;
         flushApplicationEdits();
         resetScrapeState();
 
@@ -252,15 +267,12 @@ export function PrepDetailPanel({
     const sprintStatusSummary = sprintForApplication
         ? (() => {
             let completedDays = 0;
-
-            for (const day of sprintForApplication.dailyPlans) {
-                if (day.completed) completedDays += 1;
-            }
-
             let totalTasks = 0;
             let completedTasks = 0;
 
             for (const day of sprintForApplication.dailyPlans) {
+                if (day.completed) completedDays += 1;
+
                 for (const block of day.blocks) {
                     totalTasks += block.tasks.length;
 
@@ -764,7 +776,8 @@ function safeParseISODate(value: string | undefined): Date | null {
 }
 
 function normalizeNotesForSave(value: string): string {
-    // Preserve leading whitespace and internal formatting; trim only trailing whitespace.
+    // Preserve leading whitespace and internal formatting (e.g., indentation),
+    // but trim trailing whitespace to avoid noisy diffs and unnecessary saves.
     return value.trimEnd();
 }
 
