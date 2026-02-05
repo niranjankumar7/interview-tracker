@@ -13,8 +13,12 @@ import {
   sprintSetupCardSchema,
   TodaysPlanPanel,
   todaysPlanPanelSchema,
+  PlanForDatePanel,
+  planForDatePanelSchema,
   AddQuestionPanel,
   addQuestionPanelSchema,
+  PipelineSummaryPanel,
+  pipelineSummaryPanelSchema,
 } from "@/components/generative";
 import { useStore } from "@/lib/store";
 import type { TamboComponent } from "@tambo-ai/react";
@@ -396,11 +400,25 @@ export const components: TamboComponent[] = [
     propsSchema: todaysPlanPanelSchema,
   },
   {
+    name: "PlanForDatePanel",
+    description:
+      "A component that shows the user's prep tasks for a specific date. Supported patterns: 'today', 'tomorrow', weekday names (with optional 'next'), 'in N days', a YYYY-MM-DD date, or a full ISO timestamp (date part is used). Pass either the user's phrase or a normalized date string as the targetDate. Use this instead of TodaysPlanPanel when the user mentions any non-today date or asks for their plan on a particular day. If the exact date isn't available in a sprint, it shows the next available planned day for that sprint (or the last planned day if there is no future one), with guidance explaining the fallback.",
+    component: PlanForDatePanel,
+    propsSchema: planForDatePanelSchema,
+  },
+  {
     name: "AddQuestionPanel",
     description:
       "A component that allows users to add interview questions to their question bank. Use this when the user wants to add a question, mentions a question they were asked, or wants to save a question for later. Auto-detects the question category (DSA, System Design, Behavioral, SQL).",
     component: AddQuestionPanel,
     propsSchema: addQuestionPanelSchema,
+  },
+  {
+    name: "PipelineSummaryPanel",
+    description:
+      "Summarizes the user's job application pipeline by status and highlights upcoming interviews with a countdown. Triggers: 'show my pipeline', 'show my interviews'. Optional status filter.",
+    component: PipelineSummaryPanel,
+    propsSchema: pipelineSummaryPanelSchema,
   },
   // Add more components here
 ];

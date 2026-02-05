@@ -26,8 +26,9 @@ export const ROLE_TYPES = [
 
 export type RoleType = (typeof ROLE_TYPES)[number];
 
-export { interviewRoundTypes } from "./interviewRound";
-export type InterviewRoundType = import("./interviewRound").InterviewRoundType;
+// Interview round types for round-specific prep
+export { interviewRoundTypes, isInterviewRoundType } from './interviewRound';
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export const FOCUS_AREAS = ['DSA', 'SystemDesign', 'Behavioral', 'Review', 'Mock'] as const;
 
@@ -53,6 +54,7 @@ export interface Application {
     id: string;
     company: string;
     role: string;
+    jobDescriptionUrl?: string;
     roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string

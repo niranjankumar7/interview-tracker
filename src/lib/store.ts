@@ -16,6 +16,7 @@ import {
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
+import { autoTagCategory } from '@/utils/categoryTagger';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -86,17 +87,45 @@ interface AppState {
      *
      * To add new rounds, use `addInterviewRound`. If `feedback` is provided, it is merged field-
      * by-field, so omitted fields preserve existing values.
+     *
+     * For saving round feedback/questions and syncing the Question Bank, prefer `saveRoundFeedback`.
      */
     updateApplication: (
         id: string,
         updates: ApplicationUpdate
     ) => void;
+
+    /**
+     * Saves round feedback and replaces `questionsAsked` for the round.
+     *
+     * If `questionTexts` is non-empty, those questions are also synced into the Question Bank
+     * in the same persisted write.
+     */
+    saveRoundFeedback: (params: {
+        applicationId: string;
+        roundNumber: number;
+        feedback: InterviewRound['feedback'];
+        questionTexts: string[];
+    }) => void;
     deleteApplication: (id: string) => void;
 
     addSprint: (sprint: Sprint) => void;
     updateSprint: (id: string, updates: Partial<Sprint>) => void;
 
     addQuestion: (question: Question) => void;
+
+    /**
+     * Upserts the provided question texts into the Question Bank for the given application.
+     *
+     * De-duplication is done by matching `applicationId` + a normalized `questionText` (trimmed,
+     * collapsed whitespace, lower-cased).
+     */
+    upsertQuestionsFromRound: (params: {
+        applicationId: string;
+        roundNumber: number;
+        roundType: InterviewRound['roundType'];
+        questionTexts: string[];
+    }) => void;
 
     completeTask: (
         sprintId: string,
@@ -163,6 +192,117 @@ function safeParseISO(value: string | undefined): Date | null {
     if (!value) return null;
     const parsed = parseISO(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeQuestionText(value: string): string {
+    return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+// Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
+// Keeps IDs stable-ish and reduces same-millisecond collision risk.
+let fallbackQuestionIdLastTime = 0;
+let fallbackQuestionIdCounter = 0;
+
+function createQuestionId(): string {
+    if (
+        typeof crypto !== 'undefined' &&
+        'randomUUID' in crypto &&
+        typeof crypto.randomUUID === 'function'
+    ) {
+        return crypto.randomUUID();
+    }
+
+    if (
+        typeof crypto !== 'undefined' &&
+        'getRandomValues' in crypto &&
+        typeof crypto.getRandomValues === 'function'
+    ) {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    const now = Date.now();
+    if (now === fallbackQuestionIdLastTime) {
+        fallbackQuestionIdCounter += 1;
+    } else {
+        fallbackQuestionIdLastTime = now;
+        fallbackQuestionIdCounter = 0;
+    }
+
+    const randomSuffix = Math.random().toString(16).slice(2, 8);
+    return `${now}-${fallbackQuestionIdCounter}-${randomSuffix}`;
+}
+
+function getAskedInRoundLabel(
+    roundNumber: number,
+    roundType: InterviewRound['roundType']
+): string {
+    return `Round ${roundNumber}: ${roundType}`;
+}
+
+function getQuestionDedupeKey(applicationId: string, normalizedText: string): string {
+    return `${applicationId}|${normalizedText}`;
+}
+
+function upsertQuestionsFromRoundInList(
+    questions: Question[],
+    params: {
+        applicationId: string;
+        roundNumber: number;
+        roundType: InterviewRound['roundType'];
+        questionTexts: string[];
+    }
+): Question[] {
+    const askedInRound = getAskedInRoundLabel(params.roundNumber, params.roundType);
+    const nextQuestions = [...questions];
+    const index = new Map<string, number>();
+
+    for (let i = 0; i < nextQuestions.length; i += 1) {
+        const q = nextQuestions[i];
+        index.set(
+            getQuestionDedupeKey(q.companyId, normalizeQuestionText(q.questionText)),
+            i
+        );
+    }
+
+    const dateAdded = new Date().toISOString();
+
+    for (const rawText of params.questionTexts) {
+        const questionText = rawText.trim();
+        if (!questionText) continue;
+
+        const key = getQuestionDedupeKey(
+            params.applicationId,
+            normalizeQuestionText(questionText)
+        );
+
+        const existingIdx = index.get(key);
+        if (existingIdx === undefined) {
+            nextQuestions.push({
+                id: createQuestionId(),
+                companyId: params.applicationId,
+                questionText,
+                category: autoTagCategory(questionText),
+                askedInRound,
+                dateAdded,
+            });
+
+            index.set(key, nextQuestions.length - 1);
+            continue;
+        }
+
+        const existing = nextQuestions[existingIdx];
+        nextQuestions[existingIdx] = {
+            ...existing,
+            category: autoTagCategory(questionText),
+            askedInRound,
+        };
+    }
+
+    return nextQuestions;
 }
 
 export const useStore = create<AppState>()(
@@ -268,6 +408,61 @@ export const useStore = create<AppState>()(
                     }),
                 })),
 
+            saveRoundFeedback: ({ applicationId, roundNumber, feedback, questionTexts }) =>
+                set((state) => {
+                    let targetRoundType: InterviewRound['roundType'] | null = null;
+
+                    const applications = state.applications.map((app) => {
+                        if (app.id !== applicationId) return app;
+
+                        const nextRounds = [...(app.rounds ?? [])];
+                        const idx = nextRounds.findIndex((r) => r.roundNumber === roundNumber);
+                        if (idx === -1) {
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.warn(
+                                    'saveRoundFeedback: tried to update missing round',
+                                    {
+                                        applicationId,
+                                        roundNumber,
+                                        availableRounds: (app.rounds ?? []).map((r) => ({
+                                            roundNumber: r.roundNumber,
+                                            roundType: r.roundType,
+                                        })),
+                                    }
+                                );
+                            }
+                            return app;
+                        }
+
+                        const prev = nextRounds[idx];
+                        targetRoundType = prev.roundType;
+                        nextRounds[idx] = {
+                            ...prev,
+                            questionsAsked: questionTexts,
+                            feedback: mergeRoundFeedback(prev.feedback, feedback),
+                        };
+
+                        nextRounds.sort((a, b) => a.roundNumber - b.roundNumber);
+
+                        return {
+                            ...app,
+                            rounds: nextRounds,
+                        };
+                    });
+
+                    const questions =
+                        questionTexts.length > 0 && targetRoundType
+                            ? upsertQuestionsFromRoundInList(state.questions, {
+                                applicationId,
+                                roundNumber,
+                                roundType: targetRoundType,
+                                questionTexts,
+                            })
+                            : state.questions;
+
+                    return { applications, questions };
+                }),
+
             deleteApplication: (id) =>
                 set((state) => ({
                     applications: state.applications.filter(app => app.id !== id),
@@ -289,6 +484,16 @@ export const useStore = create<AppState>()(
             addQuestion: (question) =>
                 set((state) => ({
                     questions: [...state.questions, question]
+                })),
+
+            upsertQuestionsFromRound: ({ applicationId, roundNumber, roundType, questionTexts }) =>
+                set((state) => ({
+                    questions: upsertQuestionsFromRoundInList(state.questions, {
+                        applicationId,
+                        roundNumber,
+                        roundType,
+                        questionTexts,
+                    }),
                 })),
 
             completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
