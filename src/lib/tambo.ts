@@ -59,6 +59,7 @@ type OfferDetailsToolInput = {
 };
 
 function hasOfferCompensation(details: OfferDetailsToolInput): boolean {
+  // Treat 0 as "provided" (e.g., zero bonus).
   return (
     details.totalCTC != null ||
     details.baseSalary != null ||
@@ -447,6 +448,13 @@ export const tools: TamboTool[] = [
       const state = useStore.getState();
       const { applications, updateApplication } = state;
       const { applicationId, company, offerDetails } = input;
+
+      if (!applicationId && !company) {
+        return {
+          success: false,
+          message: "Either applicationId or company must be provided"
+        };
+      }
 
       let app = applicationId
         ? applications.find((candidate) => candidate.id === applicationId)
