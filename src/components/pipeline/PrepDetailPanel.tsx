@@ -59,8 +59,7 @@ export function PrepDetailPanel(props: {
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
   const addInterviewRound = useStore((s) => s.addInterviewRound);
-  const updateApplication = useStore((s) => s.updateApplication);
-  const upsertQuestionsFromRound = useStore((s) => s.upsertQuestionsFromRound);
+  const saveRoundFeedback = useStore((s) => s.saveRoundFeedback);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
     null
@@ -731,30 +730,19 @@ export function PrepDetailPanel(props: {
 
                       const questionTexts = linesToList(feedbackDraft.questionsText);
 
-                      updateApplication(application.id, {
-                        rounds: [
-                          {
-                            roundNumber: activeRound.roundNumber,
-                            questionsAsked: questionTexts,
-                            feedback: {
-                              rating,
-                              pros: linesToList(feedbackDraft.prosText),
-                              cons: linesToList(feedbackDraft.consText),
-                              struggledTopics: feedbackDraft.struggledTopics,
-                              notes: feedbackDraft.notes,
-                            },
-                          },
-                        ],
+                      saveRoundFeedback({
+                        applicationId: application.id,
+                        roundNumber: activeRound.roundNumber,
+                        roundType: activeRound.roundType,
+                        questionTexts,
+                        feedback: {
+                          rating,
+                          pros: linesToList(feedbackDraft.prosText),
+                          cons: linesToList(feedbackDraft.consText),
+                          struggledTopics: feedbackDraft.struggledTopics,
+                          notes: feedbackDraft.notes,
+                        },
                       });
-
-                      if (questionTexts.length > 0) {
-                        upsertQuestionsFromRound({
-                          companyId: application.id,
-                          roundNumber: activeRound.roundNumber,
-                          roundType: activeRound.roundType,
-                          questionTexts,
-                        });
-                      }
 
                       setFeedbackRoundNumber(null);
                     }}
