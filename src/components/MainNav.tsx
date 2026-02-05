@@ -1,55 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { MessageSquare, Kanban, BookOpen, BarChart3 } from "lucide-react";
 
 export function MainNav() {
     const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const currentView = searchParams.get("view");
-
-    // Determine active state
-    const isChatActive = pathname === "/chat";
-    const isPipelineActive = pathname?.startsWith("/pipeline");
-    const isQuestionsActive = pathname?.startsWith("/questions");
-    const isDashboardActive = pathname === "/dashboard";
 
     const navItems = [
         {
             href: "/chat",
             label: "Chat",
             icon: MessageSquare,
-            isActive: isChatActive,
+            isActive: pathname === "/chat",
         },
         {
             href: "/pipeline",
             label: "Pipeline",
             icon: Kanban,
-            isActive: isPipelineActive,
+            isActive: pathname.startsWith("/pipeline"),
         },
         {
             href: "/questions",
             label: "Questions",
             icon: BookOpen,
-            isActive: isQuestionsActive,
+            isActive: pathname.startsWith("/questions"),
         },
         {
             href: "/dashboard",
             label: "Dashboard",
             icon: BarChart3,
-            isActive: isDashboardActive,
+            isActive: pathname === "/dashboard",
         },
     ];
 
     return (
-        <nav className="flex bg-gray-100 dark:bg-muted rounded-lg p-1">
+        <nav className="flex bg-muted rounded-lg p-1">
             {navItems.map((item) => (
                 <Link
-                    key={item.label}
+                    key={item.href}
                     href={item.href}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${item.isActive
-                        ? "bg-white dark:bg-background text-blue-600 dark:text-blue-400 shadow-sm"
+                        ? "bg-background text-blue-600 dark:text-blue-400 shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                         }`}
                 >

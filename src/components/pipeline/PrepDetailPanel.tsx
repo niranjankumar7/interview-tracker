@@ -756,7 +756,7 @@ export function PrepDetailPanel(props: {
           </div>
         )}
       </div>
-    </div >
+    </div>
   );
 
   if (!portalTarget) return null;

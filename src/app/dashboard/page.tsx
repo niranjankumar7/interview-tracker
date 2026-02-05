@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { computeOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
@@ -32,26 +31,23 @@ import {
 import {
   BarChart3,
   Calendar,
-  LayoutTemplate,
   Target,
-  Settings,
 } from "lucide-react";
-import { MainNav } from "@/components/MainNav";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 type StatusConfig = {
   status: ApplicationStatus;
   label: string;
-  color: string;
-  colorHex: string;
+  badgeClassName: string;
+  chartColorHex: string;
 };
 
 const statusConfigs: StatusConfig[] = [
-  { status: "applied", label: "Applied", color: "text-gray-600 bg-gray-100", colorHex: "#6B7280" },
-  { status: "shortlisted", label: "Shortlisted", color: "text-blue-600 bg-blue-100", colorHex: "#3B82F6" },
-  { status: "interview", label: "Interview", color: "text-purple-600 bg-purple-100", colorHex: "#8B5CF6" },
-  { status: "offer", label: "Offer", color: "text-green-600 bg-green-100", colorHex: "#22C55E" },
-  { status: "rejected", label: "Rejected", color: "text-red-600 bg-red-100", colorHex: "#EF4444" },
+  { status: "applied", label: "Applied", badgeClassName: "text-gray-600 bg-gray-100", chartColorHex: "#6B7280" },
+  { status: "shortlisted", label: "Shortlisted", badgeClassName: "text-blue-600 bg-blue-100", chartColorHex: "#3B82F6" },
+  { status: "interview", label: "Interview", badgeClassName: "text-purple-600 bg-purple-100", chartColorHex: "#8B5CF6" },
+  { status: "offer", label: "Offer", badgeClassName: "text-green-600 bg-green-100", chartColorHex: "#22C55E" },
+  { status: "rejected", label: "Rejected", badgeClassName: "text-red-600 bg-red-100", chartColorHex: "#EF4444" },
 ];
 
 function Card({
@@ -172,7 +168,7 @@ export default function DashboardPage() {
       .map((cfg) => ({
         name: cfg.label,
         value: counts.get(cfg.status) ?? 0,
-        color: cfg.colorHex,
+        color: cfg.chartColorHex,
       }))
       .filter((d) => d.value > 0);
   }, [applications]);
@@ -274,35 +270,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-background border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
-              <LayoutTemplate className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-foreground">Blueprint</h1>
-              <p className="text-xs text-muted-foreground">The master plan for job change</p>
-            </div>
-          </div>
-
-
-        </div>
-
-        <div className="flex items-center gap-2">
-          <MainNav />
-
-          <Link
-            href="/settings"
-            className="ml-2 inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            title="Settings"
-            aria-label="Settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
-          <ThemeToggle />
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto p-6 space-y-6">

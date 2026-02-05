@@ -381,6 +381,7 @@ export const tools: TamboTool[] = [
     description:
       "Save or update the job offer details for an application. Use this when the user explicitly provides compensation details (CTC, base, bonus, equity) to save them directly.",
     tool: (input: {
+      applicationId?: string;
       company: string;
       offerDetails: {
         currency?: string;
@@ -397,23 +398,70 @@ export const tools: TamboTool[] = [
       const state = useStore.getState();
       const applications = state.applications;
       const updateApplication = state.updateApplication;
-      const { company, offerDetails } = input;
+      const { applicationId, company, offerDetails } = input;
 
-      const companyName = sanitizeCompanyName(company);
-      if (!companyName) {
-        return { success: false, message: "Company name is required" };
-      }
+      let app = applicationId
+        ? applications.find((candidate) => candidate.id === applicationId)
+        : undefined;
 
-      const app = applications.find(
-        (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
-      );
-
-      if (!app) {
+      if (applicationId && !app) {
         return {
           success: false,
-          message: `Application for "${companyName}" not found. Please add the application first.`
+          message: `Application with id "${applicationId}" not found.`
         };
       }
+
+      if (!app) {
+        const companyName = sanitizeCompanyName(company);
+        if (!companyName) {
+          return { success: false, message: "Company name is required" };
+        }
+
+        const matches = applications.filter(
+          (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
+        );
+
+        if (matches.length === 0) {
+          return {
+            success: false,
+            message: `Application for "${companyName}" not found. Please add the application first.`
+          };
+        }
+
+        if (matches.length > 1) {
+          return {
+            success: false,
+            candidates: matches.map((candidate) => ({
+              id: candidate.id,
+              company: candidate.company,
+              role: candidate.role,
+              status: candidate.status,
+            })),
+            message:
+              `Multiple applications found for "${companyName}". ` +
+              `Please specify the applicationId. ` +
+              matches
+                .map((candidate) => `${candidate.id} (${candidate.role}, ${candidate.status})`)
+                .join(" | "),
+          };
+        }
+
+        const match = matches[0];
+        if (!match) {
+          return {
+            success: false,
+            message: `Application for "${companyName}" not found. Please add the application first.`
+          };
+        }
+
+        app = match;
+      }
+
+      const hasComp =
+        offerDetails.totalCTC != null ||
+        offerDetails.baseSalary != null ||
+        offerDetails.bonus != null ||
+        offerDetails.equity != null;
 
       // Map workMode to expected format
       let mappedWorkMode: "WFH" | "Hybrid" | "Office" | undefined = undefined;
@@ -421,11 +469,17 @@ export const tools: TamboTool[] = [
         const wm = offerDetails.workMode.toLowerCase();
         if (wm.includes("remote") || wm.includes("wfh")) mappedWorkMode = "WFH";
         else if (wm.includes("hybrid")) mappedWorkMode = "Hybrid";
-        else if (wm.includes("office")) mappedWorkMode = "Office";
+        else if (
+          wm.includes("office") ||
+          wm.includes("onsite") ||
+          wm.includes("on-site") ||
+          wm.includes("on site")
+        )
+          mappedWorkMode = "Office";
       }
 
       updateApplication(app.id, {
-        status: "offer", // Ensure status is offer when saving details
+        ...(hasComp ? { status: "offer" } : {}),
         offerDetails: {
           ...app.offerDetails,
           ...offerDetails,
@@ -437,10 +491,13 @@ export const tools: TamboTool[] = [
       return {
         success: true,
         company: app.company,
-        message: `Successfully saved offer details for ${app.company}. Total CTC: ${offerDetails.totalCTC || app.offerDetails?.totalCTC || "Not set"}`
+        message:
+          `Successfully saved offer details for ${app.company}. ` +
+          `Total CTC: ${offerDetails.totalCTC ?? app.offerDetails?.totalCTC ?? "Not set"}`
       };
     },
     inputSchema: z.object({
+      applicationId: z.string().optional().describe("Application id (preferred when known)"),
       company: z.string().describe("Company name"),
       offerDetails: z.object({
         currency: z.string().optional().describe("Currency code (e.g. INR, USD)"),
@@ -457,6 +514,16 @@ export const tools: TamboTool[] = [
     outputSchema: z.object({
       success: z.boolean(),
       company: z.string().optional(),
+      candidates: z
+        .array(
+          z.object({
+            id: z.string(),
+            company: z.string(),
+            role: z.string(),
+            status: z.enum(["applied", "shortlisted", "interview", "offer", "rejected"]),
+          })
+        )
+        .optional(),
       message: z.string(),
     }),
   },
