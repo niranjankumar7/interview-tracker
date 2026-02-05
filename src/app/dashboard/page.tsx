@@ -244,9 +244,9 @@ export default function DashboardPage() {
           </div>
 
           {progress.currentStreak > 0 && (
-            <div className="hidden sm:flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-200">
+            <div className="hidden sm:flex items-center gap-2 bg-orange-50 dark:bg-orange-950/40 px-3 py-1.5 rounded-full border border-orange-200 dark:border-orange-800">
               <Flame className="w-4 h-4 text-orange-500" />
-              <span className="text-sm font-medium text-orange-700">
+              <span className="text-sm font-medium text-orange-700 dark:text-orange-200">
                 {progress.currentStreak} day streak
               </span>
             </div>

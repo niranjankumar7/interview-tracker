@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { BookOpen, RefreshCcw, Shield, Unplug } from "lucide-react";
+import { BookOpen, RefreshCcw, Shield, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { useStore } from "@/lib/store";
@@ -25,6 +25,8 @@ function ConnectModal({
   const [username, setUsername] = useState("");
 
   if (!isOpen) return null;
+  if (typeof document === "undefined") return null;
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
@@ -41,7 +43,7 @@ function ConnectModal({
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            <Unplug className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
@@ -101,11 +103,16 @@ export function LeetCodeSyncCard() {
 
   const solvedMix = useMemo(() => {
     if (!leetcodeStats) return null;
-    const total = leetcodeStats.totalSolved || 1;
+
+    const total = leetcodeStats.totalSolved;
+    if (!total || total <= 0) {
+      return { easy: 0, medium: 0, hard: 0 };
+    }
+
     return {
-      easy: Math.round((leetcodeStats.easySolved / total) * 100),
-      medium: Math.round((leetcodeStats.mediumSolved / total) * 100),
-      hard: Math.round((leetcodeStats.hardSolved / total) * 100),
+      easy: Math.round((Math.max(0, leetcodeStats.easySolved) / total) * 100),
+      medium: Math.round((Math.max(0, leetcodeStats.mediumSolved) / total) * 100),
+      hard: Math.round((Math.max(0, leetcodeStats.hardSolved) / total) * 100),
     };
   }, [leetcodeStats]);
 

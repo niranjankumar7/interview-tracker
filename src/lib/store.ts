@@ -545,7 +545,7 @@ export const useStore = create<AppState>()(
                         preferences,
                         completedTopics,
                         leetcode,
-                        leetcodeStats,
+                        leetcodeStats: leetcodeStats ?? undefined,
                     },
                 };
             },

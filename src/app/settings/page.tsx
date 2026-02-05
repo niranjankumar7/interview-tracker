@@ -54,7 +54,7 @@ const EXPORT_REVOKE_URL_DELAY_MS = 1000;
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
-  const { setTheme } = useTheme();
+  const { setTheme, theme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const profile = useStore((s) => s.profile);
@@ -78,6 +78,12 @@ export default function SettingsPage() {
     setTheme(next);
     updatePreferences({ theme: next });
   };
+
+  const currentTheme: ThemePreference = mounted
+    ? theme === "light" || theme === "dark" || theme === "system"
+      ? theme
+      : preferences.theme
+    : preferences.theme;
 
   const handleExport = () => {
     const data = exportData();
@@ -207,9 +213,7 @@ export default function SettingsPage() {
               <div className="text-sm font-medium">Theme</div>
               <div className="flex flex-wrap gap-2">
                 {themeOptions.map((opt) => {
-                  // Use source of truth from next-themes for UI selection
-                  const { theme: currentTheme } = useTheme();
-                  const selected = (currentTheme === opt.id) || (opt.id === 'system' && currentTheme === 'system');
+                  const selected = currentTheme === opt.id;
                   const Icon = opt.icon;
                   return (
                     <button
@@ -231,7 +235,7 @@ export default function SettingsPage() {
               </div>
               <div className="text-xs text-muted-foreground">
                 {mounted ? (
-                  <span>Current: {useTheme().theme}</span>
+                  <span>Current: {currentTheme}</span>
                 ) : (
                   <span>Loading theme…</span>
                 )}
