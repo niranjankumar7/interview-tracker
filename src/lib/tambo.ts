@@ -376,6 +376,90 @@ export const tools: TamboTool[] = [
       count: z.number(),
     }),
   },
+  {
+    name: "updateOfferDetails",
+    description:
+      "Save or update the job offer details for an application. Use this when the user explicitly provides compensation details (CTC, base, bonus, equity) to save them directly.",
+    tool: (input: {
+      company: string;
+      offerDetails: {
+        currency?: string;
+        totalCTC?: number;
+        baseSalary?: number;
+        bonus?: number;
+        equity?: string | number;
+        joiningDate?: string;
+        location?: string;
+        workMode?: string;
+        notes?: string;
+      };
+    }) => {
+      const state = useStore.getState();
+      const applications = state.applications;
+      const updateApplication = state.updateApplication;
+      const { company, offerDetails } = input;
+
+      const companyName = sanitizeCompanyName(company);
+      if (!companyName) {
+        return { success: false, message: "Company name is required" };
+      }
+
+      const app = applications.find(
+        (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
+      );
+
+      if (!app) {
+        return {
+          success: false,
+          message: `Application for "${companyName}" not found. Please add the application first.`
+        };
+      }
+
+      // Map workMode to expected format
+      let mappedWorkMode: "WFH" | "Hybrid" | "Office" | undefined = undefined;
+      if (offerDetails.workMode) {
+        const wm = offerDetails.workMode.toLowerCase();
+        if (wm.includes("remote") || wm.includes("wfh")) mappedWorkMode = "WFH";
+        else if (wm.includes("hybrid")) mappedWorkMode = "Hybrid";
+        else if (wm.includes("office")) mappedWorkMode = "Office";
+      }
+
+      updateApplication(app.id, {
+        status: "offer", // Ensure status is offer when saving details
+        offerDetails: {
+          ...app.offerDetails,
+          ...offerDetails,
+          workMode: mappedWorkMode || app.offerDetails?.workMode,
+          currency: offerDetails.currency || app.offerDetails?.currency || "INR",
+        }
+      });
+
+      return {
+        success: true,
+        company: app.company,
+        message: `Successfully saved offer details for ${app.company}. Total CTC: ${offerDetails.totalCTC || app.offerDetails?.totalCTC || "Not set"}`
+      };
+    },
+    inputSchema: z.object({
+      company: z.string().describe("Company name"),
+      offerDetails: z.object({
+        currency: z.string().optional().describe("Currency code (e.g. INR, USD)"),
+        totalCTC: z.number().optional().describe("Total CTC"),
+        baseSalary: z.number().optional().describe("Base salary"),
+        bonus: z.number().optional().describe("Bonus amount"),
+        equity: z.union([z.string(), z.number()]).optional().describe("Equity (number or string description)"),
+        joiningDate: z.string().optional().describe("Joining date (YYYY-MM-DD)"),
+        location: z.string().optional().describe("Location"),
+        workMode: z.string().optional().describe("Work mode (e.g. Remote, WFH, Hybrid, Office)"),
+        notes: z.string().optional().describe("Additional notes"),
+      }),
+    }),
+    outputSchema: z.object({
+      success: z.boolean(),
+      company: z.string().optional(),
+      message: z.string(),
+    }),
+  },
   // Add more tools here
 ];
 

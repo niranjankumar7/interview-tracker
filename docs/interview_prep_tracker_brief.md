@@ -1,8 +1,8 @@
-# Interview Prep Tracker - Project Brief for Development
+# Blueprint - Project Brief for Development
 
 ## 🎯 Project Overview
 
-**Project Name:** Interview Prep Tracker  
+**Project Name:** Blueprint  
 **Hackathon:** Tambo Hackathon (WeMakeDevs)  
 **Target Users:** Students and early-career professionals preparing for technical interviews  
 **Core Technology:** Tambo React SDK (Generative UI) + Modern Web Stack
@@ -22,7 +22,7 @@ Students applying for jobs face these challenges:
 
 ## ✨ Our Solution
 
-A **Generative UI Interview Prep Tracker** that:
+A **Generative UI Blueprint for Job Change** that:
 - Uses natural language to create interview prep sprints
 - Auto-generates time-boxed study plans based on interview date
 - Tracks applications through a Kanban pipeline
