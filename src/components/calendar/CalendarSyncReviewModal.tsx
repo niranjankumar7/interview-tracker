@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { format, parseISO } from "date-fns";
 import { Calendar, Check, Info, X } from "lucide-react";
@@ -175,6 +175,8 @@ export function CalendarSyncReviewModal({
 }: CalendarSyncReviewModalProps) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -193,6 +195,23 @@ export function CalendarSyncReviewModal({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof document === "undefined") return;
+
+    const active = document.activeElement;
+    previousFocusRef.current = active instanceof HTMLElement ? active : null;
+
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    closeButtonRef.current?.focus();
+  }, [isOpen, portalTarget]);
 
   if (!isOpen || !portalTarget) return null;
 
@@ -220,7 +239,13 @@ export function CalendarSyncReviewModal({
               We found {pending.length} interview{pending.length === 1 ? "" : "s"} in your calendar.
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close"
+            ref={closeButtonRef}
+          >
             <X className="h-5 w-5" />
           </Button>
         </div>

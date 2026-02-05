@@ -527,6 +527,15 @@ export const useStore = create<AppState>()(
 
                     const companyInput = (overrides.company ?? suggestion.company).trim();
                     if (!isValidCompanyName(companyInput)) {
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.warn(
+                                'confirmCalendarSuggestion: invalid company',
+                                {
+                                    suggestionId: id,
+                                    company: companyInput,
+                                }
+                            );
+                        }
                         return {};
                     }
 
