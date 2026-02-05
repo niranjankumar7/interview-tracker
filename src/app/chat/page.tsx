@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import { AppHeader } from "@/components/layout/AppHeader";
 
@@ -10,7 +11,9 @@ export default function ChatPage() {
 
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          <MessageThreadFull />
+          <Suspense fallback={<div className="h-full bg-background" />}>
+            <MessageThreadFull />
+          </Suspense>
         </div>
       </main>
     </div>

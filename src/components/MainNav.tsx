@@ -6,31 +6,32 @@ import { MessageSquare, Kanban, BookOpen, BarChart3 } from "lucide-react";
 
 export function MainNav() {
     const pathname = usePathname();
+    const safePathname = pathname ?? "";
 
     const navItems = [
         {
             href: "/chat",
             label: "Chat",
             icon: MessageSquare,
-            isActive: pathname === "/chat",
+            isActive: safePathname === "/chat",
         },
         {
             href: "/pipeline",
             label: "Pipeline",
             icon: Kanban,
-            isActive: pathname.startsWith("/pipeline"),
+            isActive: safePathname.startsWith("/pipeline"),
         },
         {
             href: "/questions",
             label: "Questions",
             icon: BookOpen,
-            isActive: pathname.startsWith("/questions"),
+            isActive: safePathname.startsWith("/questions"),
         },
         {
             href: "/dashboard",
             label: "Dashboard",
             icon: BarChart3,
-            isActive: pathname === "/dashboard",
+            isActive: safePathname === "/dashboard",
         },
     ];
 

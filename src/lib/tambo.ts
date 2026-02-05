@@ -382,7 +382,7 @@ export const tools: TamboTool[] = [
       "Save or update the job offer details for an application. Use this when the user explicitly provides compensation details (CTC, base, bonus, equity) to save them directly.",
     tool: (input: {
       applicationId?: string;
-      company: string;
+      company?: string;
       offerDetails: {
         currency?: string;
         totalCTC?: number;
@@ -412,7 +412,7 @@ export const tools: TamboTool[] = [
       }
 
       if (!app) {
-        const companyName = sanitizeCompanyName(company);
+        const companyName = sanitizeCompanyName(company ?? "");
         if (!companyName) {
           return { success: false, message: "Company name is required" };
         }
@@ -437,12 +437,7 @@ export const tools: TamboTool[] = [
               role: candidate.role,
               status: candidate.status,
             })),
-            message:
-              `Multiple applications found for "${companyName}". ` +
-              `Please specify the applicationId. ` +
-              matches
-                .map((candidate) => `${candidate.id} (${candidate.role}, ${candidate.status})`)
-                .join(" | "),
+            message: `Multiple applications found for "${companyName}". Please specify the applicationId from the candidates list.`,
           };
         }
 
@@ -496,21 +491,25 @@ export const tools: TamboTool[] = [
           `Total CTC: ${offerDetails.totalCTC ?? app.offerDetails?.totalCTC ?? "Not set"}`
       };
     },
-    inputSchema: z.object({
-      applicationId: z.string().optional().describe("Application id (preferred when known)"),
-      company: z.string().describe("Company name"),
-      offerDetails: z.object({
-        currency: z.string().optional().describe("Currency code (e.g. INR, USD)"),
-        totalCTC: z.number().optional().describe("Total CTC"),
-        baseSalary: z.number().optional().describe("Base salary"),
-        bonus: z.number().optional().describe("Bonus amount"),
-        equity: z.union([z.string(), z.number()]).optional().describe("Equity (number or string description)"),
-        joiningDate: z.string().optional().describe("Joining date (YYYY-MM-DD)"),
-        location: z.string().optional().describe("Location"),
-        workMode: z.string().optional().describe("Work mode (e.g. Remote, WFH, Hybrid, Office)"),
-        notes: z.string().optional().describe("Additional notes"),
+    inputSchema: z
+      .object({
+        applicationId: z.string().optional().describe("Application id (preferred when known)"),
+        company: z.string().optional().describe("Company name"),
+        offerDetails: z.object({
+          currency: z.string().optional().describe("Currency code (e.g. INR, USD)"),
+          totalCTC: z.number().optional().describe("Total CTC"),
+          baseSalary: z.number().optional().describe("Base salary"),
+          bonus: z.number().optional().describe("Bonus amount"),
+          equity: z.union([z.string(), z.number()]).optional().describe("Equity (number or string description)"),
+          joiningDate: z.string().optional().describe("Joining date (YYYY-MM-DD)"),
+          location: z.string().optional().describe("Location"),
+          workMode: z.string().optional().describe("Work mode (e.g. Remote, WFH, Hybrid, Office)"),
+          notes: z.string().optional().describe("Additional notes"),
+        }),
+      })
+      .refine((data) => Boolean(data.applicationId || data.company), {
+        message: "Either applicationId or company must be provided",
       }),
-    }),
     outputSchema: z.object({
       success: z.boolean(),
       company: z.string().optional(),
