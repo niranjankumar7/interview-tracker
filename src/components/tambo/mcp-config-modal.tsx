@@ -177,7 +177,7 @@ function MyApp() {
   const modalContent = (
     <motion.div
       className={cn(
-        "fixed inset-0 bg-backdrop flex items-center justify-center z-50",
+        "fixed inset-0 bg-black/50 flex items-center justify-center z-50",
         className,
       )}
       onClick={handleBackdropClick}
@@ -199,7 +199,7 @@ function MyApp() {
 
         {/* Content */}
         <div className="px-4 pb-4">
-          <div className="mb-6 bg-container border border-muted rounded-lg">
+          <div className="mb-6 bg-muted/30 border border-muted rounded-lg">
             <button
               onClick={() => setShowInstructions(!showInstructions)}
               className="w-full flex items-center justify-between p-2 hover:bg-muted transition-colors cursor-pointer"
@@ -209,9 +209,8 @@ function MyApp() {
                 Setup Instructions
               </span>
               <ChevronDown
-                className={`w-4 h-4 text-foreground transition-transform duration-200 ${
-                  showInstructions ? "rotate-180" : ""
-                }`}
+                className={`w-4 h-4 text-foreground transition-transform duration-200 ${showInstructions ? "rotate-180" : ""
+                  }`}
               />
             </button>
             {showInstructions && (
@@ -296,7 +295,7 @@ function MyApp() {
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="w-full px-3 py-2.5 border border-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-card text-foreground text-sm flex items-center justify-between hover:bg-muted-backdrop cursor-pointer transition-all duration-150"
+                      className="w-full px-3 py-2.5 border border-muted rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-card text-foreground text-sm flex items-center justify-between hover:bg-muted cursor-pointer transition-all duration-150"
                     >
                       <span>{getTransportDisplayText(transportType)}</span>
                       <ChevronDown className="w-4 h-4 text-foreground" />
@@ -313,7 +312,7 @@ function MyApp() {
                       HTTP (default)
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="px-3 py-2 text-sm text-foreground hover:bg-muted-backdrop cursor-pointer focus:bg-muted-backdrop focus:outline-none"
+                      className="px-3 py-2 text-sm text-foreground hover:bg-muted cursor-pointer focus:bg-muted focus:outline-none"
                       onClick={() => setTransportType(MCPTransport.SSE)}
                     >
                       SSE
@@ -353,7 +352,7 @@ function MyApp() {
                   return (
                     <div
                       key={index}
-                      className="flex items-start justify-between p-4 border border-muted rounded-lg hover:border-muted-backdrop transition-colors duration-150"
+                      className="flex items-start justify-between p-4 border border-muted rounded-lg hover:border-muted-foreground/30 transition-colors duration-150"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center mb-1">
@@ -398,7 +397,7 @@ function MyApp() {
           )}
 
           {/* Info Section */}
-          <div className="mt-8 bg-container border border-muted p-4 rounded-lg">
+          <div className="mt-8 bg-muted/30 border border-muted p-4 rounded-lg">
             <h4 className="font-medium mb-2 text-foreground">What is MCP?</h4>
             <p className="text-foreground text-sm leading-relaxed">
               The{" "}

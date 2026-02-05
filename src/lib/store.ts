@@ -10,6 +10,8 @@ import {
     UserProfile,
     AppPreferences,
     CompletedTopic,
+    LeetCodeConnection,
+    LeetCodeStats,
 } from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
@@ -24,6 +26,8 @@ export type AppDataSnapshot = {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    leetcode?: LeetCodeConnection;
+    leetcodeStats?: LeetCodeStats;
 };
 
 export type AppDataExport = {
@@ -63,6 +67,8 @@ interface AppState {
     profile: UserProfile;
     preferences: AppPreferences;
     completedTopics: CompletedTopic[];
+    leetcode: LeetCodeConnection;
+    leetcodeStats: LeetCodeStats | null;
     hasHydrated: boolean;
 
     setHasHydrated: (hasHydrated: boolean) => void;
@@ -142,6 +148,11 @@ interface AppState {
     resetData: () => void;
     exportData: () => AppDataExport;
     importData: (data: unknown) => void;
+
+    // LeetCode sync
+    connectLeetCode: (info: { username: string }) => void;
+    disconnectLeetCode: () => void;
+    syncLeetCodeStats: (stats: LeetCodeStats) => void;
 }
 
 const getInitialProgress = (): UserProgress => ({
@@ -168,6 +179,13 @@ const getInitialProfile = (): UserProfile => ({
 const getInitialPreferences = (): AppPreferences => ({
     theme: 'system',
     studyRemindersEnabled: false,
+    calendarAutoSyncEnabled: false,
+    leetcodeAutoSyncEnabled: false,
+});
+
+const getInitialLeetCode = (): LeetCodeConnection => ({
+    connected: false,
+    readOnly: true,
 });
 
 function safeParseISO(value: string | undefined): Date | null {
@@ -297,6 +315,8 @@ export const useStore = create<AppState>()(
             profile: getInitialProfile(),
             preferences: getInitialPreferences(),
             completedTopics: [],
+            leetcode: getInitialLeetCode(),
+            leetcodeStats: null,
             hasHydrated: false,
 
             setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -561,6 +581,32 @@ export const useStore = create<AppState>()(
                     preferences: { ...state.preferences, ...updates }
                 })),
 
+            connectLeetCode: ({ username }) =>
+                set((state) => ({
+                    leetcode: {
+                        ...state.leetcode,
+                        connected: true,
+                        readOnly: true,
+                        username: username.trim(),
+                        connectedAt: new Date().toISOString(),
+                    },
+                })),
+
+            disconnectLeetCode: () =>
+                set(() => ({
+                    leetcode: getInitialLeetCode(),
+                    leetcodeStats: null,
+                })),
+
+            syncLeetCodeStats: (stats) =>
+                set((state) => ({
+                    leetcodeStats: stats,
+                    leetcode: {
+                        ...state.leetcode,
+                        lastSyncAt: new Date().toISOString(),
+                    },
+                })),
+
             // Topic progress tracking
             markTopicComplete: (topicName, source = 'manual') => {
                 const normalized = normalizeTopic(topicName);
@@ -657,6 +703,8 @@ export const useStore = create<AppState>()(
                     sprints: [],
                     questions: demoQuestions,
                     completedTopics: [],
+                    leetcode: getInitialLeetCode(),
+                    leetcodeStats: null,
                     progress: {
                         currentStreak: 3,
                         longestStreak: 7,
@@ -674,27 +722,57 @@ export const useStore = create<AppState>()(
                 profile: getInitialProfile(),
                 preferences: getInitialPreferences(),
                 completedTopics: [],
+                leetcode: getInitialLeetCode(),
+                leetcodeStats: null,
             }),
 
             exportData: () => {
-                const { applications, sprints, questions, progress, profile, preferences, completedTopics } = get();
+                const {
+                    applications,
+                    sprints,
+                    questions,
+                    progress,
+                    profile,
+                    preferences,
+                    completedTopics,
+                    leetcode,
+                    leetcodeStats,
+                } = get();
                 return {
                     version: APP_VERSION,
                     exportedAt: new Date().toISOString(),
-                    snapshot: { applications, sprints, questions, progress, profile, preferences, completedTopics },
+                    snapshot: {
+                        applications,
+                        sprints,
+                        questions,
+                        progress,
+                        profile,
+                        preferences,
+                        completedTopics,
+                        leetcode,
+                        leetcodeStats: leetcodeStats ?? undefined,
+                    },
                 };
             },
 
             importData: (data) => {
                 const exportParse = appDataExportSchema.safeParse(data);
+                const applySnapshot = (snapshot: AppDataSnapshot) => {
+                    set({
+                        ...snapshot,
+                        leetcode: snapshot.leetcode ?? getInitialLeetCode(),
+                        leetcodeStats: snapshot.leetcodeStats ?? null,
+                    });
+                };
+
                 if (exportParse.success) {
-                    set(exportParse.data.snapshot);
+                    applySnapshot(exportParse.data.snapshot);
                     return;
                 }
 
                 const snapshotParse = appDataSnapshotSchema.safeParse(data);
                 if (snapshotParse.success) {
-                    set(snapshotParse.data);
+                    applySnapshot(snapshotParse.data);
                     return;
                 }
 
@@ -715,9 +793,18 @@ export const useStore = create<AppState>()(
                 profile: state.profile,
                 preferences: state.preferences,
                 completedTopics: state.completedTopics,
+                leetcode: state.leetcode,
+                leetcodeStats: state.leetcodeStats,
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);
+                if (!state) return;
+                if (state.preferences.calendarAutoSyncEnabled === undefined) {
+                    state.updatePreferences({ calendarAutoSyncEnabled: false });
+                }
+                if (state.preferences.leetcodeAutoSyncEnabled === undefined) {
+                    state.updatePreferences({ leetcodeAutoSyncEnabled: false });
+                }
             },
         }
     )
