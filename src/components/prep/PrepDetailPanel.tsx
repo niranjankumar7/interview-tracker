@@ -9,7 +9,12 @@ import {
 } from "@/data/prep-templates";
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
-import { formatOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
+import {
+    formatOfferTotalCTC,
+    getOfferCurrency,
+    parseEquityField,
+    parseNumberField,
+} from "@/lib/offer-details";
 import { format, parseISO, differenceInDays } from "date-fns";
 import {
     X,
@@ -55,6 +60,17 @@ export function PrepDetailPanel({
     const [offerBenefitsText, setOfferBenefitsText] = useState(offerBenefitsKey);
     const [isOfferBenefitsDirty, setIsOfferBenefitsDirty] = useState(false);
 
+    const offerBenefitsTextRef = useRef(offerBenefitsKey);
+    const isOfferBenefitsDirtyRef = useRef(false);
+
+    useEffect(() => {
+        offerBenefitsTextRef.current = offerBenefitsText;
+    }, [offerBenefitsText]);
+
+    useEffect(() => {
+        isOfferBenefitsDirtyRef.current = isOfferBenefitsDirty;
+    }, [isOfferBenefitsDirty]);
+
     useEffect(() => {
         if (isOfferBenefitsDirty) return;
         setOfferBenefitsText(offerBenefitsKey);
@@ -89,6 +105,18 @@ export function PrepDetailPanel({
         updateOfferDetails({ benefits: parsedBenefits });
         setIsOfferBenefitsDirty(false);
     }, [offerBenefitsText, updateOfferDetails]);
+
+    useEffect(() => {
+        return () => {
+            if (!isOfferBenefitsDirtyRef.current) return;
+
+            const parsedBenefits = offerBenefitsTextRef.current
+                .split(/\n|,/)
+                .map((b) => b.trim())
+                .filter(Boolean);
+            updateOfferDetails({ benefits: parsedBenefits });
+        };
+    }, [appId, updateOfferDetails]);
 
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
@@ -126,6 +154,7 @@ export function PrepDetailPanel({
 
     useEffect(() => {
         setHadApplication(false);
+        setIsOfferBenefitsDirty(false);
     }, [appId]);
 
     useEffect(() => {
@@ -227,23 +256,6 @@ export function PrepDetailPanel({
     const offerDetails = application.offerDetails;
     const offerCurrency = getOfferCurrency(offerDetails);
     const offerTotalLabel = formatOfferTotalCTC(offerDetails) ?? "—";
-
-    const parseNumberField = (value: string): number | undefined => {
-        const trimmed = value.trim();
-        if (trimmed === "") return undefined;
-        const parsed = Number(trimmed);
-        return Number.isFinite(parsed) ? parsed : undefined;
-    };
-
-    const parseEquityField = (value: string): OfferDetails["equity"] | undefined => {
-        const trimmed = value.trim();
-        if (trimmed === "") return undefined;
-        const parsed = Number(trimmed);
-        if (Number.isFinite(parsed)) {
-            return parsed;
-        }
-        return trimmed;
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

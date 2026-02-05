@@ -2,13 +2,27 @@
 
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { formatOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
+import {
+  formatOfferTotalCTC,
+  getOfferCurrency,
+  parseEquityField,
+  parseNumberField,
+  sanitizeCompanyName,
+} from "@/lib/offer-details";
 import type { Application, OfferDetails, WorkMode } from "@/types";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Building2, CheckCircle2, Briefcase } from "lucide-react";
 import { z } from "zod";
 
 export const offerDetailsPanelSchema = z.object({
+  applicationId: z
+    .string()
+    .optional()
+    .describe("If known, attach offer to this application"),
+  panelId: z
+    .string()
+    .optional()
+    .describe("Unique panel id to prevent state collisions"),
   company: z
     .string()
     .optional()
@@ -42,29 +56,17 @@ export const offerDetailsPanelSchema = z.object({
 type OfferDetailsPanelProps = z.infer<typeof offerDetailsPanelSchema>;
 
 type OfferDetailsPanelState = OfferDetailsPanelProps & {
+  selectedApplicationId?: string;
   isSaved: boolean;
   isSaving: boolean;
 };
 
-function sanitizeCompanyName(name: string): string {
-  return name.split("|")[0]?.split(" - ")[0]?.trim();
-}
-
-function parseNumberField(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (trimmed === "") return undefined;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseEquityField(value: string): OfferDetails["equity"] | undefined {
-  const trimmed = value.trim();
-  if (trimmed === "") return undefined;
-  const parsed = Number(trimmed);
-  if (Number.isFinite(parsed)) {
-    return parsed;
+function createId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
-  return trimmed;
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function buildOfferDetailsFromState(state: OfferDetailsPanelProps): OfferDetails {
@@ -85,14 +87,17 @@ function buildOfferDetailsFromState(state: OfferDetailsPanelProps): OfferDetails
 
 export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   const initialCompany = props.company;
+  const panelNonce = useMemo(() => createId(), []);
   const componentId = useMemo(() => {
-    const slug = initialCompany ? sanitizeCompanyName(initialCompany).toLowerCase() : "unknown";
-    return `offer-details-panel:${slug}`;
-  }, [initialCompany]);
+    const slugRaw = props.panelId || props.applicationId || initialCompany || "unknown";
+    const slug = sanitizeCompanyName(slugRaw).toLowerCase() || "unknown";
+    return `offer-details-panel:${slug}:${panelNonce}`;
+  }, [initialCompany, panelNonce, props.applicationId, props.panelId]);
 
   const [state, setState] = useTamboComponentState<OfferDetailsPanelState>(componentId, {
     ...props,
     currency: props.currency || "INR",
+    selectedApplicationId: props.applicationId,
     isSaved: false,
     isSaving: false,
   });
@@ -103,17 +108,31 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
   const normalizedCompany = state?.company ? sanitizeCompanyName(state.company) : "";
 
-  const existingApplication = useMemo(() => {
-    if (!normalizedCompany) return null;
-    return (
-      applications.find(
-        (a) => sanitizeCompanyName(a.company).toLowerCase() === normalizedCompany.toLowerCase()
-      ) ?? null
+  const companyMatches = useMemo(() => {
+    if (!normalizedCompany) return [];
+    const normalizedLower = normalizedCompany.toLowerCase();
+    return applications.filter(
+      (a) => sanitizeCompanyName(a.company).toLowerCase() === normalizedLower
     );
   }, [applications, normalizedCompany]);
 
+  const resolvedApplicationId = useMemo(() => {
+    if (!state) return undefined;
+    if (state.selectedApplicationId === "__new__") return undefined;
+    if (state.selectedApplicationId) return state.selectedApplicationId;
+    if (companyMatches.length === 1) return companyMatches[0]?.id;
+    return undefined;
+  }, [companyMatches, state]);
+
+  const existingApplication = useMemo(() => {
+    if (!resolvedApplicationId) return null;
+    return applications.find((a) => a.id === resolvedApplicationId) ?? null;
+  }, [applications, resolvedApplicationId]);
+
+  const needsApplicationSelection =
+    companyMatches.length > 1 && !state?.selectedApplicationId;
+
   const offerDetails = state ? buildOfferDetailsFromState(state) : undefined;
-  const offerCurrency = getOfferCurrency(offerDetails);
   const offerTotalLabel = formatOfferTotalCTC(offerDetails) ?? "—";
 
   if (!state) {
@@ -130,7 +149,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   }
 
   const handleSave = async () => {
-    if (!normalizedCompany || state.isSaving) return;
+    if (!normalizedCompany || state.isSaving || needsApplicationSelection) return;
     setState({ ...state, isSaving: true });
 
     try {
@@ -139,7 +158,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
         currency: state.currency || "INR",
       });
 
-      if (existingApplication) {
+      if (existingApplication && state.selectedApplicationId !== "__new__") {
         updateApplication(existingApplication.id, {
           status: "offer",
           offerDetails: nextOffer,
@@ -147,7 +166,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
       } else {
         const now = new Date().toISOString();
         const application: Application = {
-          id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
+          id: createId(),
           company: normalizedCompany,
           role: "Software Engineer",
           status: "offer",
@@ -216,15 +235,45 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
           <input
             type="text"
             value={state.company ?? ""}
-            onChange={(e) => setState({ ...state, company: e.target.value })}
+            onChange={(e) =>
+              setState({
+                ...state,
+                company: e.target.value,
+                selectedApplicationId: undefined,
+              })
+            }
             placeholder="e.g., Google"
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
           />
-          {existingApplication && (
+          {existingApplication ? (
             <p className="text-xs text-gray-500 mt-1">
               Saving into existing application: {existingApplication.company}
             </p>
-          )}
+          ) : companyMatches.length > 1 ? (
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Multiple applications found — select one
+              </label>
+              <select
+                value={state.selectedApplicationId ?? ""}
+                onChange={(e) =>
+                  setState({
+                    ...state,
+                    selectedApplicationId: e.target.value || undefined,
+                  })
+                }
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all bg-white"
+              >
+                <option value="">Select…</option>
+                {companyMatches.map((app) => (
+                  <option key={app.id} value={app.id}>
+                    {app.role} • {app.status}
+                  </option>
+                ))}
+                <option value="__new__">Create new application</option>
+              </select>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -232,8 +281,9 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
             <input
               type="text"
-              value={offerCurrency}
+              value={state.currency ?? ""}
               onChange={(e) => setState({ ...state, currency: e.target.value })}
+              placeholder={getOfferCurrency(offerDetails)}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
             />
           </div>
@@ -370,7 +420,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
 
         <button
           onClick={handleSave}
-          disabled={!normalizedCompany || state.isSaving}
+          disabled={!normalizedCompany || state.isSaving || needsApplicationSelection}
           className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
         >
           {state.isSaving ? "Saving..." : "Save offer details"}

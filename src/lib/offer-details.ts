@@ -1,5 +1,26 @@
 import type { OfferDetails } from "@/types";
 
+export function sanitizeCompanyName(name: string): string {
+  return name.split("|")[0]?.split(" - ")[0]?.trim() ?? "";
+}
+
+export function parseNumberField(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export function parseEquityField(value: string): OfferDetails["equity"] | undefined {
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number(trimmed);
+  if (Number.isFinite(parsed)) {
+    return parsed;
+  }
+  return trimmed;
+}
+
 export function getOfferCurrency(offer: OfferDetails | undefined): string {
   const currency = offer?.currency?.trim();
   return currency ? currency : "INR";

@@ -182,18 +182,33 @@ export default function DashboardPage() {
     return applications
       .filter((app) => app.status === "offer")
       .map((app) => {
+        const currency = getOfferCurrency(app.offerDetails);
         const total = computeOfferTotalCTC(app.offerDetails);
         return {
           app,
           offer: app.offerDetails,
+          currency,
           total,
           sortValue: total ?? Number.NEGATIVE_INFINITY,
         };
       })
-      .sort((a, b) => b.sortValue - a.sortValue);
+      .sort((a, b) => {
+        if (a.currency !== b.currency) {
+          return a.currency.localeCompare(b.currency);
+        }
+        return b.sortValue - a.sortValue;
+      });
   }, [applications]);
 
+  const offerCurrencies = useMemo(() => {
+    return Array.from(new Set(offerRows.map((row) => row.currency)));
+  }, [offerRows]);
+
+  const canCompareOffers = offerCurrencies.length <= 1;
+
   const bestOfferTotal = useMemo(() => {
+    if (!canCompareOffers) return null;
+
     let best: number | null = null;
     for (const row of offerRows) {
       if (row.total === null) continue;
@@ -202,7 +217,7 @@ export default function DashboardPage() {
       }
     }
     return best;
-  }, [offerRows]);
+  }, [canCompareOffers, offerRows]);
 
   const upcomingInterviews = useMemo(() => {
     return applications
@@ -445,6 +460,11 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
+                {!canCompareOffers && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                    Multiple currencies detected ({offerCurrencies.join(", ")}) — best offer highlighting is disabled.
+                  </div>
+                )}
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left text-gray-500 border-b">
@@ -459,7 +479,6 @@ export default function DashboardPage() {
                   </thead>
                   <tbody className="divide-y">
                     {offerRows.map((row) => {
-                      const currency = getOfferCurrency(row.offer);
                       const isBest =
                         bestOfferTotal !== null && row.total !== null && row.total === bestOfferTotal;
 
@@ -479,17 +498,17 @@ export default function DashboardPage() {
                           <td className="py-2 pr-4">
                             {row.total === null
                               ? "—"
-                              : `${row.total.toLocaleString()} ${currency}`}
+                              : `${row.total.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
                             {row.offer?.baseSalary === undefined
                               ? "—"
-                              : `${row.offer.baseSalary.toLocaleString()} ${currency}`}
+                              : `${row.offer.baseSalary.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
                             {row.offer?.bonus === undefined
                               ? "—"
-                              : `${row.offer.bonus.toLocaleString()} ${currency}`}
+                              : `${row.offer.bonus.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
                             {row.offer?.equity === undefined
