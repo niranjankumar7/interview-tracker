@@ -2,6 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { tryParseDateInput } from "@/lib/date-parsing";
+import type { Sprint } from "@/types";
 import {
     buildStruggledTopicMatchersByAppId,
     matchesStruggledTopic,
@@ -37,15 +38,24 @@ interface PlanForDatePanelProps {
     applicationId?: string;
 }
 
-function SprintMessageCard({
-    company,
-    role,
-    children,
-}: {
+type DailyPlan = Sprint["dailyPlans"][number];
+
+type ParsedDailyPlan = {
+    plan: DailyPlan;
+    parsedDate: Date;
+    time: number | null;
+    index: number;
+};
+
+type ValidParsedDailyPlan = ParsedDailyPlan & { time: number };
+
+type SprintMessageCardProps = {
     company?: string;
     role?: string;
     children: ReactNode;
-}) {
+};
+
+function SprintMessageCard({ company, role, children }: SprintMessageCardProps) {
     const hasHeader = Boolean(company || role);
 
     return (
@@ -156,9 +166,8 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 const struggledTopicMatchers =
                     struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
 
-                type DailyPlan = (typeof sprint.dailyPlans)[number];
-
-                const parsedDailyPlans = sprint.dailyPlans.map((plan, index) => {
+                const parsedDailyPlans: ParsedDailyPlan[] = sprint.dailyPlans.map(
+                    (plan, index) => {
                     const parsedDate = parseISO(plan.date);
                     const time = parsedDate.getTime();
                     return {
@@ -167,11 +176,11 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                         time: Number.isNaN(time) ? null : time,
                         index,
                     };
-                });
+                }
+                );
 
                 const validDailyPlans = parsedDailyPlans.filter(
-                    (p): p is { plan: DailyPlan; parsedDate: Date; time: number; index: number } =>
-                        p.time !== null
+                    (p): p is ValidParsedDailyPlan => p.time !== null
                 );
 
                 const hasInvalidPlanDates =
@@ -221,14 +230,15 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     );
                 }
 
-                const requestedPlan = validDailyPlans.find(({ parsedDate }) =>
-                    isSameDay(parsedDate, resolvedDate)
-                );
+                const requestedPlanEntry =
+                    validDailyPlans.find(({ parsedDate }) =>
+                        isSameDay(parsedDate, resolvedDate)
+                    ) ?? null;
 
-                let planToShow = requestedPlan;
+                let selectedPlanEntry: ValidParsedDailyPlan | null = requestedPlanEntry;
                 let guidanceMessage: string | null = null;
 
-                if (!planToShow) {
+                if (!selectedPlanEntry) {
                     // Fallback is computed per-sprint (not globally across all sprints).
                     const resolvedTime = resolvedDate.getTime();
 
@@ -257,15 +267,15 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     }, null);
 
                     if (nextPlan) {
-                        planToShow = nextPlan;
+                        selectedPlanEntry = nextPlan;
                         guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. Showing the next available day in this sprint: ${format(nextPlan.parsedDate, "EEE, MMM d, yyyy")}.`;
                     } else if (lastPlan) {
-                        planToShow = lastPlan;
+                        selectedPlanEntry = lastPlan;
                         guidanceMessage = `No plan found for ${format(resolvedDate, "EEE, MMM d, yyyy")} in this sprint. This is the last planned prep day in this sprint (${format(lastPlan.parsedDate, "EEE, MMM d, yyyy")}).`;
                     }
                 }
 
-                if (!planToShow) {
+                if (!selectedPlanEntry) {
                     // Show a per-sprint message instead of silently skipping the sprint.
                     return (
                         <SprintMessageCard
@@ -278,16 +288,14 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     );
                 }
 
-                const planDate = planToShow.parsedDate;
-
-                const dayIndex = planToShow.index;
+                const { plan, parsedDate: planDate, index: dayIndex } = selectedPlanEntry;
 
                 if (dayIndex < 0 || dayIndex >= sprint.dailyPlans.length) {
                     if (process.env.NODE_ENV !== "production") {
                         console.error("PlanForDatePanel: invalid day index", {
                             sprintId: sprint.id,
                             dayIndex,
-                            plan: planToShow.plan,
+                            selectedPlanEntry,
                         });
                     }
 
@@ -302,12 +310,12 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     );
                 }
 
-                const completedTasks = planToShow.plan.blocks.reduce(
+                const completedTasks = plan.blocks.reduce(
                     (acc, block) =>
                         acc + block.tasks.filter((t) => t.completed).length,
                     0
                 );
-                const totalTasks = planToShow.plan.blocks.reduce(
+                const totalTasks = plan.blocks.reduce(
                     (acc, block) => acc + block.tasks.length,
                     0
                 );
@@ -357,12 +365,12 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                                 <div>
                                     <p className="text-sm opacity-80">Plan for</p>
                                     <p className="font-semibold">
-                                        {format(planDate, "yyyy-MM-dd")} · {planToShow.plan.focus}
+                                        {format(planDate, "yyyy-MM-dd")} · {plan.focus}
                                     </p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-3xl font-bold">
-                                        Day {planToShow.plan.day}/{sprint.totalDays}
+                                        Day {plan.day}/{sprint.totalDays}
                                     </p>
                                 </div>
                             </div>
@@ -394,7 +402,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                         {/* Blocks */}
                         <div className="p-5 space-y-4">
-                            {planToShow.plan.blocks.map((block, blockIdx) => (
+                            {plan.blocks.map((block, blockIdx) => (
                                 <div
                                     key={block.id}
                                     className={`rounded-lg p-4 ${block.completed
