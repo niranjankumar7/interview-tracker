@@ -27,17 +27,8 @@ export const ROLE_TYPES = [
 export type RoleType = (typeof ROLE_TYPES)[number];
 
 // Interview round types for round-specific prep
-export const INTERVIEW_ROUND_TYPES = [
-    'HR',
-    'TechnicalRound1',
-    'TechnicalRound2',
-    'SystemDesign',
-    'Managerial',
-    'Assignment',
-    'Final',
-] as const;
-
-export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+export { interviewRoundTypes, isInterviewRoundType } from './interviewRound';
+export type InterviewRoundType = import('./interviewRound').InterviewRoundType;
 
 export const FOCUS_AREAS = ['DSA', 'SystemDesign', 'Behavioral', 'Review', 'Mock'] as const;
 
@@ -81,6 +72,7 @@ export interface Application {
     id: string;
     company: string;
     role: string;
+    jobDescriptionUrl?: string;
     roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string
@@ -170,6 +162,8 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 export interface AppPreferences {
     theme: ThemePreference;
     studyRemindersEnabled: boolean;
+    calendarAutoSyncEnabled: boolean;
+    leetcodeAutoSyncEnabled: boolean;
 }
 
 // Track completed prep topics globally
@@ -178,4 +172,22 @@ export interface CompletedTopic {
     displayName?: string;     // Original display name (for UI)
     completedAt: string;      // ISO date string
     source: 'chat' | 'manual';
+}
+
+export interface LeetCodeConnection {
+    connected: boolean;
+    username?: string;
+    connectedAt?: string;
+    lastSyncAt?: string;
+    readOnly: boolean;
+}
+
+export interface LeetCodeStats {
+    currentStreak: number;
+    longestStreak: number;
+    lastActiveDate?: string;
+    totalSolved: number;
+    easySolved: number;
+    mediumSolved: number;
+    hardSolved: number;
 }

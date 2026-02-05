@@ -4,8 +4,9 @@ import { PrepDetailPanel } from "@/components/prep";
 import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { formatOfferTotalCTC } from "@/lib/offer-details";
-import { Application, ApplicationStatus } from "@/types";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { generateSprint } from "@/lib/sprintGenerator";
+import { Application, ApplicationStatus, RoleType } from "@/types";
+import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import {
     AlertTriangle,
     Briefcase,
@@ -18,7 +19,7 @@ import {
     Trash2,
 } from "lucide-react";
 import { useDebounce } from "use-debounce";
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { PrepDetailPanel as RoundFeedbackPanel } from "./PrepDetailPanel";
 
@@ -32,6 +33,51 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
 
 const SEARCH_DEBOUNCE_MS = 250;
 const DRAG_DATA_KEY = "applicationId";
+const DEFAULT_INTERVIEW_OFFSET_DAYS = 7;
+
+const ROLE_TYPE_LABELS: Record<RoleType, string> = {
+    SDE: "Software Development Engineer",
+    SDET: "Software Dev Engineer in Test",
+    ML: "Machine Learning Engineer",
+    DevOps: "DevOps / SRE",
+    Frontend: "Frontend Developer",
+    Backend: "Backend Developer",
+    FullStack: "Full Stack Developer",
+    Data: "Data Engineer / Analyst",
+    PM: "Product Manager",
+    MobileEngineer: "Mobile Engineer",
+};
+
+const ROLE_TYPE_ORDER: RoleType[] = [
+    "SDE",
+    "SDET",
+    "ML",
+    "DevOps",
+    "Frontend",
+    "Backend",
+    "FullStack",
+    "Data",
+    "PM",
+    "MobileEngineer",
+];
+
+const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_TIME_PREFIX_RE = /^\d{4}-\d{2}-\d{2}T/;
+
+const parseInterviewDate = (value: string): Date | null => {
+    const parsed = parseISO(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return startOfDay(parsed);
+};
+
+const getInterviewDateOnly = (value: string): string | null => {
+    if (ISO_DATE_ONLY_RE.test(value)) return value;
+    if (ISO_DATE_TIME_PREFIX_RE.test(value)) return value.slice(0, 10);
+
+    const parsed = parseInterviewDate(value);
+    if (!parsed) return null;
+    return format(parsed, "yyyy-MM-dd");
+};
 
 // Rank search results so that:
 // 0: company starts with query
@@ -54,8 +100,11 @@ const getSearchRank = (
 
 export function KanbanBoard() {
     const applications = useStore((state) => state.applications);
+    const sprints = useStore((state) => state.sprints);
     const updateApplication = useStore((state) => state.updateApplication);
     const deleteApplication = useStore((state) => state.deleteApplication);
+    const addSprint = useStore((state) => state.addSprint);
+    const updateSprint = useStore((state) => state.updateSprint);
     const [searchQuery, setSearchQuery] = useState("");
     const [debouncedSearchQuery] = useDebounce(searchQuery, SEARCH_DEBOUNCE_MS);
 
@@ -65,6 +114,40 @@ export function KanbanBoard() {
     const [feedbackApplicationId, setFeedbackApplicationId] = useState<string | null>(
         null
     );
+
+    const [interviewSetup, setInterviewSetup] = useState<{
+        applicationId: string;
+        interviewDate: string;
+        roleType: RoleType;
+        previousStatus: ApplicationStatus;
+    } | null>(null);
+    const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
+        null
+    );
+
+    const cancelInterviewSetup = useCallback(() => {
+        if (!interviewSetup) return;
+        if (interviewSetup.previousStatus !== "interview") {
+            updateApplication(interviewSetup.applicationId, {
+                status: interviewSetup.previousStatus,
+            });
+        }
+
+        setInterviewSetup(null);
+        setInterviewSetupError(null);
+    }, [interviewSetup, updateApplication]);
+
+    useEffect(() => {
+        if (!interviewSetup) return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== "Escape") return;
+            cancelInterviewSetup();
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [cancelInterviewSetup, interviewSetup]);
 
     // Track mouse position to distinguish click from drag
     const mouseDownPosition = useRef<{ x: number; y: number } | null>(null);
@@ -143,14 +226,156 @@ export function KanbanBoard() {
         e.preventDefault();
     };
 
+    const ensureSprintForInterview = (
+        applicationId: string,
+        interviewDate: Date,
+        roleType: RoleType
+    ) => {
+        const relatedSprints = sprints.filter(
+            (sprint) => sprint.applicationId === applicationId
+        );
+
+        const activeSprints = relatedSprints.filter(
+            (sprint) => sprint.status === "active"
+        );
+
+        const candidates = activeSprints.length > 0 ? activeSprints : relatedSprints;
+        const canonical = candidates
+            .slice()
+            .sort((a, b) => {
+                const aCreatedAt = new Date(a.createdAt).getTime();
+                const bCreatedAt = new Date(b.createdAt).getTime();
+
+                if (Number.isNaN(aCreatedAt) && Number.isNaN(bCreatedAt)) {
+                    return b.id.localeCompare(a.id);
+                }
+                if (Number.isNaN(aCreatedAt)) return 1;
+                if (Number.isNaN(bCreatedAt)) return -1;
+
+                const createdAtDelta = bCreatedAt - aCreatedAt;
+                if (createdAtDelta !== 0) return createdAtDelta;
+                return b.id.localeCompare(a.id);
+            })[0];
+
+        const nextSprint = generateSprint(applicationId, interviewDate, roleType);
+
+        if (!canonical) {
+            addSprint(nextSprint);
+            return;
+        }
+
+        if (relatedSprints.length > 1) {
+            console.warn(
+                "KanbanBoard: multiple sprints found for application; using canonical sprint",
+                {
+                    applicationId,
+                    sprintIds: relatedSprints.map((s) => s.id),
+                    canonicalSprintId: canonical.id,
+                }
+            );
+        }
+
+        if (canonical.status === "active") {
+            const shouldReplace = window.confirm(
+                "An interview prep sprint already exists for this application. Regenerate it? This will replace your existing plan and reset any progress."
+            );
+            if (!shouldReplace) return;
+        }
+
+        updateSprint(canonical.id, {
+            interviewDate: nextSprint.interviewDate,
+            roleType: nextSprint.roleType,
+            totalDays: nextSprint.totalDays,
+            dailyPlans: nextSprint.dailyPlans,
+            status: nextSprint.status,
+            createdAt: nextSprint.createdAt,
+        });
+
+        for (const duplicate of relatedSprints) {
+            if (duplicate.id === canonical.id) continue;
+            if (duplicate.status !== "active") continue;
+            updateSprint(duplicate.id, { status: "expired" });
+        }
+    };
+
     const handleDrop = (
         e: DragEvent<HTMLDivElement>,
         newStatus: ApplicationStatus
     ) => {
         e.preventDefault();
         const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
-        if (appId) {
-            updateApplication(appId, { status: newStatus });
+
+        if (!appId) return;
+        const app = applications.find((a) => a.id === appId);
+        if (!app) return;
+
+        if (newStatus === "interview") {
+            const interviewDateIso = app.interviewDate;
+            const roleType = app.roleType;
+            const needsInterviewDetails = !interviewDateIso || !roleType;
+
+            if (needsInterviewDetails) {
+                updateApplication(appId, { status: "interview" });
+                setInterviewSetupError(null);
+                const existingDateOnly = interviewDateIso
+                    ? getInterviewDateOnly(interviewDateIso)
+                    : null;
+                setInterviewSetup({
+                    applicationId: app.id,
+                    interviewDate:
+                        existingDateOnly ??
+                        format(
+                            addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
+                            "yyyy-MM-dd"
+                        ),
+                    roleType: roleType ?? "SDE",
+                    previousStatus: app.status,
+                });
+                return;
+            }
+
+            const normalizedExistingDate = parseInterviewDate(interviewDateIso);
+            const normalizedToday = startOfDay(new Date());
+            const daysUntilInterview = differenceInDays(
+                normalizedExistingDate ?? normalizedToday,
+                normalizedToday
+            );
+
+            if (
+                !normalizedExistingDate ||
+                daysUntilInterview < 0
+            ) {
+                updateApplication(appId, { status: "interview" });
+                setInterviewSetup({
+                    applicationId: app.id,
+                    interviewDate: format(
+                        addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
+                        "yyyy-MM-dd"
+                    ),
+                    roleType: roleType ?? "SDE",
+                    previousStatus: app.status,
+                });
+                setInterviewSetupError(
+                    "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
+                );
+                return;
+            }
+
+            updateApplication(appId, { status: "interview" });
+            ensureSprintForInterview(app.id, normalizedExistingDate, roleType);
+            return;
+        }
+
+        updateApplication(appId, { status: newStatus });
+
+        if (newStatus === "rejected") {
+            const relatedSprints = sprints.filter(
+                (sprint) => sprint.applicationId === app.id
+            );
+            for (const sprint of relatedSprints) {
+                if (sprint.status !== "active") continue;
+                updateSprint(sprint.id, { status: "expired" });
+            }
         }
     };
 
@@ -186,7 +411,9 @@ export function KanbanBoard() {
     // Calculate days until interview
     const getDaysUntilInterview = (interviewDate: string | undefined) => {
         if (!interviewDate) return null;
-        return differenceInDays(parseISO(interviewDate), new Date());
+        const parsed = parseInterviewDate(interviewDate);
+        if (!parsed) return null;
+        return differenceInDays(parsed, startOfDay(new Date()));
     };
 
     return (
@@ -246,6 +473,9 @@ export function KanbanBoard() {
                                     ) : (
                                         columnApps.map((app) => {
                                             const daysUntil = getDaysUntilInterview(app.interviewDate);
+                                            const parsedInterviewDate = app.interviewDate
+                                                ? parseInterviewDate(app.interviewDate)
+                                                : null;
                                             const isUrgent =
                                                 daysUntil !== null &&
                                                 daysUntil <= 3 &&
@@ -347,14 +577,14 @@ export function KanbanBoard() {
                                                     )}
 
                                                     {/* Interview Date with countdown */}
-                                                    {app.interviewDate && (
+                                                    {parsedInterviewDate && (
                                                         <div className={`flex items-center justify-between gap-2 text-sm px-2 py-1.5 rounded ${isUrgent
                                                             ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
                                                             : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
                                                             }`}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="w-3.5 h-3.5" />
-                                                                {format(parseISO(app.interviewDate), "MMM d")}
+                                                                {format(parsedInterviewDate, "MMM d")}
                                                             </div>
                                                             {daysUntil !== null && daysUntil >= 0 && (
                                                                 <span className="font-medium">
@@ -410,6 +640,168 @@ export function KanbanBoard() {
                 isOpen={feedbackApplicationId !== null}
                 onClose={() => setFeedbackApplicationId(null)}
             />
+
+            {interviewSetup && (
+                <div
+                    className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.target === e.currentTarget) {
+                            cancelInterviewSetup();
+                        }
+                    }}
+                >
+                    <div className="bg-card rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-foreground">
+                                    Move to Interview
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Set interview date and role to generate a sprint
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    cancelInterviewSetup();
+                                }}
+                                className="p-2 hover:bg-muted rounded-lg"
+                                aria-label="Close"
+                            >
+                                <span className="text-xl leading-none">×</span>
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">
+                                    Interview date
+                                </label>
+                                <input
+                                    type="date"
+                                    value={interviewSetup.interviewDate}
+                                    onChange={(e) => {
+                                        setInterviewSetupError(null);
+                                        setInterviewSetup((prev) =>
+                                            prev
+                                                ? {
+                                                      ...prev,
+                                                      interviewDate: e.target.value,
+                                                  }
+                                                : prev
+                                        );
+                                    }}
+                                    min={format(new Date(), "yyyy-MM-dd")}
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-1">
+                                    Role type
+                                </label>
+                                <select
+                                    value={interviewSetup.roleType}
+                                    onChange={(e) => {
+                                        setInterviewSetupError(null);
+                                        setInterviewSetup((prev) =>
+                                            prev
+                                                ? {
+                                                      ...prev,
+                                                      roleType: e.target.value as RoleType,
+                                                  }
+                                                : prev
+                                        );
+                                    }}
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background"
+                                >
+                                    {ROLE_TYPE_ORDER.map((role) => (
+                                        <option key={role} value={role}>
+                                            {ROLE_TYPE_LABELS[role]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {interviewSetupError && (
+                                <div className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                                    {interviewSetupError}
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        cancelInterviewSetup();
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!interviewSetup) return;
+                                        if (!interviewSetup.interviewDate) {
+                                            setInterviewSetupError(
+                                                "Please select an interview date."
+                                            );
+                                            return;
+                                        }
+
+                                        const parsedDate = parseInterviewDate(
+                                            interviewSetup.interviewDate
+                                        );
+                                        if (!parsedDate) {
+                                            setInterviewSetupError(
+                                                "Interview date is invalid."
+                                            );
+                                            return;
+                                        }
+
+                                        const normalizedToday = startOfDay(new Date());
+                                        if (
+                                            differenceInDays(
+                                                parsedDate,
+                                                normalizedToday
+                                            ) < 0
+                                        ) {
+                                            setInterviewSetupError(
+                                                "Interview date must be today or later."
+                                            );
+                                            return;
+                                        }
+
+                                        updateApplication(
+                                            interviewSetup.applicationId,
+                                            {
+                                                status: "interview",
+                                                interviewDate:
+                                                    interviewSetup.interviewDate,
+                                                roleType: interviewSetup.roleType,
+                                            }
+                                        );
+
+                                        ensureSprintForInterview(
+                                            interviewSetup.applicationId,
+                                            parsedDate,
+                                            interviewSetup.roleType
+                                        );
+
+                                        setInterviewSetup(null);
+                                        setInterviewSetupError(null);
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
+                                >
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

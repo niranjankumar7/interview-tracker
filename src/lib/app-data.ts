@@ -57,6 +57,15 @@ const interviewRoundSchema = z.object({
   scheduledDate: z.string().optional(),
   notes: z.string(),
   questionsAsked: z.array(z.string()),
+  feedback: z
+    .object({
+      rating: z.number(),
+      pros: z.array(z.string()),
+      cons: z.array(z.string()),
+      struggledTopics: z.array(z.string()),
+      notes: z.string(),
+    })
+    .optional(),
 });
 
 const workModeSchema = z.enum(WORK_MODES);
@@ -81,13 +90,14 @@ const applicationSchema = z.object({
   id: z.string(),
   company: z.string(),
   role: z.string(),
+  jobDescriptionUrl: z.string().optional(),
   roleType: roleTypeSchema.optional(),
   status: applicationStatusSchema,
   applicationDate: z.string(),
   interviewDate: z.string().optional(),
   currentRound: interviewRoundTypeSchema.optional(),
   rounds: z.array(interviewRoundSchema),
-  notes: z.string(),
+  notes: z.string().default(""),
   offerDetails: offerDetailsSchema.optional(),
   createdAt: z.string(),
 });
@@ -152,6 +162,8 @@ const userProfileSchema = z.object({
 const appPreferencesSchema = z.object({
   theme: themePreferenceSchema,
   studyRemindersEnabled: z.boolean(),
+  calendarAutoSyncEnabled: z.boolean().default(false),
+  leetcodeAutoSyncEnabled: z.boolean().default(false),
 });
 
 const completedTopicSchema = z.object({
@@ -159,6 +171,24 @@ const completedTopicSchema = z.object({
   displayName: z.string().optional(),
   completedAt: z.string(),
   source: z.enum(["chat", "manual"]),
+});
+
+const leetcodeConnectionSchema = z.object({
+  connected: z.boolean(),
+  username: z.string().optional(),
+  connectedAt: z.string().optional(),
+  lastSyncAt: z.string().optional(),
+  readOnly: z.boolean(),
+});
+
+const leetcodeStatsSchema = z.object({
+  currentStreak: z.number(),
+  longestStreak: z.number(),
+  lastActiveDate: z.string().optional(),
+  totalSolved: z.number(),
+  easySolved: z.number(),
+  mediumSolved: z.number(),
+  hardSolved: z.number(),
 });
 
 export const appDataSnapshotSchema = z.object({
@@ -169,6 +199,8 @@ export const appDataSnapshotSchema = z.object({
   profile: userProfileSchema,
   preferences: appPreferencesSchema,
   completedTopics: z.array(completedTopicSchema),
+  leetcode: leetcodeConnectionSchema.optional(),
+  leetcodeStats: leetcodeStatsSchema.optional(),
 });
 
 export const appDataExportSchema = z.object({

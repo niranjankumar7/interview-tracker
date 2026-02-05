@@ -1,6 +1,10 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import {
+    buildStruggledTopicMatchersByAppId,
+    matchesStruggledTopic,
+} from "@/lib/struggled-topics";
 import { isToday, differenceInDays, parseISO } from "date-fns";
 import {
     Clock,
@@ -32,32 +36,6 @@ interface TodaysPlanPanelProps {
     focusApplicationId?: string;
 }
 
-type TopicMatcher = {
-    needle: string;
-    regex: RegExp | null;
-};
-
-function escapeRegExp(value: string): string {
-    // Escape topic text so it can be safely embedded in a RegExp.
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildTopicMatcher(topic: string): TopicMatcher {
-    const needle = topic.toLowerCase();
-
-    if (needle.length <= 3) {
-        // Avoid overly-permissive substring matches for short topics (e.g. "SQL" in "sequel").
-        return {
-            needle,
-            regex: new RegExp(
-                `(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`
-            ),
-        };
-    }
-
-    return { needle, regex: null };
-}
-
 export function TodaysPlanPanel({
     showAll = true,
     focusApplicationId,
@@ -68,24 +46,7 @@ export function TodaysPlanPanel({
     const progress = useStore((state) => state.progress);
 
     const struggledTopicMatchersByAppId = useMemo(() => {
-        // Precompute once per applications update to avoid per-task lowercasing and repeated scans.
-        const result = new Map<string, TopicMatcher[]>();
-
-        for (const app of applications) {
-            const topics = [
-                ...new Set(
-                    (app.rounds ?? []).flatMap(
-                        (r) => r.feedback?.struggledTopics ?? []
-                    )
-                ),
-            ];
-
-            const matchers = topics.map(buildTopicMatcher).filter((m) => m.needle.length > 0);
-
-            result.set(app.id, matchers);
-        }
-
-        return result;
+        return buildStruggledTopicMatchersByAppId(applications);
     }, [applications]);
 
     // Find active sprints
@@ -263,13 +224,11 @@ export function TodaysPlanPanel({
 
                                             const struggledMatch =
                                                 struggledTopicMatchers.length > 0 &&
-                                                struggledTopicMatchers.some((matcher) => {
-                                                    if (categoryLower === matcher.needle) return true;
-
-                                                    return matcher.regex
-                                                        ? matcher.regex.test(descriptionLower)
-                                                        : descriptionLower.includes(matcher.needle);
-                                                });
+                                                matchesStruggledTopic(
+                                                    struggledTopicMatchers,
+                                                    categoryLower,
+                                                    descriptionLower
+                                                );
 
                                             return (
                                                 <li key={task.id} className="flex items-start gap-3">
