@@ -17,6 +17,7 @@ import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
 import { autoTagCategory } from '@/utils/categoryTagger';
+import { api } from '@/lib/api-client';
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -153,6 +154,38 @@ interface AppState {
     connectLeetCode: (info: { username: string }) => void;
     disconnectLeetCode: () => void;
     syncLeetCodeStats: (stats: LeetCodeStats) => void;
+
+    // API Integration methods
+    loadApplicationsFromAPI: () => Promise<void>;
+    loadSprintsFromAPI: () => Promise<void>;
+    loadQuestionsFromAPI: (filters?: { applicationId?: string; category?: string }) => Promise<void>;
+    createApplicationAPI: (data: {
+        company: string;
+        role: string;
+        jobDescriptionUrl?: string;
+        roleType?: string;
+        status?: 'applied' | 'shortlisted' | 'interview' | 'offer' | 'rejected';
+        applicationDate?: string;
+        interviewDate?: string;
+        notes?: string;
+    }) => Promise<Application>;
+    updateApplicationAPI: (id: string, updates: any) => Promise<void>;
+    deleteApplicationAPI: (id: string) => Promise<void>;
+    createSprintAPI: (data: {
+        applicationId: string;
+        interviewDate: string;
+        roleType: string;
+        totalDays: number;
+        dailyPlans: any;
+    }) => Promise<Sprint>;
+    createQuestionAPI: (data: {
+        questionText: string;
+        category: 'DSA' | 'SystemDesign' | 'Behavioral' | 'SQL' | 'Other';
+        difficulty?: 'Easy' | 'Medium' | 'Hard';
+        askedInRound?: string;
+        applicationId?: string;
+    }) => Promise<Question>;
+    syncWithBackend: () => Promise<void>;
 }
 
 const getInitialProgress = (): UserProgress => ({
@@ -781,6 +814,202 @@ export const useStore = create<AppState>()(
                 const where = issue?.path?.length ? issue.path.join('.') : defaultWhere;
                 const message = issue?.message ?? 'File does not match expected export format';
                 throw new Error(`${where}: ${message}`);
+            },
+
+            // API Integration implementations
+            loadApplicationsFromAPI: async () => {
+                try {
+                    const apps = await api.applications.getAll();
+                    set({ applications: apps });
+                } catch (error) {
+                    console.error('Failed to load applications from API:', error);
+                    throw error;
+                }
+            },
+
+            loadSprintsFromAPI: async () => {
+                try {
+                    const rawSprints = await api.sprints.getAll();
+                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
+                    const sprints = rawSprints.map((sprint: any) => ({
+                        ...sprint,
+                        dailyPlans: Array.isArray(sprint.dailyPlans)
+                            ? sprint.dailyPlans
+                            : typeof sprint.dailyPlans === 'string'
+                                ? JSON.parse(sprint.dailyPlans)
+                                : [],
+                    }));
+                    set({ sprints });
+                } catch (error) {
+                    console.error('Failed to load sprints from API:', error);
+                    throw error;
+                }
+            },
+
+            loadQuestionsFromAPI: async (filters) => {
+                try {
+                    const questions = await api.questions.getAll(filters);
+                    set({ questions });
+                } catch (error) {
+                    console.error('Failed to load questions from API:', error);
+                    throw error;
+                }
+            },
+
+            createApplicationAPI: async (data) => {
+                try {
+                    const app = await api.applications.create(data);
+                    set((state) => ({
+                        applications: [...state.applications, app]
+                    }));
+                    return app;
+                } catch (error) {
+                    console.error('Failed to create application:', error);
+                    throw error;
+                }
+            },
+
+            updateApplicationAPI: async (id, updates) => {
+                try {
+                    const updatedApp = await api.applications.update(id, updates);
+                    set((state) => ({
+                        applications: state.applications.map(app =>
+                            app.id === id ? { ...app, ...updatedApp } : app
+                        )
+                    }));
+                } catch (error) {
+                    console.error('Failed to update application:', error);
+                    throw error;
+                }
+            },
+
+            deleteApplicationAPI: async (id) => {
+                try {
+                    await api.applications.delete(id);
+                    set((state) => ({
+                        applications: state.applications.filter(app => app.id !== id),
+                        sprints: state.sprints.filter(sprint => sprint.applicationId !== id)
+                    }));
+                } catch (error) {
+                    console.error('Failed to delete application:', error);
+                    throw error;
+                }
+            },
+
+            createSprintAPI: async (data) => {
+                try {
+                    const sprint = await api.sprints.create(data);
+                    set((state) => ({
+                        sprints: [...state.sprints, sprint]
+                    }));
+                    return sprint;
+                } catch (error) {
+                    console.error('Failed to create sprint:', error);
+                    throw error;
+                }
+            },
+
+            createQuestionAPI: async (data) => {
+                try {
+                    const question = await api.questions.create(data);
+                    set((state) => ({
+                        questions: [...state.questions, question]
+                    }));
+                    return question;
+                } catch (error) {
+                    console.error('Failed to create question:', error);
+                    throw error;
+                }
+            },
+
+            syncWithBackend: async () => {
+                try {
+                    // Load all data from backend in parallel
+                    const [apps, rawSprints, questions, userProfile] = await Promise.all([
+                        api.applications.getAll(),
+                        api.sprints.getAll(),
+                        api.questions.getAll(),
+                        api.user.getProfile().catch(() => null), // User profile is optional
+                    ]);
+
+                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
+                    const sprints = rawSprints.map((sprint: any) => ({
+                        ...sprint,
+                        dailyPlans: Array.isArray(sprint.dailyPlans)
+                            ? sprint.dailyPlans
+                            : typeof sprint.dailyPlans === 'string'
+                                ? JSON.parse(sprint.dailyPlans)
+                                : [],
+                    }));
+
+                    // Build the update object
+                    const update: Partial<AppState> = {
+                        applications: apps,
+                        sprints,
+                        questions,
+                    };
+
+                    // Sync user profile data if available
+                    if (userProfile) {
+                        // Update profile
+                        if (userProfile.name) {
+                            update.profile = {
+                                ...get().profile,
+                                name: userProfile.name || get().profile.name,
+                                targetRole: userProfile.targetRole || get().profile.targetRole,
+                                experienceLevel: (userProfile.experienceLevel as any) || get().profile.experienceLevel,
+                            };
+                        }
+
+                        // Update progress from API
+                        if (userProfile.progress) {
+                            update.progress = {
+                                ...get().progress,
+                                currentStreak: userProfile.progress.currentStreak ?? get().progress.currentStreak,
+                                longestStreak: userProfile.progress.longestStreak ?? get().progress.longestStreak,
+                                lastActiveDate: userProfile.progress.lastActiveDate ?? get().progress.lastActiveDate,
+                                totalTasksCompleted: userProfile.progress.totalTasksCompleted ?? get().progress.totalTasksCompleted,
+                            };
+                        }
+
+                        // Update preferences from API
+                        if (userProfile.preferences) {
+                            update.preferences = {
+                                ...get().preferences,
+                                theme: (userProfile.preferences.theme as any) || get().preferences.theme,
+                                studyRemindersEnabled: userProfile.preferences.studyRemindersEnabled ?? get().preferences.studyRemindersEnabled,
+                                calendarAutoSyncEnabled: userProfile.preferences.calendarAutoSyncEnabled ?? get().preferences.calendarAutoSyncEnabled,
+                                leetcodeAutoSyncEnabled: userProfile.preferences.leetcodeAutoSyncEnabled ?? get().preferences.leetcodeAutoSyncEnabled,
+                            };
+                        }
+
+                        // Update leetcode connection from API
+                        if (userProfile.leetcode) {
+                            update.leetcode = {
+                                ...get().leetcode,
+                                username: userProfile.leetcode.username || get().leetcode.username,
+                                connectedAt: userProfile.leetcode.connectedAt || get().leetcode.connectedAt,
+                                lastSyncAt: userProfile.leetcode.lastSyncAt || get().leetcode.lastSyncAt,
+                            };
+
+                            // Update leetcode stats
+                            update.leetcodeStats = {
+                                totalSolved: userProfile.leetcode.totalSolved ?? 0,
+                                easySolved: userProfile.leetcode.easySolved ?? 0,
+                                mediumSolved: userProfile.leetcode.mediumSolved ?? 0,
+                                hardSolved: userProfile.leetcode.hardSolved ?? 0,
+                                currentStreak: userProfile.leetcode.currentStreak ?? 0,
+                                longestStreak: userProfile.leetcode.longestStreak ?? 0,
+                                lastActiveDate: userProfile.leetcode.lastActiveDate,
+                            };
+                        }
+                    }
+
+                    set(update as any);
+                } catch (error) {
+                    console.error('Failed to sync with backend:', error);
+                    throw error;
+                }
             },
         }),
         {

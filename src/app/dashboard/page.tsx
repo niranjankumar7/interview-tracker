@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { computeOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
+import { getDailyPlansArray } from "@/lib/sprint-utils";
 import type { ApplicationStatus, Sprint } from "@/types";
 import {
   addDays,
@@ -75,11 +76,14 @@ function computeCompletionStats(sprints: Sprint[]) {
   const topicsByDate = new Map<string, Set<string>>();
 
   for (const sprint of sprints) {
-    for (const plan of sprint.dailyPlans) {
+    const dailyPlans = getDailyPlansArray(sprint.dailyPlans);
+    for (const plan of dailyPlans) {
       const key = format(startOfDay(parseISO(plan.date)), "yyyy-MM-dd");
 
-      for (const block of plan.blocks) {
-        for (const task of block.tasks) {
+      const blocks = plan.blocks ?? [];
+      for (const block of blocks) {
+        const tasks = block.tasks ?? [];
+        for (const task of tasks) {
           if (!task.completed) continue;
 
           activityCounts.set(key, (activityCounts.get(key) ?? 0) + 1);

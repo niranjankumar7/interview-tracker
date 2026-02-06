@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { getDailyPlansArray } from "@/lib/sprint-utils";
 import { differenceInMinutes, format, isToday, isYesterday, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -138,17 +139,18 @@ export function NotificationManager() {
 
     // Check 2 (Daily Habit): user was active yesterday but has not completed tasks today.
     const lastActive = safeParseISO(state.progress.lastActiveDate);
-    const completedTasksToday = state.sprints.some((sprint) =>
-      sprint.dailyPlans.some((plan) => {
+    const completedTasksToday = state.sprints.some((sprint) => {
+      const dailyPlans = getDailyPlansArray(sprint.dailyPlans);
+      return dailyPlans.some((plan) => {
         const planDate = safeParseISO(plan.date);
         if (!planDate) return false;
 
         return (
           isToday(planDate) &&
-          plan.blocks.some((block) => block.tasks.some((task) => task.completed))
+          plan.blocks?.some((block) => block.tasks?.some((task) => task.completed))
         );
-      })
-    );
+      });
+    });
 
     if (lastActive && isYesterday(lastActive) && !completedTasksToday) {
       const notificationKey = "daily-habit";

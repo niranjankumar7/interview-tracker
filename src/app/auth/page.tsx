@@ -70,8 +70,8 @@ export default function AuthPage() {
                         <button
                             onClick={() => setIsLogin(true)}
                             className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${isLogin
-                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                                 }`}
                         >
                             <LogIn className="w-4 h-4 inline mr-2" />
@@ -80,8 +80,8 @@ export default function AuthPage() {
                         <button
                             onClick={() => setIsLogin(false)}
                             className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${!isLogin
-                                    ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                ? "bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                                 }`}
                         >
                             <UserPlus className="w-4 h-4 inline mr-2" />
