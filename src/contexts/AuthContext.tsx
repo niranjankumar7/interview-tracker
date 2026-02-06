@@ -48,27 +48,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = useCallback(async (email: string, password: string) => {
         setIsLoading(true);
         try {
-            const response = await api.auth.login({ email, password });
+            await api.auth.login({ email, password });
             const profile = await api.user.getProfile();
             setUser(profile);
         } catch (error) {
-            setIsLoading(false);
             throw error;
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, []);
 
     const register = useCallback(async (email: string, password: string, name?: string) => {
         setIsLoading(true);
         try {
-            const response = await api.auth.register({ email, password, name });
-            const profile = await api.user.getProfile();
-            setUser(profile);
+            await api.auth.register({ email, password, name });
         } catch (error) {
-            setIsLoading(false);
             throw error;
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, []);
 
     const logout = useCallback(async () => {

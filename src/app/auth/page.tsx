@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { LogIn, UserPlus, Loader2 } from "lucide-react";
 
 export default function AuthPage() {
     const router = useRouter();
+    const { login, register } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -23,20 +24,13 @@ export default function AuthPage() {
         try {
             if (isLogin) {
                 // Login
-                const response = await api.auth.login({
-                    email: formData.email,
-                    password: formData.password,
-                });
+                await login(formData.email, formData.password);
 
                 toast.success("Login successful!");
-                router.push("/dashboard");
+                router.push("/chat");
             } else {
                 // Register
-                await api.auth.register({
-                    email: formData.email,
-                    password: formData.password,
-                    name: formData.name,
-                });
+                await register(formData.email, formData.password, formData.name);
 
                 toast.success("Registration successful! Please log in.");
                 setIsLogin(true);
