@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { computeOfferTotalCTC, getOfferCurrency } from "@/lib/offer-details";
@@ -32,25 +31,22 @@ import {
 import {
   BarChart3,
   Calendar,
-  Database,
-  Flame,
-  MessageSquare,
-  RotateCcw,
   Target,
 } from "lucide-react";
+import { AppHeader } from "@/components/layout/AppHeader";
 
-type StatusConfig = {
+type StatusChartConfig = {
   status: ApplicationStatus;
   label: string;
-  color: string;
+  chartColorHex: string;
 };
 
-const statusConfigs: StatusConfig[] = [
-  { status: "applied", label: "Applied", color: "#6B7280" },
-  { status: "shortlisted", label: "Shortlisted", color: "#3B82F6" },
-  { status: "interview", label: "Interview", color: "#8B5CF6" },
-  { status: "offer", label: "Offer", color: "#22C55E" },
-  { status: "rejected", label: "Rejected", color: "#EF4444" },
+const statusChartConfigs: StatusChartConfig[] = [
+  { status: "applied", label: "Applied", chartColorHex: "#6B7280" },
+  { status: "shortlisted", label: "Shortlisted", chartColorHex: "#3B82F6" },
+  { status: "interview", label: "Interview", chartColorHex: "#8B5CF6" },
+  { status: "offer", label: "Offer", chartColorHex: "#22C55E" },
+  { status: "rejected", label: "Rejected", chartColorHex: "#EF4444" },
 ];
 
 function Card({
@@ -137,8 +133,6 @@ export default function DashboardPage() {
   const applications = useStore((s) => s.applications);
   const sprints = useStore((s) => s.sprints);
   const progress = useStore((s) => s.progress);
-  const loadDemoData = useStore((s) => s.loadDemoData);
-  const resetData = useStore((s) => s.resetData);
 
   const today = useMemo(() => startOfDay(now), [now]);
 
@@ -164,16 +158,16 @@ export default function DashboardPage() {
 
   const applicationPipelineData = useMemo(() => {
     const counts = new Map<ApplicationStatus, number>();
-    for (const config of statusConfigs) counts.set(config.status, 0);
+    for (const config of statusChartConfigs) counts.set(config.status, 0);
     for (const app of applications) {
       counts.set(app.status, (counts.get(app.status) ?? 0) + 1);
     }
 
-    return statusConfigs
+    return statusChartConfigs
       .map((cfg) => ({
         name: cfg.label,
         value: counts.get(cfg.status) ?? 0,
-        color: cfg.color,
+        color: cfg.chartColorHex,
       }))
       .filter((d) => d.value > 0);
   }, [applications]);
@@ -275,70 +269,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-background border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-foreground">Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Progress & analytics</p>
-            </div>
-          </div>
-
-          {progress.currentStreak > 0 && (
-            <div className="hidden sm:flex items-center gap-2 bg-orange-50 dark:bg-orange-950/40 px-3 py-1.5 rounded-full border border-orange-200 dark:border-orange-800">
-              <Flame className="w-4 h-4 text-orange-500" />
-              <span className="text-sm font-medium text-orange-700 dark:text-orange-200">
-                {progress.currentStreak} day streak
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <nav className="flex bg-gray-100 rounded-lg p-1">
-            <Link
-              href="/chat"
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all text-muted-foreground hover:text-foreground"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">Chat</span>
-            </Link>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all bg-card text-blue-600 shadow-sm"
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </Link>
-          </nav>
-
-          <div className="flex items-center gap-1 ml-2 border-l pl-2 border-border">
-            <button
-              onClick={loadDemoData}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-all"
-              title="Load demo data"
-            >
-              <Database className="w-4 h-4" />
-              <span className="hidden md:inline">Demo</span>
-            </button>
-            <button
-              onClick={() => {
-                if (confirm("Reset all data? This cannot be undone.")) {
-                  resetData();
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
-              title="Reset data"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden md:inline">Reset</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -452,6 +383,39 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <Card title="Next interviews" subtitle="Countdown to upcoming interviews">
+            {upcomingInterviews.length === 0 ? (
+              <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg p-10">
+                No interviews scheduled
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {upcomingInterviews.map(({ app, interviewDate, daysLeft }) => (
+                  <div
+                    key={app.id}
+                    className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-lg leading-tight">
+                          {app.company}
+                        </p>
+                        <p className="text-sm opacity-90 mt-0.5">{app.role}</p>
+                      </div>
+                      <div className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span className="font-semibold">{daysLeft}d</span>
+                      </div>
+                    </div>
+                    <p className="text-sm opacity-90 mt-4">
+                      Interview on {format(interviewDate, "MMM d, yyyy")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
           <Card
             title="Offer comparison"
             subtitle="Offers grouped by currency and sorted by total CTC (uses offerDetails.totalCTC when set, otherwise base+bonus(+numeric equity))"
@@ -538,7 +502,7 @@ export default function DashboardPage() {
           >
             {totalActivityLastYear === 0 ? (
               <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg p-10">
-                No study activity logged yet
+                Feature coming soon
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -580,39 +544,6 @@ export default function DashboardPage() {
                     <span>{format(today, "MMM yyyy")}</span>
                   </div>
                 </div>
-              </div>
-            )}
-          </Card>
-
-          <Card title="Next interviews" subtitle="Countdown to upcoming interviews">
-            {upcomingInterviews.length === 0 ? (
-              <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg p-10">
-                No interviews scheduled
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {upcomingInterviews.map(({ app, interviewDate, daysLeft }) => (
-                  <div
-                    key={app.id}
-                    className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-xl p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-lg leading-tight">
-                          {app.company}
-                        </p>
-                        <p className="text-sm opacity-90 mt-0.5">{app.role}</p>
-                      </div>
-                      <div className="bg-white/20 px-3 py-1 rounded-full flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        <span className="font-semibold">{daysLeft}d</span>
-                      </div>
-                    </div>
-                    <p className="text-sm opacity-90 mt-4">
-                      Interview on {format(interviewDate, "MMM d, yyyy")}
-                    </p>
-                  </div>
-                ))}
               </div>
             )}
           </Card>

@@ -19,7 +19,7 @@ export function Footer() {
   return (
     <footer className="shrink-0 border-t border-border bg-background text-muted-foreground">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm">© {year} Interview Tracker. All rights reserved.</div>
+        <div className="text-sm">© {year} Blueprint. All rights reserved.</div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

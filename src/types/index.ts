@@ -1,4 +1,4 @@
-// Core type definitions for Interview Prep Tracker
+// Core type definitions for Blueprint
 
 export const APPLICATION_STATUSES = [
     'applied',
