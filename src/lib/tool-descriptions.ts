@@ -1,37 +1,58 @@
 /**
- * @file tool-descriptions.ts
- * @description Centralized tool descriptions for Tambo AI
- *
- * This file contains structured descriptions that guide the AI on:
- * - When to invoke each tool
- * - How to extract data from natural language
- * - What phrases/patterns trigger each tool
- *
- * Having descriptions in a separate file improves:
- * - Readability and maintainability
- * - Collaboration (non-devs can improve prompts)
- * - Version control (easy to see prompt changes in diffs)
- */
+* Centralized AI guidance strings for Tambo tools/components.
+*/
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TOOL DESCRIPTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+type ToolDescriptionKey =
+  | "updateApplicationStatus"
+  | "addApplications"
+  | "getApplications"
+  | "getActiveSprints"
+  | "getQuestions"
+  | "getUserProgress"
+  | "markTopicComplete"
+  | "getCompletedTopics";
+
+type SchemaDescriptions = {
+  updateApplicationStatus: {
+    company: string;
+    newStatus: string;
+    updates: string;
+  };
+  addApplications: {
+    company: string;
+    role: string;
+    status: string;
+    notes: string;
+    applications: string;
+  };
+  markTopicComplete: {
+    topicName: string;
+  };
+  getQuestions: {
+    company: string;
+  };
+};
+
+type ComponentDescriptionKey =
+  | "SprintSetupCard"
+  | "TodaysPlanPanel"
+  | "PlanForDatePanel"
+  | "AddQuestionPanel"
+  | "PipelineSummaryPanel"
+  | "OfferDetailsPanel";
 
 export const toolDescriptions = {
-    // ─────────────────────────────────────────────────────────────────────────
-    // APPLICATION STATUS UPDATES
-    // ─────────────────────────────────────────────────────────────────────────
-    updateApplicationStatus: `
+  updateApplicationStatus: `
 Update the status of one or more job applications.
 
 CRITICAL: Use this tool when the user mentions a status change in natural language.
 
 ## INCOMPLETE PROMPT HANDLING (VERY IMPORTANT)
-If user provides ONLY a status word without company/role details, you MUST ask for clarification:
-- User: "rejected" → Ask: "Which company rejected you? And for what role?"
-- User: "got shortlisted" → Ask: "Great! Which company shortlisted you?"
-- User: "offer" → Ask: "Congratulations! Which company gave you an offer?"
-- User: "applied" → Redirect to addApplications tool, ask for company & role
+If the user provides ONLY a status word without a company name, you MUST ask for clarification:
+- User: "rejected" → Ask: "Which company rejected you?"
+- User: "got shortlisted" → Ask: "Which company shortlisted you?"
+- User: "offer" → Ask: "Which company gave you an offer?"
+- User: "applied" → Redirect to addApplications tool; ask for company & role
 
 ## Trigger Phrases (with variations)
 - "I got rejected from/by [company]" (both "from" and "by" are valid)
@@ -41,9 +62,8 @@ If user provides ONLY a status word without company/role details, you MUST ask f
 - "[company] shortlisted me" / "got shortlisted for [company]"
 - "[company] moved me to next round"
 - "I have an interview at [company]"
-- "interview scheduled [company] [role] [date]"
+- "interview scheduled [company] [role] [date]" (date is optional; ignore it for this tool call)
 - "I received an offer from [company]"
-- "got offer from [company] at [salary]"
 - "[company] made me an offer"
 - "did bad in the interview, got rejected, [company]"
 - "[company] didn't work out"
@@ -70,14 +90,13 @@ Handle common typos - focus on meaning, not spelling:
 - "Micrsoft" → "Microsoft"
 
 ## Extraction Rules
-1. Extract COMPANY NAME first - this is REQUIRED
-2. Handle preposition variations: "rejected BY", "rejected FROM" are equivalent
-3. If role mentioned, extract separately (e.g., "Apple SDE role" → company: Apple, role: SDE)
-4. If status unclear, ask: "Should I mark [company] as [status]?"
-5. If interview details include date, also schedule the interview
+1. Extract COMPANY NAME first - this is REQUIRED.
+2. Handle preposition variations: "rejected BY" and "rejected FROM" are equivalent.
+3. If a role is mentioned, ignore it for this tool call (this tool only updates status).
+4. If status is unclear, ask: "Should I mark [company] as [status]?"
 
 ## Real User Examples
-- "I got rejected by Microsoft for a developer" → {company: "Microsoft", role: "developer", newStatus: "rejected"}
+- "I got rejected by Microsoft for a developer" → {company: "Microsoft", newStatus: "rejected"}
 - "got shortlisted, Apple" → {company: "Apple", newStatus: "shortlisted"}
 - "interview scheduled, Apple SDT role next Wednesday" → {company: "Apple", newStatus: "interview"}
 - "did bad in the interview, got rejected, Apple SD round" → {company: "Apple", newStatus: "rejected"}
@@ -90,20 +109,17 @@ Handle common typos - focus on meaning, not spelling:
 - "got the bag from coinbase!" → {company: "Coinbase", newStatus: "offer"}
 - "lowballed by infosys" → {company: "Infosys", newStatus: "offer"}
 - "rejected by airbnb, meta and netflix all in one day" → 3 separate rejected updates
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ADD APPLICATIONS (BULK)
-    // ─────────────────────────────────────────────────────────────────────────
-    addApplications: `
+  addApplications: `
 Add one or more job applications to the pipeline.
 
 IMPORTANT: Use this when the user mentions applying to companies.
 
 ## INCOMPLETE PROMPT HANDLING (VERY IMPORTANT)
-If user just says "applied" without details, ASK for clarification:
+If the user just says "applied" without details, ASK for clarification:
 - User: "applied" → Ask: "Which company did you apply to? And for what role?"
-- User: "I applied" → Ask: "Great! Which company and role?"
+- User: "I applied" → Ask: "Which company and role?"
 
 ## Trigger Phrases
 - "I applied for/to [company]"
@@ -117,16 +133,18 @@ If user just says "applied" without details, ASK for clarification:
 - "dropped resume at [company]"
 - "applied via [platform] to [company]"
 
-## Salary/Budget Info Handling
-If user mentions HR budget or expected salary, capture as notes:
+## Notes Handling
+If the user mentions additional context (salary expectations, HR budget, source like LinkedIn, referral), capture it in the optional "notes" field.
+
+Example:
 - "Applied for zee5 - sdet role - hr said 12 lpa budget"
-  → Create app: {company: "Zee5", role: "SDET", notes: "HR said 12 LPA budget"}
+  → {company: "Zee5", role: "SDET", notes: "HR said 12 LPA budget"}
 
 ## Bulk Handling
-When user mentions multiple companies:
-1. Extract all company names from list (comma-separated, "and", etc.)
-2. If same role for all: Apply that role to all
-3. If no role specified, ask: "What role did you apply for?"
+When the user mentions multiple companies:
+1. Extract all company names from the list (comma-separated, "and", etc.)
+2. If the same role applies to all: apply that role to all
+3. If no role is specified, ask: "What role did you apply for?"
 
 ## Real User Examples
 - "I applied for Xenon, X, Y, AI, AABC company for the role ML engineer"
@@ -138,17 +156,15 @@ When user mentions multiple companies:
 - "Appleid for zee5 - sdet role - hr said 12 lpa budget"
   → {company: "Zee5", role: "SDET", notes: "HR said 12 LPA budget"}
 - "referral for google L4" → {company: "Google", role: "L4", notes: "Referral"}
-- "applied via linkedin to grab, gojek, traveloka" → 3 apps, source notes "LinkedIn"
+- "applied via linkedin to grab, gojek, traveloka"
+  → 3 apps with notes "Applied via LinkedIn"
 - "applied for sde-2 at razorpay, groww and zerodha" → 3 apps with role "SDE-2"
 - "submitted resume to ycombinator w24 batch" → {company: "YCombinator", role: "W24 Batch"}
 - "applied to 5 companies: atlassian, canva, safetyculture" → 3 apps (ignore count if mismatch)
 - "dropped resume at career fair for salesforce" → {company: "Salesforce", notes: "Career Fair"}
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GET APPLICATIONS
-    // ─────────────────────────────────────────────────────────────────────────
-    getApplications: `
+  getApplications: `
 Get all job applications with their details.
 
 ## Trigger Phrases
@@ -162,12 +178,9 @@ Get all job applications with their details.
 - "Which companies am i interviewing with?"
 - "Show me my failing apps"
 - "Who ghosted me?"
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // SPRINTS & PREP
-    // ─────────────────────────────────────────────────────────────────────────
-    getActiveSprints: `
+  getActiveSprints: `
 Get all active interview prep sprints with their daily plans and progress.
 
 ## Trigger Phrases
@@ -177,12 +190,9 @@ Get all active interview prep sprints with their daily plans and progress.
 - "What interviews am I prepping for?"
 - "prep for lld round"
 - "schedule mock for system design"
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // QUESTIONS
-    // ─────────────────────────────────────────────────────────────────────────
-    getQuestions: `
+  getQuestions: `
 Get interview questions from the question bank, optionally filtered by company.
 
 ## Trigger Phrases
@@ -193,12 +203,9 @@ Get interview questions from the question bank, optionally filtered by company.
 - "save this q: [question]"
 - "remember this question"
 - "note down this behavioral question"
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PROGRESS
-    // ─────────────────────────────────────────────────────────────────────────
-    getUserProgress: `
+  getUserProgress: `
 Get the user's current progress including streak and completed tasks.
 
 ## Trigger Phrases
@@ -207,12 +214,9 @@ Get the user's current progress including streak and completed tasks.
 - "How am I doing?"
 - "Show my stats"
 - "what did i study last week?"
-`,
+`.trim(),
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TOPIC COMPLETION
-    // ─────────────────────────────────────────────────────────────────────────
-    markTopicComplete: `
+  markTopicComplete: `
 Mark a prep topic as completed when the user says they studied or finished a topic.
 
 ## Trigger Phrases
@@ -243,82 +247,106 @@ Mark a prep topic as completed when the user says they studied or finished a top
 
 ## Effect
 Updates global progress and shows completion with date on all PrepDetailPanels.
-`,
+`.trim(),
 
-    getCompletedTopics: `
+  getCompletedTopics: `
 Get all topics the user has marked as completed.
 
 ## Trigger Phrases
 - "What topics have I completed?"
 - "Show my completed topics"
 - "What have I studied?"
-`,
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INPUT SCHEMA DESCRIPTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+`.trim(),
+} satisfies Record<ToolDescriptionKey, string>;
 
 export const schemaDescriptions = {
-    updateApplicationStatus: {
-        company: `Company name to update. REQUIRED field.
-Extract from phrases - handle preposition variations:
+  updateApplicationStatus: {
+    company: `
+Company name to update. REQUIRED field.
+
+Extract from phrases (handle preposition variations):
 - "I got rejected from Microsoft" → "Microsoft"
 - "rejected by Amazon" → "Amazon"
 - "Microsoft SDE Cloud" → "Microsoft" (remove role suffix)
 - "rejected - [company]" → extract company after dash
-If company is missing, ASK: "Which company?"`,
-        newStatus: `The new status. Map natural language:
+
+If company is missing, ASK: "Which company?"
+`.trim(),
+    newStatus: `
+The new status. Map natural language:
 - rejected / didn't work out / said no / did bad / withdrew / bombed / ghosted → "rejected"
 - shortlisted / moved forward / next round / cracked OA / recruiter call → "shortlisted"
 - interview / scheduled / phone screen / cleared screen / final round → "interview"
-- offer / accepted / got the job / got the bag / lowballed / negotiating → "offer"`,
-        updates: `List of status updates.
+- offer / accepted / got the job / got the bag / lowballed / negotiating → "offer"
+`.trim(),
+    updates: `
+List of status updates.
+
 Real examples:
 - "I got rejected by Microsoft for a developer" → [{company: "Microsoft", newStatus: "rejected"}]
 - "rejected from softbank" → [{company: "Softbank", newStatus: "rejected"}]
 - "did bad in the interview, got rejected, Apple SD round" → [{company: "Apple", newStatus: "rejected"}]
-- "rejected by airbnb, meta and netflix" → 3 separate updates`,
-    },
+- "rejected by airbnb, meta and netflix" → 3 separate updates
+`.trim(),
+  },
 
-    addApplications: {
-        company: `Company name extracted from user's message.
+  addApplications: {
+    company: `
+Company name extracted from the user's message.
+
 Clean company names by removing role info:
 - "Microsoft SDE" → "Microsoft"
 - "zee5 - sdet role" → "Zee5"
-- "softbank" → "Softbank" (capitalize)`,
-        role: `Job role/title. Common formats:
+- "softbank" → "Softbank" (capitalize)
+`.trim(),
+    role: `
+Job role/title. Common formats:
 - "SDE", "SDET", "Software Engineer", "ML Engineer"
 - "Head of Engineer", "Sr. Developer", "L4", "W24 Batch"
-Handle typos: "develoer" → "Developer", "SDT" → "SDE"`,
-        status: `Application status, defaults to "applied" unless user specifies otherwise.`,
-        applications: `List of applications to add.
+
+Handle typos:
+- "develoer" → "Developer"
+- "SDT" → "SDE"
+`.trim(),
+    status: `Application status. Defaults to "applied" unless the user specifies otherwise.`,
+    notes: `
+Optional free-text notes. Use for context like salary/budget, referral/source, etc.
+
+Examples:
+- "HR said 12 LPA budget"
+- "Applied via LinkedIn"
+- "Referral"
+`.trim(),
+    applications: `
+List of applications to add.
+
 Real examples:
 - "I applied for Xenon, X, Y, AI, AABC company for the role ML engineer"
-  → [{company: 'Xenon', role: 'ML Engineer'}, {company: 'X', role: 'ML Engineer'}, ...]
+  → [{company: "Xenon", role: "ML Engineer"}, {company: "X", role: "ML Engineer"}, ...]
 - "Applied for head of engineer role at softbank"
-  → [{company: 'Softbank', role: 'Head of Engineer'}]
-- "referral for google L4" → [{company: 'Google', role: 'L4', notes: 'Referral'}]
-- "applied via linkedin to grab, gojek" → 2 apps`,
-    },
+  → [{company: "Softbank", role: "Head of Engineer"}]
+- "referral for google L4" → [{company: "Google", role: "L4", notes: "Referral"}]
+- "applied via linkedin to grab, gojek" → 2 apps with notes "Applied via LinkedIn"
+`.trim(),
+  },
 
-    markTopicComplete: {
-        topicName: `The name of the topic the user completed studying.
-Examples: "Arrays & Strings", "Dynamic Programming", "System Design", "STAR Method"
-Match what the user says to the closest topic name.`,
-    },
+  markTopicComplete: {
+    topicName: `
+The name of the topic the user completed studying.
 
-    getQuestions: {
-        company: `Optional company name to filter questions by.`,
-    },
-};
+Examples: "Arrays & Strings", "Dynamic Programming", "System Design", "STAR Method".
+Match what the user says to the closest topic name.
+`.trim(),
+  },
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT DESCRIPTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+  getQuestions: {
+    company: `Optional company name to filter questions by.`,
+  },
+} satisfies SchemaDescriptions;
 
 export const componentDescriptions = {
-    SprintSetupCard: `A component that allows users to set up an interview prep sprint.
+  SprintSetupCard: `
+A component that allows users to set up an interview prep sprint.
 
 ## Trigger Phrases
 - "I have an interview at [company]"
@@ -327,9 +355,11 @@ export const componentDescriptions = {
 - "I'm interviewing at [company] on [date]"
 - "Prepare me for [company]"
 
-Extracts company name, role type, and interview date from the conversation.`,
+Extracts company name, role type, and interview date from the conversation.
+`.trim(),
 
-    TodaysPlanPanel: `A component that shows the user's daily prep tasks.
+  TodaysPlanPanel: `
+A component that shows the user's daily prep tasks.
 
 ## Trigger Phrases
 - "What should I study today?"
@@ -338,9 +368,11 @@ Extracts company name, role type, and interview date from the conversation.`,
 - "Today's tasks"
 - "What do I need to do today?"
 
-Shows tasks organized by morning and evening blocks with checkboxes.`,
+Shows tasks organized by morning and evening blocks with checkboxes.
+`.trim(),
 
-    PlanForDatePanel: `A component that shows the user's prep tasks for a specific date.
+  PlanForDatePanel: `
+A component that shows the user's prep tasks for a specific date.
 
 ## Trigger Phrases
 - "Show my plan for [date]"
@@ -349,9 +381,11 @@ Shows tasks organized by morning and evening blocks with checkboxes.`,
 - "Show tasks for next week"
 - "interview scheduled, [company] [role] next Wednesday"
 
-Use instead of TodaysPlanPanel when user mentions any non-today date.`,
+Use instead of TodaysPlanPanel when user mentions any non-today date.
+`.trim(),
 
-    AddQuestionPanel: `A component that allows users to add interview questions.
+  AddQuestionPanel: `
+A component that allows users to add interview questions.
 
 ## Trigger Phrases
 - "Save this question: [question]"
@@ -360,9 +394,11 @@ Use instead of TodaysPlanPanel when user mentions any non-today date.`,
 - "Remember this question"
 - "save this behavioral q: [question]"
 
-Auto-detects category: DSA, System Design, Behavioral, SQL.`,
+Auto-detects category: DSA, System Design, Behavioral, SQL.
+`.trim(),
 
-    PipelineSummaryPanel: `Summarizes the user's job application pipeline by status.
+  PipelineSummaryPanel: `
+Summarizes the user's job application pipeline by status.
 
 ## Trigger Phrases
 - "Show my pipeline"
@@ -371,9 +407,11 @@ Auto-detects category: DSA, System Design, Behavioral, SQL.`,
 - "Pipeline summary"
 - "Application overview"
 
-Highlights upcoming interviews with a countdown.`,
+Highlights upcoming interviews with a countdown.
+`.trim(),
 
-    OfferDetailsPanel: `A component that captures and edits job offer details.
+  OfferDetailsPanel: `
+A component that captures and edits job offer details.
 
 ## Trigger Phrases
 - "I got an offer from [company]"
@@ -390,5 +428,6 @@ Parse salary details from natural language:
   → {totalCTC: "10 LPA", baseSalary: "8 LPA", bonus: "2 LPA", equity: "None"}
 - "12 lpa budget" → {expectedCTC: "12 LPA"}
 
-Captures: CTC/base/bonus/equity, work mode, location, joining date, benefits, notes.`,
-};
+Captures: CTC/base/bonus/equity, work mode, location, joining date, benefits, notes.
+`.trim(),
+} satisfies Record<ComponentDescriptionKey, string>;

@@ -135,7 +135,7 @@ export const tools: TamboTool[] = [
       }));
     },
     inputSchema: z.object({
-      company: z.string().optional().describe("Filter questions by company name"),
+      company: z.string().optional().describe(schemaDescriptions.getQuestions.company),
     }),
     outputSchema: z.array(
       z.object({
@@ -233,6 +233,7 @@ export const tools: TamboTool[] = [
         company: string;
         role?: string;
         status?: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
+        notes?: string;
       }>;
     }) => {
       const addApplication = useStore.getState().addApplication;
@@ -260,7 +261,7 @@ export const tools: TamboTool[] = [
           status: (typeof app === 'object' ? app?.status : undefined) || "applied",
           applicationDate: new Date().toISOString(),
           rounds: [],
-          notes: "",
+          notes: (typeof app === 'object' ? app?.notes : undefined) || "",
           createdAt: new Date().toISOString(),
         };
 
@@ -280,6 +281,7 @@ export const tools: TamboTool[] = [
               .enum(["applied", "shortlisted", "interview", "offer", "rejected"])
               .optional()
               .describe(schemaDescriptions.addApplications.status),
+            notes: z.string().optional().describe(schemaDescriptions.addApplications.notes),
           })
         )
         .describe(schemaDescriptions.addApplications.applications),
