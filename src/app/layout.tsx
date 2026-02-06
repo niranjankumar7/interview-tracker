@@ -7,6 +7,7 @@ import { TamboProviderWrapper } from "@/components/providers/tambo-provider-wrap
 import { LeetCodeSyncGate } from "@/components/leetcode";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataSyncProvider } from "@/components/providers/DataSyncProvider";
+import { AuthGuard } from "@/components/providers/AuthGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

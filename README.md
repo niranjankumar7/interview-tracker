@@ -1,131 +1,206 @@
-# Tambo Template
+# Blueprint 🎯
 
-This is a starter NextJS app with Tambo hooked up to get your AI app development started quickly.
+**The Master Plan for Your Job Change**
 
-## Get Started
+> Built with [Tambo](https://tambo.co) for the **WeMakeDevs Hackathon**
 
-1. Run `npm create-tambo@latest my-tambo-app` for a new project
+Blueprint is a **Generative UI Interview Prep Tracker** that uses natural language to help you manage job applications and prepare systematically for interviews.
 
-2. `npm install`
+---
 
-3. `npx tambo init`
+## 💡 The Problem
 
-- or rename `example.env.local` to `.env.local` and add your tambo API key you can get for free [here](https://tambo.co/dashboard).
+Students and early-career professionals face these challenges during job hunting:
 
-4. Run `npm run dev` and go to `localhost:3000` to use the app!
+| Challenge | Impact |
+|-----------|--------|
+| **Disorganized tracking** | Applications scattered across emails, spreadsheets, and sticky notes |
+| **No structured prep plan** | Know what to study, but not *when* or *how much* |
+| **Last-minute cramming** | Without a timeline, students panic-prep the day before |
+| **Lost interview insights** | Questions asked in previous rounds are forgotten |
+| **No accountability** | Easy to skip prep days without progress tracking |
 
-## Customizing
+---
 
-### Change what components tambo can control
+## ✨ Our Solution
 
-You can see how components are registered with tambo in `src/lib/tambo.ts`:
+Blueprint transforms chaotic interview prep into a **structured system**:
 
-```tsx
-export const components: TamboComponent[] = [
-  {
-    name: "Graph",
-    description:
-      "A component that renders various types of charts (bar, line, pie) using Recharts. Supports customizable data visualization with labels, datasets, and styling options.",
-    component: Graph,
-    propsSchema: graphSchema,
-  },
-  // Add more components here
-];
+### 🤖 Powered by Tambo's Generative UI
+
+Instead of clicking through forms, you **describe your situation in plain English**:
+
+```
+"I have an interview at Google next Thursday for SDE role"
 ```
 
-You can install the graph component into any project with:
+Tambo's AI automatically:
+- Creates an application card in your pipeline
+- Generates a 7-day prep sprint
+- Shows today's tasks and countdown
+
+### 📊 Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **AI Chat Interface** | Natural language commands to manage everything |
+| **Kanban Pipeline** | Track applications: Applied → Interview → Offer |
+| **Sprint Generator** | Auto-generates study plans based on interview date |
+| **Daily Prep View** | Today's tasks, streaks, and progress tracking |
+| **Question Bank** | Store questions asked at each company |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL database (local or cloud: [Neon](https://neon.tech) / [Supabase](https://supabase.com))
+
+### 1. Clone & Install
 
 ```bash
-npx tambo add graph
+git clone https://github.com/your-repo/blueprint.git
+cd blueprint
+npm install
 ```
 
-The example Graph component demonstrates several key features:
+### 2. Configure Environment
 
-- Different prop types (strings, arrays, enums, nested objects)
-- Multiple chart types (bar, line, pie)
-- Customizable styling (variants, sizes)
-- Optional configurations (title, legend, colors)
-- Data visualization capabilities
+Copy the example environment file:
 
-Update the `components` array with any component(s) you want tambo to be able to use in a response!
-
-You can find more information about the options [here](https://docs.tambo.co/concepts/generative-interfaces/generative-components)
-
-### Add tools for tambo to use
-
-Tools are defined with `inputSchema` and `outputSchema`:
-
-```tsx
-export const tools: TamboTool[] = [
-  {
-    name: "globalPopulation",
-    description:
-      "A tool to get global population trends with optional year range filtering",
-    tool: getGlobalPopulationTrend,
-    inputSchema: z.object({
-      startYear: z.number().optional(),
-      endYear: z.number().optional(),
-    }),
-    outputSchema: z.array(
-      z.object({
-        year: z.number(),
-        population: z.number(),
-        growthRate: z.number(),
-      }),
-    ),
-  },
-];
+```bash
+cp example.env.local .env.local
 ```
 
-Find more information about tools [here.](https://docs.tambo.co/concepts/tools)
+Edit `.env.local` with your values:
 
-### The Magic of Tambo Requires the TamboProvider
+```bash
+# Tambo AI - Get your free key at https://tambo.co/dashboard
+NEXT_PUBLIC_TAMBO_API_KEY=your-tambo-api-key
 
-Make sure in the TamboProvider wrapped around your app:
+# PostgreSQL Database
+DATABASE_URL="postgresql://user:password@localhost:5432/interview_tracker"
 
-```tsx
-...
-<TamboProvider
-  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
-  components={components} // Array of components to control
-  tools={tools} // Array of tools it can use
->
-  {children}
-</TamboProvider>
+# JWT Secret (generate with: openssl rand -base64 32)
+JWT_SECRET="your-secret-key-at-least-32-characters"
 ```
 
-In this example we do this in the `Layout.tsx` file, but you can do it anywhere in your app that is a client component.
+Also create a `.env` file for Prisma:
 
-### Voice input
-
-The template includes a `DictationButton` component using the `useTamboVoice` hook for speech-to-text input.
-
-### MCP (Model Context Protocol)
-
-The template includes MCP support for connecting to external tools and resources. You can use the MCP hooks from `@tambo-ai/react/mcp`:
-
-- `useTamboMcpPromptList` - List available prompts from MCP servers
-- `useTamboMcpPrompt` - Get a specific prompt
-- `useTamboMcpResourceList` - List available resources
-
-See `src/components/tambo/mcp-components.tsx` for example usage.
-
-### Change where component responses are shown
-
-The components used by tambo are shown alongside the message response from tambo within the chat thread, but you can have the result components show wherever you like by accessing the latest thread message's `renderedComponent` field:
-
-```tsx
-const { thread } = useTambo();
-const latestComponent =
-  thread?.messages[thread.messages.length - 1]?.renderedComponent;
-
-return (
-  <div>
-    {latestComponent && (
-      <div className="my-custom-wrapper">{latestComponent}</div>
-    )}
-  </div>
-);
+```bash
+echo 'DATABASE_URL="postgresql://user:password@localhost:5432/interview_tracker"' > .env
 ```
 
-For more detailed documentation, visit [Tambo's official docs](https://docs.tambo.co).
+### 3. Setup Database
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Create database tables
+npx prisma db push
+```
+
+### 4. Run the App
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) 🎉
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **AI/Chat** | [Tambo React SDK](https://tambo.co) - Generative UI |
+| **Frontend** | Next.js 15, React 18, TypeScript |
+| **Styling** | Tailwind CSS |
+| **State** | Zustand |
+| **Backend** | Next.js API Routes |
+| **Database** | PostgreSQL + Prisma ORM |
+| **Auth** | JWT (bcrypt + jose) |
+
+---
+
+## 🎨 How Tambo Powers Blueprint
+
+Tambo's Generative UI SDK is the **core innovation** of Blueprint:
+
+### Natural Language → UI Components
+
+```typescript
+// Users speak naturally, Tambo generates the right UI
+"Add interview at Microsoft for PM role next Friday"
+  → Renders ApplicationCard + SprintSetup components
+
+"Show my prep plan for tomorrow"
+  → Renders DailyPlanView with tasks
+
+"Add question: explain microservices architecture"
+  → Adds to Question Bank, auto-categorizes as SystemDesign
+```
+
+### Registered Components & Tools
+
+See `src/lib/tambo.ts` for all Tambo integrations:
+
+- **Components**: Graph, ApplicationCard, PrepPlan, QuestionCard
+- **Tools**: addApplications, updateApplicationStatus, addQuestions, markTopicComplete
+
+---
+
+## 📁 Project Structure
+
+```
+blueprint/
+├── src/
+│   ├── app/                    # Next.js pages & API routes
+│   │   ├── api/               # REST API endpoints
+│   │   ├── dashboard/         # Main dashboard
+│   │   ├── pipeline/          # Kanban board
+│   │   └── chat/              # AI chat interface
+│   ├── components/            # React components
+│   ├── lib/                   # Utilities, Tambo config, auth
+│   └── services/              # API client services
+├── prisma/                    # Database schema
+└── docs/                      # Documentation
+```
+
+---
+
+## 📚 Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Quickstart](docs/setup/quickstart.md) | 5-minute setup |
+| [Backend Setup](docs/setup/backend-setup.md) | Detailed configuration |
+| [API Map](docs/api/api-map.md) | All API endpoints |
+| [Testing Guide](docs/guides/testing.md) | How to test |
+
+---
+
+## 🏆 Built for Tambo Hackathon
+
+This project was built for the **WeMakeDevs x Tambo Hackathon** to showcase:
+
+- ✅ **Best Use of Tambo** - Core interaction via Generative UI
+- ✅ **Real Problem** - Addresses actual student pain points
+- ✅ **Production Ready** - Full backend with user auth and data persistence
+- ✅ **Polished UX** - Dark mode, responsive design, smooth animations
+
+---
+
+## 👥 Team
+
+Built with ❤️ for the Tambo Hackathon
+
+---
+
+## 📄 License
+
+MIT License - feel free to use and modify!
