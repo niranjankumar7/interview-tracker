@@ -521,7 +521,9 @@ export function KanbanBoard() {
                                         <div className="text-center py-8 text-muted-foreground text-sm">
                                             {isSearching
                                                 ? "No matches in this column for this search"
-                                                : "Drop applications here"}
+                                                : column.status === "rejected"
+                                                    ? "Only rejected applications go here"
+                                                    : "Drop applications here"}
                                         </div>
                                     ) : (
                                         columnApps.map((app) => {
@@ -599,6 +601,11 @@ export function KanbanBoard() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                const confirmed = window.confirm(
+                                                                    `Are you sure you want to delete the ${app.company} - ${app.role} application? This action cannot be undone.`
+                                                                );
+                                                                if (!confirmed) return;
+
                                                                 void deleteApplicationAPI(app.id).catch((error) => {
                                                                     console.error(
                                                                         "Failed to delete application from pipeline:",
@@ -662,17 +669,20 @@ export function KanbanBoard() {
                                                         Click to view prep →
                                                     </div>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setFeedbackApplicationId(app.id);
-                                                        }}
-                                                        className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
-                                                    >
-                                                        <PanelRight className="w-4 h-4" />
-                                                        Round feedback
-                                                    </button>
+                                                    {/* Round feedback button only shown for Interview status */}
+                                                    {app.status === "interview" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setFeedbackApplicationId(app.id);
+                                                            }}
+                                                            className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2"
+                                                        >
+                                                            <PanelRight className="w-4 h-4" />
+                                                            Round feedback
+                                                        </button>
+                                                    )}
                                                 </div>
                                             );
                                         })
