@@ -1,0 +1,614 @@
+{
+    "info": {
+        "_postman_id": "interview-tracker-api-2026",
+        "name": "Interview Tracker API",
+        "description": "Complete API collection for Interview Tracker application with authentication, applications, questions, sprints, and user management endpoints.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "interview-tracker"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{authToken}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "Register User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('userId', response.user.id);",
+                                    "    console.log('User registered successfully:', response.user.email);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"SecurePassword123!\",\n    \"name\": \"John Doe\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/register",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "register"
+                            ]
+                        },
+                        "description": "Register a new user account. Password must be at least 8 characters."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('authToken', response.token);",
+                                    "    pm.environment.set('userId', response.user.id);",
+                                    "    console.log('Login successful. Token saved to environment.');",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"SecurePassword123!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login with email and password. Returns JWT token valid for 7 days."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/logout",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "logout"
+                            ]
+                        },
+                        "description": "Logout user by clearing the auth cookie."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Authentication endpoints for user registration, login, and logout."
+        },
+        {
+            "name": "User Profile",
+            "item": [
+                {
+                    "name": "Get Current User",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/user/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "user",
+                                "me"
+                            ]
+                        },
+                        "description": "Get current authenticated user's profile, progress, preferences, and LeetCode connection."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update User Profile",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"John Doe Updated\",\n    \"targetRole\": \"Senior Software Engineer\",\n    \"experienceLevel\": \"Senior\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/user/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "user",
+                                "me"
+                            ]
+                        },
+                        "description": "Update user profile information. Experience level can be: Junior, Mid, or Senior."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "User profile management endpoints."
+        },
+        {
+            "name": "Applications",
+            "item": [
+                {
+                    "name": "Get All Applications",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications"
+                            ]
+                        },
+                        "description": "Get all job applications for the authenticated user, including interview rounds."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Application",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('applicationId', response.id);",
+                                    "    console.log('Application created:', response.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"company\": \"Google\",\n    \"role\": \"Software Engineer\",\n    \"jobDescriptionUrl\": \"https://careers.google.com/jobs/12345\",\n    \"roleType\": \"SDE\",\n    \"status\": \"applied\",\n    \"applicationDate\": \"2026-02-06T00:00:00.000Z\",\n    \"notes\": \"Applied through referral\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications"
+                            ]
+                        },
+                        "description": "Create a new job application. Status can be: applied, shortlisted, interview, offer, or rejected."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Single Application",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications",
+                                "{{applicationId}}"
+                            ]
+                        },
+                        "description": "Get a specific application by ID with all interview rounds."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Application",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"interview\",\n    \"interviewDate\": \"2026-02-15T10:00:00.000Z\",\n    \"currentRound\": \"Technical Round 1\",\n    \"notes\": \"Scheduled for technical interview\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications",
+                                "{{applicationId}}"
+                            ]
+                        },
+                        "description": "Update an existing application. All fields are optional."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Application with Offer Details",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"status\": \"offer\",\n    \"offerDetails\": {\n        \"baseSalary\": 150000,\n        \"equity\": \"0.5% RSU\",\n        \"bonus\": 20000,\n        \"currency\": \"USD\",\n        \"location\": \"San Francisco, CA\",\n        \"workMode\": \"Hybrid\",\n        \"joiningDate\": \"2026-03-15T00:00:00.000Z\",\n        \"noticePeriod\": \"2 weeks\",\n        \"benefits\": [\"Health Insurance\", \"401k Match\", \"Gym Membership\"],\n        \"notes\": \"Great offer with excellent benefits\",\n        \"totalCTC\": 170000\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications",
+                                "{{applicationId}}"
+                            ]
+                        },
+                        "description": "Update application with offer details. Work mode can be: WFH, Hybrid, or Office."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete Application",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/applications/{{applicationId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "applications",
+                                "{{applicationId}}"
+                            ]
+                        },
+                        "description": "Delete an application. This will also delete all associated interview rounds."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Job application management endpoints."
+        },
+        {
+            "name": "Questions",
+            "item": [
+                {
+                    "name": "Get All Questions",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/questions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "questions"
+                            ]
+                        },
+                        "description": "Get all questions for the authenticated user."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Questions by Application",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/questions?applicationId={{applicationId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "questions"
+                            ],
+                            "query": [
+                                {
+                                    "key": "applicationId",
+                                    "value": "{{applicationId}}"
+                                }
+                            ]
+                        },
+                        "description": "Get questions filtered by application ID."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Questions by Category",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/questions?category=DSA",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "questions"
+                            ],
+                            "query": [
+                                {
+                                    "key": "category",
+                                    "value": "DSA"
+                                }
+                            ]
+                        },
+                        "description": "Get questions filtered by category. Categories: DSA, SystemDesign, Behavioral, SQL, Other."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Question",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"questionText\": \"Implement a LRU Cache with O(1) operations\",\n    \"category\": \"DSA\",\n    \"difficulty\": \"Medium\",\n    \"askedInRound\": \"Technical Round 1\",\n    \"applicationId\": \"{{applicationId}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/questions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "questions"
+                            ]
+                        },
+                        "description": "Create a new question. applicationId is optional. Difficulty can be: Easy, Medium, or Hard."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create General Question (No Application)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"questionText\": \"Design a URL shortening service like bit.ly\",\n    \"category\": \"SystemDesign\",\n    \"difficulty\": \"Hard\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/questions",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "questions"
+                            ]
+                        },
+                        "description": "Create a general question not linked to any specific application."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Question bank management endpoints."
+        },
+        {
+            "name": "Sprints",
+            "item": [
+                {
+                    "name": "Get All Sprints",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/sprints",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "sprints"
+                            ]
+                        },
+                        "description": "Get all interview prep sprints for the authenticated user."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Active Sprints",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/sprints?status=active",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "sprints"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "active"
+                                }
+                            ]
+                        },
+                        "description": "Get sprints filtered by status. Status can be: active, completed, or expired."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Sprint",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"applicationId\": \"{{applicationId}}\",\n    \"interviewDate\": \"2026-02-20T00:00:00.000Z\",\n    \"roleType\": \"SDE\",\n    \"totalDays\": 14,\n    \"dailyPlans\": {\n        \"day1\": {\n            \"topics\": [\"Arrays\", \"Strings\"],\n            \"problems\": 5,\n            \"completed\": false\n        },\n        \"day2\": {\n            \"topics\": [\"Linked Lists\", \"Stacks\"],\n            \"problems\": 5,\n            \"completed\": false\n        },\n        \"day3\": {\n            \"topics\": [\"Trees\", \"Binary Search\"],\n            \"problems\": 5,\n            \"completed\": false\n        }\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/sprints",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "sprints"
+                            ]
+                        },
+                        "description": "Create a new interview prep sprint. Total days must be between 1 and 30."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Interview preparation sprint management endpoints."
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000",
+            "type": "string"
+        },
+        {
+            "key": "authToken",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "userId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "applicationId",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

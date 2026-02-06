@@ -2,7 +2,8 @@
 
 import { useStore } from "@/lib/store";
 import { tryParseDateInput } from "@/lib/date-parsing";
-import type { Sprint } from "@/types";
+import { getDailyPlansArray } from "@/lib/sprint-utils";
+import type { Sprint, DailyPlan } from "@/types";
 import {
     buildStruggledTopicMatchersByAppId,
     matchesStruggledTopic,
@@ -37,8 +38,6 @@ interface PlanForDatePanelProps {
     targetDate: string;
     applicationId?: string;
 }
-
-type DailyPlan = Sprint["dailyPlans"][number];
 
 type ParsedDailyPlan = {
     plan: DailyPlan;
@@ -166,17 +165,18 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 const struggledTopicMatchers =
                     struggledTopicMatchersByAppId.get(sprint.applicationId) ?? [];
 
-                const parsedDailyPlans: ParsedDailyPlan[] = sprint.dailyPlans.map(
+                const dailyPlans = getDailyPlansArray(sprint.dailyPlans);
+                const parsedDailyPlans: ParsedDailyPlan[] = dailyPlans.map(
                     (plan, index) => {
-                    const parsedDate = parseISO(plan.date);
-                    const time = parsedDate.getTime();
-                    return {
-                        plan,
-                        parsedDate,
-                        time: Number.isNaN(time) ? null : time,
-                        index,
-                    };
-                }
+                        const parsedDate = parseISO(plan.date);
+                        const time = parsedDate.getTime();
+                        return {
+                            plan,
+                            parsedDate,
+                            time: Number.isNaN(time) ? null : time,
+                            index,
+                        };
+                    }
                 );
 
                 const validDailyPlans = parsedDailyPlans.filter(
@@ -186,7 +186,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                 const hasInvalidPlanDates =
                     validDailyPlans.length !== parsedDailyPlans.length;
 
-                if (sprint.dailyPlans.length === 0) {
+                if (dailyPlans.length === 0) {
                     return (
                         <div
                             key={sprint.id}
@@ -212,7 +212,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                             "PlanForDatePanel: sprint has invalid daily plan dates",
                             {
                                 sprintId: sprint.id,
-                                dailyPlanDates: sprint.dailyPlans.map((p) => p.date),
+                                dailyPlanDates: dailyPlans.map((p) => p.date),
                             }
                         );
                     }
@@ -290,7 +290,7 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                 const { plan, parsedDate: planDate, index: dayIndex } = selectedPlanEntry;
 
-                if (dayIndex < 0 || dayIndex >= sprint.dailyPlans.length) {
+                if (dayIndex < 0 || dayIndex >= dailyPlans.length) {
                     if (process.env.NODE_ENV !== "production") {
                         console.error("PlanForDatePanel: invalid day index", {
                             sprintId: sprint.id,
@@ -310,13 +310,14 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                     );
                 }
 
-                const completedTasks = plan.blocks.reduce(
+                const blocks = plan.blocks ?? [];
+                const completedTasks = blocks.reduce(
                     (acc, block) =>
-                        acc + block.tasks.filter((t) => t.completed).length,
+                        acc + (block.tasks ?? []).filter((t) => t.completed).length,
                     0
                 );
-                const totalTasks = plan.blocks.reduce(
-                    (acc, block) => acc + block.tasks.length,
+                const totalTasks = blocks.reduce(
+                    (acc, block) => acc + (block.tasks ?? []).length,
                     0
                 );
 
@@ -402,12 +403,12 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
 
                         {/* Blocks */}
                         <div className="p-5 space-y-4">
-                            {plan.blocks.map((block, blockIdx) => (
+                            {blocks.map((block, blockIdx) => (
                                 <div
                                     key={block.id}
                                     className={`rounded-lg p-4 ${block.completed
-                                            ? "bg-green-50 border border-green-200"
-                                            : "bg-gray-50 border border-gray-200"
+                                        ? "bg-green-50 border border-green-200"
+                                        : "bg-gray-50 border border-gray-200"
                                         }`}
                                 >
                                     <div className="flex items-center justify-between mb-3">
@@ -464,8 +465,8 @@ export function PlanForDatePanel({ targetDate, applicationId }: PlanForDatePanel
                                                     </button>
                                                     <span
                                                         className={`text-sm ${task.completed
-                                                                ? "line-through text-gray-400"
-                                                                : "text-gray-700"
+                                                            ? "line-through text-gray-400"
+                                                            : "text-gray-700"
                                                             } ${struggledMatch && !task.completed
                                                                 ? "bg-yellow-50 border border-yellow-200 rounded px-2 py-1"
                                                                 : ""
