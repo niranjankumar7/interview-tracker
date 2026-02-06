@@ -1,0 +1,231 @@
+// Prisma Schema for Interview Tracker
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  targetRole    String?
+  experienceLevel String? // Junior, Mid, Senior
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  applications     Application[]
+  questions        Question[]
+  sprints          Sprint[]
+  completedTopics  CompletedTopic[]
+  progress         UserProgress?
+  preferences      UserPreferences?
+  leetcode         LeetCodeConnection?
+  
+  @@index([email])
+}
+
+// ============================================
+// JOB APPLICATIONS
+// ============================================
+
+model Application {
+  id                String    @id @default(uuid())
+  userId            String
+  company           String
+  role              String
+  jobDescriptionUrl String?
+  roleType          String?   // SDE, SDET, ML, etc.
+  status            String    // applied, shortlisted, interview, offer, rejected
+  applicationDate   DateTime
+  interviewDate     DateTime?
+  currentRound      String?   // Current interview round type
+  notes             String    @default("")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Offer details (JSON)
+  offerBaseSalary   Float?
+  offerEquity       String?
+  offerBonus        Float?
+  offerCurrency     String?
+  offerLocation     String?
+  offerWorkMode     String?   // WFH, Hybrid, Office
+  offerJoiningDate  DateTime?
+  offerNoticePeriod String?
+  offerBenefits     String[]  // Array of benefits
+  offerNotes        String?
+  offerTotalCTC     Float?
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rounds            InterviewRound[]
+  sprints           Sprint[]
+  questions         Question[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([interviewDate])
+}
+
+// ============================================
+// INTERVIEW ROUNDS
+// ============================================
+
+model InterviewRound {
+  id              String    @id @default(uuid())
+  applicationId   String
+  roundNumber     Int
+  roundType       String    // technical, behavioral, system-design, etc.
+  scheduledDate   DateTime?
+  notes           String    @default("")
+  questionsAsked  String[]  // Array of question texts
+  
+  // Feedback (optional)
+  feedbackRating        Int?      // 1-5 stars
+  feedbackPros          String[]
+  feedbackCons          String[]
+  feedbackStruggledTopics String[]
+  feedbackNotes         String?
+  
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, roundNumber])
+  @@index([applicationId])
+}
+
+// ============================================
+// INTERVIEW PREP SPRINTS
+// ============================================
+
+model Sprint {
+  id              String    @id @default(uuid())
+  userId          String
+  applicationId   String
+  interviewDate   DateTime
+  roleType        String    // SDE, SDET, ML, etc.
+  totalDays       Int
+  status          String    // active, completed, expired
+  dailyPlans      Json      // Store daily plans as JSON
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([status])
+  @@index([interviewDate])
+}
+
+// ============================================
+// QUESTION BANK
+// ============================================
+
+model Question {
+  id              String    @id @default(uuid())
+  userId          String
+  applicationId   String?   // Optional - can be general questions
+  questionText    String
+  category        String    // DSA, SystemDesign, Behavioral, SQL, Other
+  difficulty      String?   // Easy, Medium, Hard
+  askedInRound    String?   // e.g., "Round 2: Technical"
+  dateAdded       DateTime  @default(now())
+
+  // Relations
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application     Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([category])
+}
+
+// ============================================
+// USER PROGRESS & PREFERENCES
+// ============================================
+
+model UserProgress {
+  userId              String   @id
+  currentStreak       Int      @default(0)
+  longestStreak       Int      @default(0)
+  lastActiveDate      DateTime?
+  totalTasksCompleted Int      @default(0)
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserPreferences {
+  userId                    String   @id
+  theme                     String   @default("system") // light, dark, system
+  studyRemindersEnabled     Boolean  @default(false)
+  calendarAutoSyncEnabled   Boolean  @default(false)
+  leetcodeAutoSyncEnabled   Boolean  @default(false)
+  updatedAt                 DateTime @updatedAt
+
+  // Relations
+  user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// COMPLETED TOPICS TRACKING
+// ============================================
+
+model CompletedTopic {
+  id            String   @id @default(uuid())
+  userId        String
+  topicName     String   // Normalized topic name
+  displayName   String?  // Original display name
+  completedAt   DateTime @default(now())
+  source        String   // chat, manual
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicName])
+  @@index([userId])
+}
+
+// ============================================
+// LEETCODE INTEGRATION
+// ============================================
+
+model LeetCodeConnection {
+  userId          String   @id
+  username        String
+  connectedAt     DateTime @default(now())
+  lastSyncAt      DateTime?
+  readOnly        Boolean  @default(true)
+  
+  // Stats (cached from LeetCode)
+  currentStreak   Int?
+  longestStreak   Int?
+  lastActiveDate  DateTime?
+  totalSolved     Int?
+  easySolved      Int?
+  mediumSolved    Int?
+  hardSolved      Int?
+  
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
