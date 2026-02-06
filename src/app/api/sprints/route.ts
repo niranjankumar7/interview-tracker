@@ -8,13 +8,41 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
+import { Prisma } from '@prisma/client';
+
+// Schema for individual task in a daily plan
+const taskSchema = z.object({
+    id: z.string(),
+    description: z.string(),
+    completed: z.boolean().default(false),
+    category: z.string().optional(),
+    estimatedMinutes: z.number().optional(),
+});
+
+// Schema for a block within a daily plan
+const blockSchema = z.object({
+    id: z.string(),
+    type: z.string(),
+    duration: z.string(),
+    completed: z.boolean().default(false),
+    tasks: z.array(taskSchema),
+});
+
+// Schema for a daily plan
+const dailyPlanSchema = z.object({
+    day: z.number().int().min(1),
+    date: z.string(),
+    focus: z.string(),
+    completed: z.boolean().default(false),
+    blocks: z.array(blockSchema),
+});
 
 const createSprintSchema = z.object({
     applicationId: z.string(),
     interviewDate: z.string(),
     roleType: z.string(),
     totalDays: z.number().int().min(1).max(30),
-    dailyPlans: z.any(), // JSON data
+    dailyPlans: z.array(dailyPlanSchema),
 });
 
 // GET /api/sprints
@@ -24,7 +52,8 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get('status');
 
-        const where: any = { userId: user.userId };
+        // Build where clause with proper typing
+        const where: Prisma.SprintWhereInput = { userId: user.userId };
         if (status) where.status = status;
 
         const sprints = await prisma.sprint.findMany({

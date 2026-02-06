@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
+import { Prisma } from '@prisma/client';
 
 const updateApplicationSchema = z.object({
     company: z.string().min(1).optional(),
@@ -109,8 +110,8 @@ export async function PUT(
             );
         }
 
-        // Prepare update data
-        const updateData: any = {};
+        // Prepare update data with proper Prisma type
+        const updateData: Prisma.ApplicationUpdateInput = {};
 
         if (data.company) updateData.company = data.company;
         if (data.role) updateData.role = data.role;

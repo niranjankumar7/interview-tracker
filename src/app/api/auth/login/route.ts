@@ -14,10 +14,13 @@ const loginSchema = z.object({
     password: z.string(),
 });
 
-// JWT secret (should be in environment variables)
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
-);
+// JWT secret - MUST be set in environment variables
+const jwtSecretString = process.env.JWT_SECRET;
+if (!jwtSecretString) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretString);
+
 
 export async function POST(req: NextRequest) {
     try {

@@ -6,9 +6,12 @@
 import { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
-);
+// JWT secret - MUST be set in environment variables
+const jwtSecretString = process.env.JWT_SECRET;
+if (!jwtSecretString) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretString);
 
 export interface AuthUser {
     userId: string;
@@ -43,8 +46,11 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
             userId: payload.userId as string,
             email: payload.email as string,
         };
-    } catch (error) {
-        console.error('Auth verification error:', error);
+    } catch {
+        // Only log in development to avoid noise and potential token leakage
+        if (process.env.NODE_ENV === 'development') {
+            console.debug('Auth verification failed');
+        }
         return null;
     }
 }

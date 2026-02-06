@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
+import { Prisma } from '@prisma/client';
 
 const createQuestionSchema = z.object({
     applicationId: z.string().optional(),
@@ -25,7 +26,8 @@ export async function GET(req: NextRequest) {
         const applicationId = searchParams.get('applicationId');
         const category = searchParams.get('category');
 
-        const where: any = { userId: user.userId };
+        // Build where clause with proper typing
+        const where: Prisma.QuestionWhereInput = { userId: user.userId };
         if (applicationId) where.applicationId = applicationId;
         if (category) where.category = category;
 
