@@ -12,6 +12,8 @@ type ToolDescriptionKey =
   | "markTopicComplete"
   | "getCompletedTopics";
 
+// Only include tools here where we actually wire field-level `.describe(...)` strings.
+// Tools with empty or trivial input schemas don't need entries.
 type SchemaDescriptions = {
   updateApplicationStatus: {
     company: string;
@@ -340,7 +342,7 @@ Match what the user says to the closest topic name.
   },
 
   getQuestions: {
-    company: `Optional company name to filter questions by.`,
+    company: `Optional company name to filter questions by.`.trim(),
   },
 } satisfies SchemaDescriptions;
 
