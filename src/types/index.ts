@@ -135,7 +135,7 @@ export interface Task {
 
 export interface Question {
     id: string;
-    companyId: string;
+    companyId?: string; // Optional - use undefined when no company, not empty string
     questionText: string;
     category: QuestionCategory;
     difficulty?: QuestionDifficulty;

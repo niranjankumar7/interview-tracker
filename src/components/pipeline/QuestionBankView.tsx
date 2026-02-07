@@ -2,7 +2,7 @@
 
 import { useStore } from "@/lib/store";
 import { QuestionCategory, QUESTION_CATEGORIES, Question } from "@/types";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
     Search,
     Filter,
@@ -13,6 +13,7 @@ import {
     Plus,
     X,
 } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 const categoryColors: Record<QuestionCategory, { bg: string; text: string }> = {
     DSA: { bg: "bg-blue-100 dark:bg-blue-950/40", text: "text-blue-700 dark:text-blue-200" },
@@ -28,6 +29,17 @@ const difficultyColors: Record<string, { bg: string; text: string }> = {
     Hard: { bg: "bg-red-100 dark:bg-red-950/40", text: "text-red-700 dark:text-red-200" },
 };
 
+/**
+ * Generate a unique ID with fallback for environments without crypto.randomUUID
+ */
+function generateId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers/test environments
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+}
+
 export function QuestionBankView() {
     const questions = useStore((state) => state.questions);
     const applications = useStore((state) => state.applications);
@@ -42,7 +54,7 @@ export function QuestionBankView() {
         questionText: "",
         category: "Other" as QuestionCategory,
         askedInRound: "",
-        companyId: "",
+        companyId: undefined as string | undefined,
     });
     const [addError, setAddError] = useState<string | null>(null);
 
@@ -77,18 +89,28 @@ export function QuestionBankView() {
         return acc;
     }, {} as Record<QuestionCategory, typeof questions>);
 
-    const handleAddQuestion = () => {
+    const handleAddQuestion = useCallback(() => {
         if (!newQuestion.questionText.trim()) {
             setAddError("Please enter the question text.");
             return;
         }
 
+        // Validate companyId if provided - ensure it exists in applications
+        if (newQuestion.companyId) {
+            const appExists = applications.some(app => app.id === newQuestion.companyId);
+            if (!appExists) {
+                setAddError("Selected company no longer exists.");
+                return;
+            }
+        }
+
         const question: Question = {
-            id: crypto.randomUUID(),
-            companyId: newQuestion.companyId || "",
+            id: generateId(),
+            // Use undefined for companyId when not selected (avoid empty string footgun)
+            companyId: newQuestion.companyId || undefined,
             questionText: newQuestion.questionText.trim(),
             category: newQuestion.category,
-            askedInRound: newQuestion.askedInRound || undefined,
+            askedInRound: newQuestion.askedInRound.trim() || undefined,
             dateAdded: new Date().toISOString(),
         };
 
@@ -99,22 +121,30 @@ export function QuestionBankView() {
             questionText: "",
             category: "Other",
             askedInRound: "",
-            companyId: "",
+            companyId: undefined,
         });
         setAddError(null);
         setIsAddModalOpen(false);
-    };
+    }, [newQuestion, addQuestion, applications]);
 
-    const handleCloseModal = () => {
+    const handleCloseModal = useCallback(() => {
         setIsAddModalOpen(false);
         setAddError(null);
         setNewQuestion({
             questionText: "",
             category: "Other",
             askedInRound: "",
-            companyId: "",
+            companyId: undefined,
         });
-    };
+    }, []);
+
+    // Handle company selection - convert empty string to undefined
+    const handleCompanyChange = useCallback((value: string) => {
+        setNewQuestion(prev => ({
+            ...prev,
+            companyId: value === "" ? undefined : value
+        }));
+    }, []);
 
     return (
         <div className="h-full bg-background overflow-auto">
@@ -132,14 +162,17 @@ export function QuestionBankView() {
                             </p>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Question
-                    </button>
+                    <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                        <Dialog.Trigger asChild>
+                            <button
+                                type="button"
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Question
+                            </button>
+                        </Dialog.Trigger>
+                    </Dialog.Root>
                 </div>
 
                 {/* Filters */}
@@ -292,39 +325,44 @@ export function QuestionBankView() {
                 )}
             </div>
 
-            {/* Add Question Modal */}
-            {isAddModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) handleCloseModal();
-                    }}
-                >
-                    <div className="bg-card rounded-xl shadow-xl w-full max-w-lg">
+            {/* Add Question Modal - Using Radix Dialog for accessibility */}
+            <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <Dialog.Content
+                        className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+                        onEscapeKeyDown={handleCloseModal}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-5 border-b border-border">
                             <div>
-                                <h2 className="text-lg font-semibold text-foreground">Add Question</h2>
-                                <p className="text-sm text-muted-foreground">Record a question asked in an interview</p>
+                                <Dialog.Title className="text-lg font-semibold text-foreground">
+                                    Add Question
+                                </Dialog.Title>
+                                <Dialog.Description className="text-sm text-muted-foreground">
+                                    Record a question asked in an interview
+                                </Dialog.Description>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleCloseModal}
-                                className="p-2 hover:bg-muted rounded-lg"
-                                aria-label="Close"
-                            >
-                                <X className="w-5 h-5 text-muted-foreground" />
-                            </button>
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    className="p-2 hover:bg-muted rounded-lg"
+                                    aria-label="Close"
+                                >
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                            </Dialog.Close>
                         </div>
 
                         {/* Modal Body */}
                         <div className="p-5 space-y-4">
                             {/* Question Text */}
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">
+                                <label htmlFor="question-text" className="block text-sm font-medium text-foreground mb-1">
                                     Question <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
+                                    id="question-text"
                                     value={newQuestion.questionText}
                                     onChange={(e) => {
                                         setAddError(null);
@@ -338,10 +376,11 @@ export function QuestionBankView() {
 
                             {/* Category */}
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">
+                                <label htmlFor="question-category" className="block text-sm font-medium text-foreground mb-1">
                                     Category
                                 </label>
                                 <select
+                                    id="question-category"
                                     value={newQuestion.category}
                                     onChange={(e) => setNewQuestion(prev => ({ ...prev, category: e.target.value as QuestionCategory }))}
                                     className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background"
@@ -354,10 +393,11 @@ export function QuestionBankView() {
 
                             {/* Interview Round */}
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">
+                                <label htmlFor="interview-round" className="block text-sm font-medium text-foreground mb-1">
                                     Interview Round
                                 </label>
                                 <input
+                                    id="interview-round"
                                     type="text"
                                     value={newQuestion.askedInRound}
                                     onChange={(e) => setNewQuestion(prev => ({ ...prev, askedInRound: e.target.value }))}
@@ -368,12 +408,13 @@ export function QuestionBankView() {
 
                             {/* Company */}
                             <div>
-                                <label className="block text-sm font-medium text-foreground mb-1">
+                                <label htmlFor="question-company" className="block text-sm font-medium text-foreground mb-1">
                                     Company (optional)
                                 </label>
                                 <select
-                                    value={newQuestion.companyId}
-                                    onChange={(e) => setNewQuestion(prev => ({ ...prev, companyId: e.target.value }))}
+                                    id="question-company"
+                                    value={newQuestion.companyId ?? ""}
+                                    onChange={(e) => handleCompanyChange(e.target.value)}
                                     className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background"
                                 >
                                     <option value="">No company</option>
@@ -387,7 +428,7 @@ export function QuestionBankView() {
 
                             {/* Error Message */}
                             {addError && (
-                                <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-200 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                                <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-200 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2" role="alert">
                                     {addError}
                                 </div>
                             )}
@@ -395,13 +436,14 @@ export function QuestionBankView() {
 
                         {/* Modal Footer */}
                         <div className="flex items-center justify-end gap-2 p-5 border-t border-border">
-                            <button
-                                type="button"
-                                onClick={handleCloseModal}
-                                className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted"
-                            >
-                                Cancel
-                            </button>
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </Dialog.Close>
                             <button
                                 type="button"
                                 onClick={handleAddQuestion}
@@ -410,10 +452,9 @@ export function QuestionBankView() {
                                 Add Question
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
         </div>
     );
 }
-
