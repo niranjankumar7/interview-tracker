@@ -14,12 +14,13 @@ const loginSchema = z.object({
     password: z.string(),
 });
 
-// JWT secret - MUST be set in environment variables
-const jwtSecretString = process.env.JWT_SECRET;
-if (!jwtSecretString) {
-    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+function getJwtSecret(): Uint8Array {
+    const jwtSecretString = process.env.JWT_SECRET;
+    if (!jwtSecretString) {
+        throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+    }
+    return new TextEncoder().encode(jwtSecretString);
 }
-const JWT_SECRET = new TextEncoder().encode(jwtSecretString);
 
 
 export async function POST(req: NextRequest) {
@@ -65,11 +66,12 @@ export async function POST(req: NextRequest) {
         }
 
         // Create JWT token
+        const jwtSecret = getJwtSecret();
         const token = await new SignJWT({ userId: user.id, email: user.email })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
             .setExpirationTime('7d') // Token expires in 7 days
-            .sign(JWT_SECRET);
+            .sign(jwtSecret);
 
         // Return user data and token
         const response = NextResponse.json({

@@ -6,12 +6,13 @@
 import { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-// JWT secret - MUST be set in environment variables
-const jwtSecretString = process.env.JWT_SECRET;
-if (!jwtSecretString) {
-    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+function getJwtSecret(): Uint8Array {
+    const jwtSecretString = process.env.JWT_SECRET;
+    if (!jwtSecretString) {
+        throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+    }
+    return new TextEncoder().encode(jwtSecretString);
 }
-const JWT_SECRET = new TextEncoder().encode(jwtSecretString);
 
 export interface AuthUser {
     userId: string;
@@ -40,13 +41,19 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
         }
 
         // Verify token
-        const { payload } = await jwtVerify(token, JWT_SECRET);
+        const jwtSecret = getJwtSecret();
+        const { payload } = await jwtVerify(token, jwtSecret);
 
         return {
             userId: payload.userId as string,
             email: payload.email as string,
         };
-    } catch {
+    } catch (error) {
+        // Surface infrastructure misconfiguration as a real server error.
+        if (error instanceof Error && error.message.includes('FATAL: JWT_SECRET')) {
+            throw error;
+        }
+
         // Only log in development to avoid noise and potential token leakage
         if (process.env.NODE_ENV === 'development') {
             console.debug('Auth verification failed');
