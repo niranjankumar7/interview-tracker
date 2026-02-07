@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { formatOfferTotalCTC } from "@/lib/offer-details";
 import { generateSprint } from "@/lib/sprintGenerator";
-import { Application, ApplicationStatus, RoleType } from "@/types";
+import { Application, ApplicationStatus, RoleType, Sprint } from "@/types";
 import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import {
     AlertTriangle,
@@ -18,6 +18,7 @@ import {
     Search,
     Trash2,
 } from "lucide-react";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { useDebounce } from "use-debounce";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
@@ -126,6 +127,14 @@ export function KanbanBoard() {
     const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
         null
     );
+
+    const [deleteCandidate, setDeleteCandidate] = useState<Application | null>(null);
+    const [pendingSprintReplacement, setPendingSprintReplacement] = useState<{
+        applicationLabel: string;
+        canonicalSprintId: string;
+        nextSprint: Sprint;
+        activeDuplicateSprintIds: string[];
+    } | null>(null);
 
     const cancelInterviewSetup = useCallback(() => {
         if (interviewSetup && interviewSetup.previousStatus !== "interview") {
@@ -287,10 +296,21 @@ export function KanbanBoard() {
         }
 
         if (canonical.status === "active") {
-            const shouldReplace = window.confirm(
-                "An interview prep sprint already exists for this application. Regenerate it? This will replace your existing plan and reset any progress."
-            );
-            if (!shouldReplace) return;
+            const application = applications.find((a) => a.id === applicationId);
+            const applicationLabel = application
+                ? `${application.company} - ${application.role}`
+                : "this application";
+            const activeDuplicateSprintIds = relatedSprints
+                .filter((s) => s.id !== canonical.id && s.status === "active")
+                .map((s) => s.id);
+
+            setPendingSprintReplacement({
+                applicationLabel,
+                canonicalSprintId: canonical.id,
+                nextSprint,
+                activeDuplicateSprintIds,
+            });
+            return;
         }
 
         updateSprint(canonical.id, {
@@ -601,17 +621,7 @@ export function KanbanBoard() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                const confirmed = window.confirm(
-                                                                    `Are you sure you want to delete the ${app.company} - ${app.role} application? This action cannot be undone.`
-                                                                );
-                                                                if (!confirmed) return;
-
-                                                                void deleteApplicationAPI(app.id).catch((error) => {
-                                                                    console.error(
-                                                                        "Failed to delete application from pipeline:",
-                                                                        error
-                                                                    );
-                                                                });
+                                                                setDeleteCandidate(app);
                                                             }}
                                                             className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1"
                                                             title="Delete application"
@@ -889,6 +899,124 @@ export function KanbanBoard() {
                     </div>
                 </div>
             )}
+
+            <AlertDialog.Root
+                open={deleteCandidate !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeleteCandidate(null);
+                }}
+            >
+                <AlertDialog.Portal>
+                    <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-card shadow-xl border border-border p-5">
+                        <AlertDialog.Title className="text-lg font-semibold text-foreground">
+                            Delete application?
+                        </AlertDialog.Title>
+                        <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
+                            {deleteCandidate
+                                ? `This will permanently delete ${deleteCandidate.company} - ${deleteCandidate.role}. This action cannot be undone.`
+                                : "This action cannot be undone."}
+                        </AlertDialog.Description>
+
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <AlertDialog.Cancel asChild>
+                                <button
+                                    type="button"
+                                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </AlertDialog.Cancel>
+                            <AlertDialog.Action asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!deleteCandidate) return;
+                                        deleteApplication(deleteCandidate.id);
+                                        setDeleteCandidate(null);
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-500"
+                                >
+                                    Delete
+                                </button>
+                            </AlertDialog.Action>
+                        </div>
+                    </AlertDialog.Content>
+                </AlertDialog.Portal>
+            </AlertDialog.Root>
+
+            <AlertDialog.Root
+                open={pendingSprintReplacement !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPendingSprintReplacement(null);
+                }}
+            >
+                <AlertDialog.Portal>
+                    <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-card shadow-xl border border-border p-5">
+                        <AlertDialog.Title className="text-lg font-semibold text-foreground">
+                            Regenerate prep plan?
+                        </AlertDialog.Title>
+                        <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
+                            {pendingSprintReplacement
+                                ? `A prep plan already exists for ${pendingSprintReplacement.applicationLabel}. Regenerating will replace the existing plan and reset any progress.`
+                                : "A prep plan already exists. Regenerating will replace the existing plan and reset any progress."}
+                        </AlertDialog.Description>
+
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <AlertDialog.Cancel asChild>
+                                <button
+                                    type="button"
+                                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </AlertDialog.Cancel>
+                            <AlertDialog.Action asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!pendingSprintReplacement) return;
+
+                                        updateSprint(
+                                            pendingSprintReplacement.canonicalSprintId,
+                                            {
+                                                interviewDate:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .interviewDate,
+                                                roleType:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .roleType,
+                                                totalDays:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .totalDays,
+                                                dailyPlans:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .dailyPlans,
+                                                status: pendingSprintReplacement.nextSprint.status,
+                                                createdAt:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .createdAt,
+                                            }
+                                        );
+
+                                        for (const duplicateSprintId of pendingSprintReplacement.activeDuplicateSprintIds) {
+                                            updateSprint(duplicateSprintId, {
+                                                status: "expired",
+                                            });
+                                        }
+
+                                        setPendingSprintReplacement(null);
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
+                                >
+                                    Regenerate
+                                </button>
+                            </AlertDialog.Action>
+                        </div>
+                    </AlertDialog.Content>
+                </AlertDialog.Portal>
+            </AlertDialog.Root>
         </>
     );
 }
