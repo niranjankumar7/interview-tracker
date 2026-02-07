@@ -7,7 +7,7 @@ CREATE TABLE "User" (
     "targetRole" TEXT,
     "experienceLevel" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -26,7 +26,7 @@ CREATE TABLE "Application" (
     "currentRound" TEXT,
     "notes" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "offerBaseSalary" DOUBLE PRECISION,
     "offerEquity" TEXT,
     "offerBonus" DOUBLE PRECISION,
@@ -72,7 +72,7 @@ CREATE TABLE "Sprint" (
     "status" TEXT NOT NULL,
     "dailyPlans" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Sprint_pkey" PRIMARY KEY ("id")
 );
@@ -98,7 +98,7 @@ CREATE TABLE "UserProgress" (
     "longestStreak" INTEGER NOT NULL DEFAULT 0,
     "lastActiveDate" TIMESTAMP(3),
     "totalTasksCompleted" INTEGER NOT NULL DEFAULT 0,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "UserProgress_pkey" PRIMARY KEY ("userId")
 );
@@ -110,7 +110,7 @@ CREATE TABLE "UserPreferences" (
     "studyRemindersEnabled" BOOLEAN NOT NULL DEFAULT false,
     "calendarAutoSyncEnabled" BOOLEAN NOT NULL DEFAULT false,
     "leetcodeAutoSyncEnabled" BOOLEAN NOT NULL DEFAULT false,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "UserPreferences_pkey" PRIMARY KEY ("userId")
 );
@@ -141,7 +141,7 @@ CREATE TABLE "LeetCodeConnection" (
     "easySolved" INTEGER,
     "mediumSolved" INTEGER,
     "hardSolved" INTEGER,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "LeetCodeConnection_pkey" PRIMARY KEY ("userId")
 );
@@ -193,6 +193,47 @@ CREATE INDEX "CompletedTopic_userId_idx" ON "CompletedTopic"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CompletedTopic_userId_topicName_key" ON "CompletedTopic"("userId", "topicName");
+
+-- AddCheckConstraints
+ALTER TABLE "User"
+    ADD CONSTRAINT "User_experienceLevel_check"
+    CHECK ("experienceLevel" IS NULL OR "experienceLevel" IN ('Junior', 'Mid', 'Senior'));
+
+ALTER TABLE "Application"
+    ADD CONSTRAINT "Application_status_check"
+    CHECK ("status" IN ('applied', 'shortlisted', 'interview', 'offer', 'rejected'));
+
+ALTER TABLE "Application"
+    ADD CONSTRAINT "Application_roleType_check"
+    CHECK ("roleType" IS NULL OR "roleType" IN ('SDE', 'SDET', 'ML', 'DevOps', 'Frontend', 'Backend', 'FullStack', 'Data', 'PM', 'MobileEngineer'));
+
+ALTER TABLE "Application"
+    ADD CONSTRAINT "Application_offerWorkMode_check"
+    CHECK ("offerWorkMode" IS NULL OR "offerWorkMode" IN ('WFH', 'Hybrid', 'Office'));
+
+ALTER TABLE "InterviewRound"
+    ADD CONSTRAINT "InterviewRound_roundType_check"
+    CHECK ("roundType" IN ('HR', 'TechnicalRound1', 'TechnicalRound2', 'SystemDesign', 'Managerial', 'Assignment', 'Final'));
+
+ALTER TABLE "Sprint"
+    ADD CONSTRAINT "Sprint_status_check"
+    CHECK ("status" IN ('active', 'completed', 'expired'));
+
+ALTER TABLE "Sprint"
+    ADD CONSTRAINT "Sprint_roleType_check"
+    CHECK ("roleType" IN ('SDE', 'SDET', 'ML', 'DevOps', 'Frontend', 'Backend', 'FullStack', 'Data', 'PM', 'MobileEngineer'));
+
+ALTER TABLE "Question"
+    ADD CONSTRAINT "Question_category_check"
+    CHECK ("category" IN ('DSA', 'SystemDesign', 'Behavioral', 'SQL', 'Other'));
+
+ALTER TABLE "Question"
+    ADD CONSTRAINT "Question_difficulty_check"
+    CHECK ("difficulty" IS NULL OR "difficulty" IN ('Easy', 'Medium', 'Hard'));
+
+ALTER TABLE "UserPreferences"
+    ADD CONSTRAINT "UserPreferences_theme_check"
+    CHECK ("theme" IN ('light', 'dark', 'system'));
 
 -- AddForeignKey
 ALTER TABLE "Application" ADD CONSTRAINT "Application_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

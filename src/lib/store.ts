@@ -12,6 +12,7 @@ import {
     CompletedTopic,
     LeetCodeConnection,
     LeetCodeStats,
+    OfferDetails,
 } from '@/types';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
@@ -168,6 +169,7 @@ interface AppState {
         applicationDate?: string;
         interviewDate?: string;
         notes?: string;
+        offerDetails?: OfferDetails;
     }) => Promise<Application>;
     updateApplicationAPI: (id: string, updates: any) => Promise<void>;
     deleteApplicationAPI: (id: string) => Promise<void>;
@@ -229,6 +231,64 @@ function safeParseISO(value: string | undefined): Date | null {
 
 function normalizeQuestionText(value: string): string {
     return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function hasMeaningfulOfferValue(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') return value.trim().length > 0;
+    return true;
+}
+
+function normalizeApplicationFromApi(raw: Record<string, unknown>): Application {
+    const existingOffer = (raw.offerDetails as OfferDetails | undefined) ?? {};
+    const mergedOffer: OfferDetails = {
+        baseSalary:
+            existingOffer.baseSalary ??
+            (raw.offerBaseSalary as number | undefined),
+        equity:
+            existingOffer.equity ??
+            (raw.offerEquity as string | undefined),
+        bonus:
+            existingOffer.bonus ??
+            (raw.offerBonus as number | undefined),
+        currency:
+            existingOffer.currency ??
+            (raw.offerCurrency as string | undefined),
+        location:
+            existingOffer.location ??
+            (raw.offerLocation as string | undefined),
+        workMode:
+            existingOffer.workMode ??
+            (raw.offerWorkMode as OfferDetails['workMode'] | undefined),
+        joiningDate:
+            existingOffer.joiningDate ??
+            (typeof raw.offerJoiningDate === 'string'
+                ? raw.offerJoiningDate
+                : undefined),
+        noticePeriod:
+            existingOffer.noticePeriod ??
+            (raw.offerNoticePeriod as string | undefined),
+        benefits:
+            existingOffer.benefits ??
+            (raw.offerBenefits as string[] | undefined),
+        notes:
+            existingOffer.notes ??
+            (raw.offerNotes as string | undefined),
+        totalCTC:
+            existingOffer.totalCTC ??
+            (raw.offerTotalCTC as number | undefined),
+    };
+
+    const hasOfferDetails = Object.values(mergedOffer).some(hasMeaningfulOfferValue);
+
+    const application = raw as unknown as Application;
+    return {
+        ...application,
+        notes: application.notes ?? '',
+        rounds: application.rounds ?? [],
+        offerDetails: hasOfferDetails ? mergedOffer : undefined,
+    };
 }
 
 // Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
@@ -820,7 +880,11 @@ export const useStore = create<AppState>()(
             loadApplicationsFromAPI: async () => {
                 try {
                     const apps = await api.applications.getAll();
-                    set({ applications: apps });
+                    set({
+                        applications: apps.map((app) =>
+                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                        ),
+                    });
                 } catch (error) {
                     console.error('Failed to load applications from API:', error);
                     throw error;
@@ -859,10 +923,13 @@ export const useStore = create<AppState>()(
             createApplicationAPI: async (data) => {
                 try {
                     const app = await api.applications.create(data);
+                    const normalizedApp = normalizeApplicationFromApi(
+                        app as Record<string, unknown>
+                    );
                     set((state) => ({
-                        applications: [...state.applications, app]
+                        applications: [...state.applications, normalizedApp]
                     }));
-                    return app;
+                    return normalizedApp;
                 } catch (error) {
                     console.error('Failed to create application:', error);
                     throw error;
@@ -872,9 +939,12 @@ export const useStore = create<AppState>()(
             updateApplicationAPI: async (id, updates) => {
                 try {
                     const updatedApp = await api.applications.update(id, updates);
+                    const normalizedUpdatedApp = normalizeApplicationFromApi(
+                        updatedApp as Record<string, unknown>
+                    );
                     set((state) => ({
                         applications: state.applications.map(app =>
-                            app.id === id ? { ...app, ...updatedApp } : app
+                            app.id === id ? { ...app, ...normalizedUpdatedApp } : app
                         )
                     }));
                 } catch (error) {
@@ -944,7 +1014,9 @@ export const useStore = create<AppState>()(
 
                     // Build the update object
                     const update: Partial<AppState> = {
-                        applications: apps,
+                        applications: apps.map((app) =>
+                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                        ),
                         sprints,
                         questions,
                     };

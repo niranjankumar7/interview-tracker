@@ -169,16 +169,16 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
         });
       } else {
         const now = new Date().toISOString();
-        const createdApplication = await createApplicationAPI({
+        await createApplicationAPI({
           company: normalizedCompany,
           role: "Software Engineer",
           status: "offer",
           notes: "",
           applicationDate: now,
-        });
-        await updateApplicationAPI(createdApplication.id, {
-          status: "offer",
-          offerDetails: nextOffer,
+          offerDetails: {
+            ...nextOffer,
+            currency: nextOffer.currency || "INR",
+          },
         });
       }
 

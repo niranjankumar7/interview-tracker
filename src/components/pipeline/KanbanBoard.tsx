@@ -101,6 +101,7 @@ const getSearchRank = (
 export function KanbanBoard() {
     const applications = useStore((state) => state.applications);
     const sprints = useStore((state) => state.sprints);
+    const updateApplication = useStore((state) => state.updateApplication);
     const updateApplicationAPI = useStore((state) => state.updateApplicationAPI);
     const deleteApplicationAPI = useStore((state) => state.deleteApplicationAPI);
     const addSprint = useStore((state) => state.addSprint);
@@ -119,15 +120,33 @@ export function KanbanBoard() {
         applicationId: string;
         interviewDate: string;
         roleType: RoleType;
+        previousStatus: ApplicationStatus;
+        statusPersisted: boolean;
     } | null>(null);
     const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
         null
     );
 
     const cancelInterviewSetup = useCallback(() => {
+        if (interviewSetup && interviewSetup.previousStatus !== "interview") {
+            updateApplication(interviewSetup.applicationId, {
+                status: interviewSetup.previousStatus,
+            });
+            if (interviewSetup.statusPersisted) {
+                void updateApplicationAPI(interviewSetup.applicationId, {
+                    status: interviewSetup.previousStatus,
+                }).catch((error) => {
+                    console.error(
+                        "Failed to revert application status after interview setup cancel:",
+                        error
+                    );
+                });
+            }
+        }
+
         setInterviewSetup(null);
         setInterviewSetupError(null);
-    }, []);
+    }, [interviewSetup, updateApplication, updateApplicationAPI]);
 
     useEffect(() => {
         if (!interviewSetup) return;
@@ -295,12 +314,17 @@ export function KanbanBoard() {
         newStatus: ApplicationStatus
     ) => {
         e.preventDefault();
+        let rollbackStatus: (() => void) | null = null;
         try {
             const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
 
             if (!appId) return;
             const app = applications.find((a) => a.id === appId);
             if (!app) return;
+            const previousStatus = app.status;
+            rollbackStatus = () => {
+                updateApplication(appId, { status: previousStatus });
+            };
 
             if (newStatus === "interview") {
                 const interviewDateIso = app.interviewDate;
@@ -308,6 +332,20 @@ export function KanbanBoard() {
                 const needsInterviewDetails = !interviewDateIso || !roleType;
 
                 if (needsInterviewDetails) {
+                    updateApplication(appId, { status: "interview" });
+                    let statusPersisted = false;
+                    try {
+                        await updateApplicationAPI(appId, { status: "interview" });
+                        statusPersisted = true;
+                    } catch (error) {
+                        updateApplication(appId, { status: previousStatus });
+                        console.error(
+                            "Failed to persist interview status before opening setup modal:",
+                            error
+                        );
+                        return;
+                    }
+
                     setInterviewSetupError(null);
                     const existingDateOnly = interviewDateIso
                         ? getInterviewDateOnly(interviewDateIso)
@@ -321,6 +359,8 @@ export function KanbanBoard() {
                                 "yyyy-MM-dd"
                             ),
                         roleType: roleType ?? "SDE",
+                        previousStatus,
+                        statusPersisted,
                     });
                     return;
                 }
@@ -336,6 +376,20 @@ export function KanbanBoard() {
                     !normalizedExistingDate ||
                     daysUntilInterview < 0
                 ) {
+                    updateApplication(appId, { status: "interview" });
+                    let statusPersisted = false;
+                    try {
+                        await updateApplicationAPI(appId, { status: "interview" });
+                        statusPersisted = true;
+                    } catch (error) {
+                        updateApplication(appId, { status: previousStatus });
+                        console.error(
+                            "Failed to persist interview status for invalid-date setup flow:",
+                            error
+                        );
+                        return;
+                    }
+
                     setInterviewSetup({
                         applicationId: app.id,
                         interviewDate: format(
@@ -343,6 +397,8 @@ export function KanbanBoard() {
                             "yyyy-MM-dd"
                         ),
                         roleType: roleType ?? "SDE",
+                        previousStatus,
+                        statusPersisted,
                     });
                     setInterviewSetupError(
                         "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
@@ -350,11 +406,13 @@ export function KanbanBoard() {
                     return;
                 }
 
+                updateApplication(appId, { status: "interview" });
                 await updateApplicationAPI(appId, { status: "interview" });
                 ensureSprintForInterview(app.id, normalizedExistingDate, roleType);
                 return;
             }
 
+            updateApplication(appId, { status: newStatus });
             await updateApplicationAPI(appId, { status: newStatus });
 
             if (newStatus === "rejected") {
@@ -367,6 +425,7 @@ export function KanbanBoard() {
                 }
             }
         } catch (error) {
+            rollbackStatus?.();
             console.error("Failed to update application status from pipeline:", error);
         }
     };
@@ -775,6 +834,15 @@ export function KanbanBoard() {
                                             }
 
                                             await updateApplicationAPI(
+                                                interviewSetup.applicationId,
+                                                {
+                                                    status: "interview",
+                                                    interviewDate:
+                                                        interviewSetup.interviewDate,
+                                                    roleType: interviewSetup.roleType,
+                                                }
+                                            );
+                                            updateApplication(
                                                 interviewSetup.applicationId,
                                                 {
                                                     status: "interview",

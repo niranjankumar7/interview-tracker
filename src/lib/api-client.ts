@@ -3,6 +3,8 @@
  * Handles all HTTP requests to the backend API
  */
 
+import type { OfferDetails } from '@/types';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Types for API responses
@@ -226,6 +228,7 @@ export const applicationsApi = {
         applicationDate?: string;
         interviewDate?: string;
         notes?: string;
+        offerDetails?: OfferDetails;
     }): Promise<any> {
         return apiRequest<any>('/api/applications', {
             method: 'POST',

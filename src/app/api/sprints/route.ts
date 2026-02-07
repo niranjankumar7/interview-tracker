@@ -10,6 +10,19 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 import { Prisma } from '@prisma/client';
 
+const roleTypeSchema = z.enum([
+    'SDE',
+    'SDET',
+    'ML',
+    'DevOps',
+    'Frontend',
+    'Backend',
+    'FullStack',
+    'Data',
+    'PM',
+    'MobileEngineer',
+]);
+
 // Schema for individual task in a daily plan
 const taskSchema = z.object({
     id: z.string(),
@@ -40,7 +53,7 @@ const dailyPlanSchema = z.object({
 const createSprintSchema = z.object({
     applicationId: z.string(),
     interviewDate: z.string(),
-    roleType: z.string(),
+    roleType: roleTypeSchema,
     totalDays: z.number().int().min(1).max(30),
     dailyPlans: z.array(dailyPlanSchema),
 });

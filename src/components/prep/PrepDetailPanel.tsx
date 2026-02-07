@@ -121,8 +121,16 @@ export function PrepDetailPanel({
             };
 
             updateApplication(appId, { offerDetails: next });
+            void updateApplicationAPI(appId, { offerDetails: patch })
+                .then(() => {
+                    setSaveError(null);
+                })
+                .catch((error) => {
+                    console.error("Failed to persist offer details:", error);
+                    setSaveError("Failed to save offer details. Please retry.");
+                });
         },
-        [appId, application, updateApplication]
+        [appId, application, updateApplication, updateApplicationAPI]
     );
 
     const commitBenefits = useCallback(() => {
@@ -155,6 +163,7 @@ export function PrepDetailPanel({
 
     const [jobDescriptionUrlDraft, setJobDescriptionUrlDraft] = useState("");
     const [notesDraft, setNotesDraft] = useState("");
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     // Only the latest scrape request is allowed to update local state.
     const activeScrapeAbortController = useRef<AbortController | null>(null);
@@ -163,6 +172,7 @@ export function PrepDetailPanel({
     const lastSavedJobDescriptionUrl = useRef<string>("");
     // Notes are normalized via `normalizeNotesForSave` before saving/comparing.
     const lastSavedNotes = useRef<string>("");
+    const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
 
     const resetScrapeState = useCallback(() => {
         if (activeScrapeAbortController.current && !activeScrapeAbortController.current.signal.aborted) {
@@ -184,52 +194,88 @@ export function PrepDetailPanel({
 
         setJobDescriptionUrlDraft(jobDescriptionUrl);
         setNotesDraft(notes);
+        setSaveError(null);
 
         lastSavedJobDescriptionUrl.current = jobDescriptionUrl;
         lastSavedNotes.current = normalizeNotesForSave(notes);
     }, [application, isOpen]);
 
-    const saveJobDescriptionUrl = useCallback(async () => {
-        const nextJobDescriptionUrl = jobDescriptionUrlDraft.trim();
-        if (nextJobDescriptionUrl === lastSavedJobDescriptionUrl.current) return;
+    const persistApplicationEdits = useCallback(
+        async (input: { jobDescriptionUrl?: string; notes?: string }) => {
+            const runPersist = async () => {
+                const updates: {
+                    jobDescriptionUrl?: string | null;
+                    notes?: string;
+                } = {};
 
-        try {
-            await updateApplicationAPI(appId, {
-                jobDescriptionUrl: nextJobDescriptionUrl || null,
-            });
-            lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
-        } catch (error) {
-            console.error("Failed to save job description URL:", error);
-        }
-    }, [appId, jobDescriptionUrlDraft, updateApplicationAPI]);
+                const nextJobDescriptionUrl =
+                    input.jobDescriptionUrl !== undefined
+                        ? input.jobDescriptionUrl.trim()
+                        : undefined;
+                if (
+                    nextJobDescriptionUrl !== undefined &&
+                    nextJobDescriptionUrl !== lastSavedJobDescriptionUrl.current
+                ) {
+                    updates.jobDescriptionUrl = nextJobDescriptionUrl || null;
+                }
+
+                const nextNotes =
+                    input.notes !== undefined
+                        ? normalizeNotesForSave(input.notes)
+                        : undefined;
+                if (nextNotes !== undefined && nextNotes !== lastSavedNotes.current) {
+                    updates.notes = nextNotes;
+                }
+
+                if (Object.keys(updates).length === 0) return;
+
+                try {
+                    await updateApplicationAPI(appId, updates);
+                    if (nextJobDescriptionUrl !== undefined) {
+                        lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
+                    }
+                    if (nextNotes !== undefined) {
+                        lastSavedNotes.current = nextNotes;
+                    }
+                    setSaveError(null);
+                } catch (error) {
+                    console.error("Failed to save application edits:", error);
+                    setSaveError("Failed to save your latest edits. Please retry.");
+                }
+            };
+
+            const queuedPersist = persistQueueRef.current.then(runPersist, runPersist);
+            persistQueueRef.current = queuedPersist.catch(() => undefined);
+            await queuedPersist;
+        },
+        [appId, updateApplicationAPI]
+    );
+
+    const saveJobDescriptionUrl = useCallback(async () => {
+        await persistApplicationEdits({ jobDescriptionUrl: jobDescriptionUrlDraft });
+    }, [jobDescriptionUrlDraft, persistApplicationEdits]);
 
     const saveNotes = useCallback(async () => {
-        const nextNotes = normalizeNotesForSave(notesDraft);
-        if (nextNotes === lastSavedNotes.current) return;
-
-        try {
-            await updateApplicationAPI(appId, { notes: nextNotes });
-            lastSavedNotes.current = nextNotes;
-        } catch (error) {
-            console.error("Failed to save application notes:", error);
-        }
-    }, [appId, notesDraft, updateApplicationAPI]);
+        await persistApplicationEdits({ notes: notesDraft });
+    }, [notesDraft, persistApplicationEdits]);
 
     // Idempotent: safe to call multiple times during close/unmount.
-    const flushApplicationEdits = useCallback(() => {
-        void saveJobDescriptionUrl();
-        void saveNotes();
-    }, [saveJobDescriptionUrl, saveNotes]);
+    const flushApplicationEdits = useCallback(async () => {
+        await persistApplicationEdits({
+            jobDescriptionUrl: jobDescriptionUrlDraft,
+            notes: notesDraft,
+        });
+    }, [jobDescriptionUrlDraft, notesDraft, persistApplicationEdits]);
 
     useEffect(() => {
         if (!isOpen) return;
         return () => {
-            flushApplicationEdits();
+            void flushApplicationEdits();
         };
     }, [flushApplicationEdits, isOpen]);
 
     const handleClose = useCallback(() => {
-        flushApplicationEdits();
+        void flushApplicationEdits();
         resetScrapeState();
 
         onClose();
@@ -407,6 +453,7 @@ export function PrepDetailPanel({
         updateApplication(appId, { currentRound: round });
         void updateApplicationAPI(appId, { currentRound: round }).catch((error) => {
             console.error("Failed to persist current round:", error);
+            setSaveError("Failed to save current round. Please retry.");
         });
     };
 
@@ -687,6 +734,11 @@ export function PrepDetailPanel({
                             <h3 className="font-semibold text-lg text-foreground mb-4">
                                 Application details
                             </h3>
+                            {saveError && (
+                                <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                                    {saveError}
+                                </div>
+                            )}
 
                             <div className="space-y-4">
                                 <div>

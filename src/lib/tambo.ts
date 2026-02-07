@@ -56,6 +56,8 @@ type OfferDetailsToolInput = {
   joiningDate?: string;
   location?: string;
   workMode?: string;
+  noticePeriod?: string;
+  benefits?: string[];
   notes?: string;
 };
 
@@ -515,21 +517,28 @@ export const tools: TamboTool[] = [
 
       const hasComp = hasOfferCompensation(offerDetails);
       const mappedWorkMode = normalizeOfferWorkMode(offerDetails.workMode);
+      const currentOffer = app.offerDetails ?? {};
+      const mergedOfferDetails = {
+        baseSalary: offerDetails.baseSalary ?? currentOffer.baseSalary,
+        bonus: offerDetails.bonus ?? currentOffer.bonus,
+        equity:
+          offerDetails.equity !== undefined
+            ? offerDetails.equity.toString()
+            : currentOffer.equity?.toString(),
+        totalCTC: offerDetails.totalCTC ?? currentOffer.totalCTC,
+        currency: offerDetails.currency ?? currentOffer.currency ?? "INR",
+        location: offerDetails.location ?? currentOffer.location,
+        workMode: mappedWorkMode ?? currentOffer.workMode,
+        joiningDate: offerDetails.joiningDate ?? currentOffer.joiningDate,
+        noticePeriod: offerDetails.noticePeriod ?? currentOffer.noticePeriod,
+        benefits: offerDetails.benefits ?? currentOffer.benefits,
+        notes: offerDetails.notes ?? currentOffer.notes,
+      };
 
       try {
         await updateApplicationAPI(app.id, {
           ...(hasComp ? { status: "offer" } : {}),
-          offerDetails: {
-            baseSalary: offerDetails.baseSalary,
-            bonus: offerDetails.bonus,
-            equity: offerDetails.equity?.toString(),
-            totalCTC: offerDetails.totalCTC,
-            currency: offerDetails.currency || "INR",
-            location: offerDetails.location,
-            workMode: mappedWorkMode,
-            joiningDate: offerDetails.joiningDate,
-            notes: offerDetails.notes,
-          }
+          offerDetails: mergedOfferDetails,
         });
 
         return {
