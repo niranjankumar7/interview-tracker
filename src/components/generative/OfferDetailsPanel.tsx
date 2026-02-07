@@ -9,7 +9,7 @@ import {
   parseNumberField,
   sanitizeCompanyName,
 } from "@/lib/offer-details";
-import type { Application, OfferDetails, WorkMode } from "@/types";
+import type { OfferDetails, WorkMode } from "@/types";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Building2, CheckCircle2, Briefcase } from "lucide-react";
 import { z } from "zod";
@@ -106,8 +106,8 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
   });
 
   const applications = useStore((s) => s.applications);
-  const addApplication = useStore((s) => s.addApplication);
-  const updateApplication = useStore((s) => s.updateApplication);
+  const createApplicationAPI = useStore((s) => s.createApplicationAPI);
+  const updateApplicationAPI = useStore((s) => s.updateApplicationAPI);
 
   const normalizedCompany = state?.company ? sanitizeCompanyName(state.company) : "";
 
@@ -163,25 +163,23 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
       });
 
       if (existingApplication && state.selectedApplicationId !== "__new__") {
-        updateApplication(existingApplication.id, {
+        await updateApplicationAPI(existingApplication.id, {
           status: "offer",
           offerDetails: nextOffer,
         });
       } else {
         const now = new Date().toISOString();
-        const application: Application = {
-          id: createId(),
+        const createdApplication = await createApplicationAPI({
           company: normalizedCompany,
           role: "Software Engineer",
           status: "offer",
-          applicationDate: now,
-          rounds: [],
           notes: "",
+          applicationDate: now,
+        });
+        await updateApplicationAPI(createdApplication.id, {
+          status: "offer",
           offerDetails: nextOffer,
-          createdAt: now,
-        };
-
-        addApplication(application);
+        });
       }
 
       setState({ ...state, isSaved: true, isSaving: false });

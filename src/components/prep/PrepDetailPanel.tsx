@@ -57,6 +57,7 @@ export function PrepDetailPanel({
         state.applications.find((app) => app.id === appId)
     );
     const updateApplication = useStore((state) => state.updateApplication);
+    const updateApplicationAPI = useStore((state) => state.updateApplicationAPI);
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
     const sprints = useStore((state) => state.sprints);
 
@@ -188,26 +189,36 @@ export function PrepDetailPanel({
         lastSavedNotes.current = normalizeNotesForSave(notes);
     }, [application, isOpen]);
 
-    const saveJobDescriptionUrl = useCallback(() => {
+    const saveJobDescriptionUrl = useCallback(async () => {
         const nextJobDescriptionUrl = jobDescriptionUrlDraft.trim();
         if (nextJobDescriptionUrl === lastSavedJobDescriptionUrl.current) return;
 
-        updateApplication(appId, { jobDescriptionUrl: nextJobDescriptionUrl });
-        lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
-    }, [appId, jobDescriptionUrlDraft, updateApplication]);
+        try {
+            await updateApplicationAPI(appId, {
+                jobDescriptionUrl: nextJobDescriptionUrl || null,
+            });
+            lastSavedJobDescriptionUrl.current = nextJobDescriptionUrl;
+        } catch (error) {
+            console.error("Failed to save job description URL:", error);
+        }
+    }, [appId, jobDescriptionUrlDraft, updateApplicationAPI]);
 
-    const saveNotes = useCallback(() => {
+    const saveNotes = useCallback(async () => {
         const nextNotes = normalizeNotesForSave(notesDraft);
         if (nextNotes === lastSavedNotes.current) return;
 
-        updateApplication(appId, { notes: nextNotes });
-        lastSavedNotes.current = nextNotes;
-    }, [appId, notesDraft, updateApplication]);
+        try {
+            await updateApplicationAPI(appId, { notes: nextNotes });
+            lastSavedNotes.current = nextNotes;
+        } catch (error) {
+            console.error("Failed to save application notes:", error);
+        }
+    }, [appId, notesDraft, updateApplicationAPI]);
 
     // Idempotent: safe to call multiple times during close/unmount.
     const flushApplicationEdits = useCallback(() => {
-        saveJobDescriptionUrl();
-        saveNotes();
+        void saveJobDescriptionUrl();
+        void saveNotes();
     }, [saveJobDescriptionUrl, saveNotes]);
 
     useEffect(() => {
@@ -394,6 +405,9 @@ export function PrepDetailPanel({
 
     const handleRoundChange = (round: InterviewRoundType) => {
         updateApplication(appId, { currentRound: round });
+        void updateApplicationAPI(appId, { currentRound: round }).catch((error) => {
+            console.error("Failed to persist current round:", error);
+        });
     };
 
     // Helper to check if a topic is completed (using store's centralized matching)
