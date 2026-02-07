@@ -3,6 +3,8 @@
  * Creates dummy data for testing the Interview Tracker application
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -138,7 +140,7 @@ async function main() {
         },
     });
 
-    const app4 = await prisma.application.create({
+    await prisma.application.create({
         data: {
             userId: user1.id,
             company: 'Meta',
@@ -150,7 +152,7 @@ async function main() {
         },
     });
 
-    const app5 = await prisma.application.create({
+    await prisma.application.create({
         data: {
             userId: user1.id,
             company: 'Netflix',

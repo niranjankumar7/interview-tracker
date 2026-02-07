@@ -17,17 +17,12 @@ import {
   subDays,
 } from "date-fns";
 import {
-  CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import {
   BarChart3,
@@ -142,23 +137,6 @@ export default function DashboardPage() {
 
   const { activityCounts: completedActivityCountsByDate, topicCounts: completedTopicCountsByDate } =
     useMemo(() => computeCompletionStats(sprints), [sprints]);
-
-  const topicProgressSeries = useMemo(() => {
-    const start = subDays(today, 29);
-    const days = Array.from({ length: 30 }, (_, idx) => addDays(start, idx));
-
-    let cumulative = 0;
-    return days.map((d) => {
-      const key = format(d, "yyyy-MM-dd");
-      cumulative += completedTopicCountsByDate.get(key) ?? 0;
-      return {
-        date: format(d, "MMM d"),
-        cumulative,
-      };
-    });
-  }, [completedTopicCountsByDate, today]);
-
-  const totalTopicsLast30 = topicProgressSeries.at(-1)?.cumulative ?? 0;
 
   const applicationPipelineData = useMemo(() => {
     const counts = new Map<ApplicationStatus, number>();

@@ -1,3 +1,5 @@
+import type { Application, Question, Sprint, ThemePreference } from '@/types';
+
 /**
  * API Client for Interview Tracker Backend
  * Handles all HTTP requests to the backend API
@@ -6,6 +8,10 @@
 import type { OfferDetails } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+type RawSprint = Omit<Sprint, 'dailyPlans'> & {
+    dailyPlans: Sprint['dailyPlans'] | string | null;
+};
 
 // Types for API responses
 export interface ApiResponse<T> {
@@ -29,7 +35,7 @@ export interface UserProfile {
     email: string;
     name: string | null;
     targetRole: string | null;
-    experienceLevel: string | null;
+    experienceLevel: 'Junior' | 'Mid' | 'Senior' | null;
     createdAt: string;
     progress: {
         userId: string;
@@ -41,13 +47,25 @@ export interface UserProfile {
     };
     preferences: {
         userId: string;
-        theme: string;
+        theme: ThemePreference;
         studyRemindersEnabled: boolean;
         calendarAutoSyncEnabled: boolean;
         leetcodeAutoSyncEnabled: boolean;
         updatedAt: string;
     };
-    leetcode: any | null;
+    leetcode: {
+        username: string;
+        connectedAt: string;
+        lastSyncAt: string;
+        readOnly: boolean;
+        currentStreak: number;
+        longestStreak: number;
+        lastActiveDate: string | null;
+        totalSolved: number;
+        easySolved: number;
+        mediumSolved: number;
+        hardSolved: number;
+    } | null;
 }
 
 /**
@@ -105,8 +123,15 @@ async function apiRequest<T>(
     });
 
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
+        const payload: unknown = await response.json().catch(() => null);
+        const message =
+            typeof payload === 'object' &&
+            payload !== null &&
+            'error' in payload &&
+            typeof (payload as { error?: unknown }).error === 'string'
+                ? (payload as { error: string }).error
+                : `HTTP ${response.status}`;
+        throw new Error(message);
     }
 
     return response.json();
@@ -205,15 +230,15 @@ export const applicationsApi = {
     /**
      * Get all applications
      */
-    async getAll(): Promise<any[]> {
-        return apiRequest<any[]>('/api/applications');
+    async getAll(): Promise<Application[]> {
+        return apiRequest<Application[]>('/api/applications');
     },
 
     /**
      * Get single application
      */
-    async getById(id: string): Promise<any> {
-        return apiRequest<any>(`/api/applications/${id}`);
+    async getById(id: string): Promise<Application> {
+        return apiRequest<Application>(`/api/applications/${id}`);
     },
 
     /**
@@ -229,8 +254,8 @@ export const applicationsApi = {
         interviewDate?: string;
         notes?: string;
         offerDetails?: OfferDetails;
-    }): Promise<any> {
-        return apiRequest<any>('/api/applications', {
+    }): Promise<Application> {
+        return apiRequest<Application>('/api/applications', {
             method: 'POST',
             body: JSON.stringify(data),
         });
@@ -239,8 +264,8 @@ export const applicationsApi = {
     /**
      * Update application
      */
-    async update(id: string, data: any): Promise<any> {
-        return apiRequest<any>(`/api/applications/${id}`, {
+    async update(id: string, data: Partial<Application>): Promise<Application> {
+        return apiRequest<Application>(`/api/applications/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
@@ -264,13 +289,13 @@ export const questionsApi = {
     /**
      * Get all questions
      */
-    async getAll(filters?: { applicationId?: string; category?: string }): Promise<any[]> {
+    async getAll(filters?: { applicationId?: string; category?: string }): Promise<Question[]> {
         const params = new URLSearchParams();
         if (filters?.applicationId) params.append('applicationId', filters.applicationId);
         if (filters?.category) params.append('category', filters.category);
 
         const query = params.toString();
-        return apiRequest<any[]>(`/api/questions${query ? `?${query}` : ''}`);
+        return apiRequest<Question[]>(`/api/questions${query ? `?${query}` : ''}`);
     },
 
     /**
@@ -282,8 +307,8 @@ export const questionsApi = {
         difficulty?: 'Easy' | 'Medium' | 'Hard';
         askedInRound?: string;
         applicationId?: string;
-    }): Promise<any> {
-        return apiRequest<any>('/api/questions', {
+    }): Promise<Question> {
+        return apiRequest<Question>('/api/questions', {
             method: 'POST',
             body: JSON.stringify(data),
         });
@@ -298,12 +323,12 @@ export const sprintsApi = {
     /**
      * Get all sprints
      */
-    async getAll(filters?: { status?: string }): Promise<any[]> {
+    async getAll(filters?: { status?: string }): Promise<Array<RawSprint>> {
         const params = new URLSearchParams();
         if (filters?.status) params.append('status', filters.status);
 
         const query = params.toString();
-        return apiRequest<any[]>(`/api/sprints${query ? `?${query}` : ''}`);
+        return apiRequest<Array<RawSprint>>(`/api/sprints${query ? `?${query}` : ''}`);
     },
 
     /**
@@ -314,9 +339,9 @@ export const sprintsApi = {
         interviewDate: string;
         roleType: string;
         totalDays: number;
-        dailyPlans: any;
-    }): Promise<any> {
-        return apiRequest<any>('/api/sprints', {
+        dailyPlans: unknown;
+    }): Promise<Sprint> {
+        return apiRequest<Sprint>('/api/sprints', {
             method: 'POST',
             body: JSON.stringify(data),
         });
