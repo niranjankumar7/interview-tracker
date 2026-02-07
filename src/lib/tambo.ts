@@ -23,6 +23,7 @@ import {
   pipelineSummaryPanelSchema,
 } from "@/components/generative";
 import { useStore } from "@/lib/store";
+import { toolDescriptions, schemaDescriptions, componentDescriptions } from "@/lib/tool-descriptions";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
@@ -114,8 +115,7 @@ function findApplicationsByCompany(
 export const tools: TamboTool[] = [
   {
     name: "getApplications",
-    description:
-      "Get all job applications with their details including company, role, status, and interview date",
+    description: toolDescriptions.getApplications,
     tool: () => {
       return useStore.getState().applications;
     },
@@ -138,8 +138,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "getActiveSprints",
-    description:
-      "Get all active interview prep sprints with their daily plans and progress",
+    description: toolDescriptions.getActiveSprints,
     tool: () => {
       const state = useStore.getState();
       return state.sprints
@@ -171,8 +170,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "getQuestions",
-    description:
-      "Get interview questions from the question bank, optionally filtered by company",
+    description: toolDescriptions.getQuestions,
     tool: ({ company }: { company?: string }) => {
       const state = useStore.getState();
       let questions = state.questions;
@@ -197,7 +195,7 @@ export const tools: TamboTool[] = [
       }));
     },
     inputSchema: z.object({
-      company: z.string().optional().describe("Filter questions by company name"),
+      company: z.string().optional().describe(schemaDescriptions.getQuestions.company),
     }),
     outputSchema: z.array(
       z.object({
@@ -211,7 +209,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "getUserProgress",
-    description: "Get the user's current progress including streak and completed tasks",
+    description: toolDescriptions.getUserProgress,
     tool: () => {
       return useStore.getState().progress;
     },
@@ -224,8 +222,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "markTopicComplete",
-    description:
-      "Mark a prep topic as completed when the user says they studied or finished a topic. Examples: 'I completed Arrays and Strings', 'I studied Dynamic Programming', 'Done with Trees and Graphs'. This updates the global progress and shows completion with date on all PrepDetailPanels.",
+    description: toolDescriptions.markTopicComplete,
     tool: (input: { topicName: string }) => {
       const store = useStore.getState();
       const { topicName } = input;
@@ -254,7 +251,7 @@ export const tools: TamboTool[] = [
       };
     },
     inputSchema: z.object({
-      topicName: z.string().describe("The name of the topic the user completed studying. Examples: 'Arrays & Strings', 'Dynamic Programming', 'System Design', 'STAR Method'"),
+      topicName: z.string().describe(schemaDescriptions.markTopicComplete.topicName),
     }),
     outputSchema: z.object({
       success: z.boolean(),
@@ -266,8 +263,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "getCompletedTopics",
-    description:
-      "Get all topics the user has marked as completed. Use this to show the user their study progress.",
+    description: toolDescriptions.getCompletedTopics,
     tool: () => {
       const completedTopics = useStore.getState().completedTopics;
       return {
@@ -291,13 +287,13 @@ export const tools: TamboTool[] = [
   },
   {
     name: "addApplications",
-    description:
-      "Add one or more job applications to the pipeline. Use this when the user wants to add companies they've applied to, track new applications, or bulk add applications. Each application will be added with the specified status.",
+    description: toolDescriptions.addApplications,
     tool: (input: {
       applications: Array<{
         company: string;
         role?: string;
         status?: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
+        notes?: string;
       }>;
     }) => {
       const addApplication = useStore.getState().addApplication;
@@ -325,7 +321,7 @@ export const tools: TamboTool[] = [
           status: (typeof app === 'object' ? app?.status : undefined) || "applied",
           applicationDate: new Date().toISOString(),
           rounds: [],
-          notes: "",
+          notes: (typeof app === 'object' ? app?.notes : undefined) || "",
           createdAt: new Date().toISOString(),
         };
 
@@ -339,15 +335,16 @@ export const tools: TamboTool[] = [
       applications: z
         .array(
           z.object({
-            company: z.string().describe("Company name"),
-            role: z.string().optional().describe("Job role/title"),
+            company: z.string().describe(schemaDescriptions.addApplications.company),
+            role: z.string().optional().describe(schemaDescriptions.addApplications.role),
             status: z
               .enum(["applied", "shortlisted", "interview", "offer", "rejected"])
               .optional()
-              .describe("Application status, defaults to 'applied'"),
+              .describe(schemaDescriptions.addApplications.status),
+            notes: z.string().optional().describe(schemaDescriptions.addApplications.notes),
           })
         )
-        .describe("List of applications to add"),
+        .describe(schemaDescriptions.addApplications.applications),
     }),
     outputSchema: z.object({
       added: z.array(z.string()),
@@ -356,8 +353,7 @@ export const tools: TamboTool[] = [
   },
   {
     name: "updateApplicationStatus",
-    description:
-      "Update the status of one or more job applications. Use this when the user says they got shortlisted, rejected, received an offer, or has an interview scheduled. This moves the application card to the corresponding column in the pipeline.",
+    description: toolDescriptions.updateApplicationStatus,
     tool: (input: {
       updates: Array<
         | string
@@ -422,13 +418,13 @@ export const tools: TamboTool[] = [
       updates: z
         .array(
           z.object({
-            company: z.string().describe("Company name to update"),
+            company: z.string().describe(schemaDescriptions.updateApplicationStatus.company),
             newStatus: z
               .enum(["applied", "shortlisted", "interview", "offer", "rejected"])
-              .describe("The new status for this application"),
+              .describe(schemaDescriptions.updateApplicationStatus.newStatus),
           })
         )
-        .describe("List of status updates to apply"),
+        .describe(schemaDescriptions.updateApplicationStatus.updates),
     }),
     outputSchema: z.object({
       updated: z.array(z.string()),
@@ -573,43 +569,37 @@ export const tools: TamboTool[] = [
 export const components: TamboComponent[] = [
   {
     name: "SprintSetupCard",
-    description:
-      "A component that allows users to set up an interview prep sprint. Use this when the user mentions having an interview, wants to prepare for an interview, or talks about an upcoming interview at a company. Extracts company name, role type, and interview date from the conversation.",
+    description: componentDescriptions.SprintSetupCard,
     component: SprintSetupCard,
     propsSchema: sprintSetupCardSchema,
   },
   {
     name: "TodaysPlanPanel",
-    description:
-      "A component that shows the user's daily prep tasks. Use this when the user asks about today's plan, what they should study, what tasks they have, or wants to see their current sprint progress. Shows tasks organized by morning and evening blocks with checkboxes.",
+    description: componentDescriptions.TodaysPlanPanel,
     component: TodaysPlanPanel,
     propsSchema: todaysPlanPanelSchema,
   },
   {
     name: "PlanForDatePanel",
-    description:
-      "A component that shows the user's prep tasks for a specific date. Supported patterns: 'today', 'tomorrow', weekday names (with optional 'next'), 'in N days', a YYYY-MM-DD date, or a full ISO timestamp (date part is used). Pass either the user's phrase or a normalized date string as the targetDate. Use this instead of TodaysPlanPanel when the user mentions any non-today date or asks for their plan on a particular day. If the exact date isn't available in a sprint, it shows the next available planned day for that sprint (or the last planned day if there is no future one), with guidance explaining the fallback.",
+    description: componentDescriptions.PlanForDatePanel,
     component: PlanForDatePanel,
     propsSchema: planForDatePanelSchema,
   },
   {
     name: "AddQuestionPanel",
-    description:
-      "A component that allows users to add interview questions to their question bank. Use this when the user wants to add a question, mentions a question they were asked, or wants to save a question for later. Auto-detects the question category (DSA, System Design, Behavioral, SQL).",
+    description: componentDescriptions.AddQuestionPanel,
     component: AddQuestionPanel,
     propsSchema: addQuestionPanelSchema,
   },
   {
     name: "PipelineSummaryPanel",
-    description:
-      "Summarizes the user's job application pipeline by status and highlights upcoming interviews with a countdown. Triggers: 'show my pipeline', 'show my interviews'. Optional status filter.",
+    description: componentDescriptions.PipelineSummaryPanel,
     component: PipelineSummaryPanel,
     propsSchema: pipelineSummaryPanelSchema,
   },
   {
     name: "OfferDetailsPanel",
-    description:
-      "A component that captures and edits job offer details (CTC/base/bonus/equity, work mode, location, joining date, benefits, notes) and saves them into the matching application. Use this when the user says they received an offer or mentions compensation details like 'CTC 18 LPA, hybrid, Bangalore'.",
+    description: componentDescriptions.OfferDetailsPanel,
     component: OfferDetailsPanel,
     propsSchema: offerDetailsPanelSchema,
   },
