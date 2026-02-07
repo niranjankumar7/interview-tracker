@@ -7,6 +7,7 @@ import { TamboProviderWrapper } from "@/components/providers/tambo-provider-wrap
 import { LeetCodeSyncGate } from "@/components/leetcode";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataSyncProvider } from "@/components/providers/DataSyncProvider";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,13 +36,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <DataSyncProvider>
-              <TamboProviderWrapper>
-                <main id="main-content" className="flex flex-1 min-h-0 flex-col">
-                  {children}
-                </main>
-              </TamboProviderWrapper>
-            </DataSyncProvider>
+            <AuthGuard>
+              <DataSyncProvider>
+                <TamboProviderWrapper>
+                  <main id="main-content" className="flex flex-1 min-h-0 flex-col">
+                    {children}
+                  </main>
+                </TamboProviderWrapper>
+              </DataSyncProvider>
+            </AuthGuard>
           </AuthProvider>
         </ThemeProvider>
         <Footer />
