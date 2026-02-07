@@ -14,15 +14,12 @@ import {
     LeetCodeStats,
     OfferDetails,
 } from '@/types';
+import type { RawSprint } from '@/types/api';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
 import { autoTagCategory } from '@/utils/categoryTagger';
 import { api } from '@/lib/api-client';
-
-type RawSprint = Omit<Sprint, 'dailyPlans'> & {
-    dailyPlans: Sprint['dailyPlans'] | string | null;
-};
 
 export type AppDataSnapshot = {
     applications: Application[];
@@ -62,6 +59,19 @@ function mergeRoundFeedback(
         struggledTopics: next.struggledTopics ?? prev.struggledTopics,
         notes: next.notes ?? prev.notes,
     };
+}
+
+function normalizeDailyPlans(value: RawSprint['dailyPlans']): Sprint['dailyPlans'] {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return Array.isArray(parsed) ? (parsed as Sprint['dailyPlans']) : [];
+    } catch (error) {
+        console.error('Failed to parse sprint dailyPlans:', error);
+        return [];
+    }
 }
 
 interface AppState {
@@ -886,7 +896,9 @@ export const useStore = create<AppState>()(
                     const apps = await api.applications.getAll();
                     set({
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                     });
                 } catch (error) {
@@ -897,15 +909,10 @@ export const useStore = create<AppState>()(
 
             loadSprintsFromAPI: async () => {
                 try {
-                    const rawSprints = (await api.sprints.getAll()) as RawSprint[];
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
+                    const rawSprints = await api.sprints.getAll();
                     const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
                     set({ sprints });
                 } catch (error) {
@@ -928,7 +935,7 @@ export const useStore = create<AppState>()(
                 try {
                     const app = await api.applications.create(data);
                     const normalizedApp = normalizeApplicationFromApi(
-                        app as Record<string, unknown>
+                        app as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: [...state.applications, normalizedApp]
@@ -944,7 +951,7 @@ export const useStore = create<AppState>()(
                 try {
                     const updatedApp = await api.applications.update(id, updates);
                     const normalizedUpdatedApp = normalizeApplicationFromApi(
-                        updatedApp as Record<string, unknown>
+                        updatedApp as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: state.applications.map(app =>
@@ -1001,25 +1008,22 @@ export const useStore = create<AppState>()(
                     // Load all data from backend in parallel
                     const [apps, rawSprints, questions, userProfile] = await Promise.all([
                         api.applications.getAll(),
-                        api.sprints.getAll() as Promise<RawSprint[]>,
+                        api.sprints.getAll(),
                         api.questions.getAll(),
                         api.user.getProfile().catch(() => null), // User profile is optional
                     ]);
 
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
                     const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
 
                     // Build the update object
                     const update: Partial<AppState> = {
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                         sprints,
                         questions,

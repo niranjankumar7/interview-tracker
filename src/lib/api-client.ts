@@ -1,4 +1,5 @@
 import type { Application, Question, Sprint, ThemePreference } from '@/types';
+import type { RawSprint } from '@/types/api';
 
 /**
  * API Client for Interview Tracker Backend
@@ -8,10 +9,6 @@ import type { Application, Question, Sprint, ThemePreference } from '@/types';
 import type { OfferDetails } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
-
-type RawSprint = Omit<Sprint, 'dailyPlans'> & {
-    dailyPlans: Sprint['dailyPlans'] | string | null;
-};
 
 // Types for API responses
 export interface ApiResponse<T> {

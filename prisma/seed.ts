@@ -3,9 +3,9 @@
  * Creates dummy data for testing the Interview Tracker application
  */
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Prisma seed script runs via Node (CommonJS)
 const { PrismaClient } = require('@prisma/client');
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Prisma seed script runs via Node (CommonJS)
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();

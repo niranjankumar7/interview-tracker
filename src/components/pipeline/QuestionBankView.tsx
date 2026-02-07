@@ -33,7 +33,7 @@ const difficultyColors: Record<string, { bg: string; text: string }> = {
  * Generate a unique ID with fallback for environments without crypto.randomUUID
  */
 function generateId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();
     }
     // Fallback for older browsers/test environments
@@ -138,6 +138,18 @@ export function QuestionBankView() {
         });
     }, []);
 
+    const handleAddModalOpenChange = useCallback(
+        (open: boolean) => {
+            if (open) {
+                setIsAddModalOpen(true);
+                return;
+            }
+
+            handleCloseModal();
+        },
+        [handleCloseModal]
+    );
+
     // Handle company selection - convert empty string to undefined
     const handleCompanyChange = useCallback((value: string) => {
         setNewQuestion(prev => ({
@@ -147,8 +159,9 @@ export function QuestionBankView() {
     }, []);
 
     return (
-        <div className="h-full bg-background overflow-auto">
-            <div className="max-w-4xl mx-auto p-6">
+        <Dialog.Root open={isAddModalOpen} onOpenChange={handleAddModalOpenChange}>
+            <div className="h-full bg-background overflow-auto">
+                <div className="max-w-4xl mx-auto p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
@@ -162,17 +175,15 @@ export function QuestionBankView() {
                             </p>
                         </div>
                     </div>
-                    <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                        <Dialog.Trigger asChild>
-                            <button
-                                type="button"
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Add Question
-                            </button>
-                        </Dialog.Trigger>
-                    </Dialog.Root>
+                    <Dialog.Trigger asChild>
+                        <button
+                            type="button"
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Question
+                        </button>
+                    </Dialog.Trigger>
                 </div>
 
                 {/* Filters */}
@@ -323,15 +334,13 @@ export function QuestionBankView() {
                         ))}
                     </div>
                 )}
-            </div>
+                </div>
 
-            {/* Add Question Modal - Using Radix Dialog for accessibility */}
-            <Dialog.Root open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                {/* Add Question Modal - Using Radix Dialog for accessibility */}
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
                     <Dialog.Content
                         className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
-                        onEscapeKeyDown={handleCloseModal}
                     >
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-5 border-b border-border">
@@ -454,7 +463,7 @@ export function QuestionBankView() {
                         </div>
                     </Dialog.Content>
                 </Dialog.Portal>
-            </Dialog.Root>
-        </div>
+            </div>
+        </Dialog.Root>
     );
 }

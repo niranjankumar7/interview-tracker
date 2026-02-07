@@ -932,8 +932,15 @@ export function KanbanBoard() {
                                     type="button"
                                     onClick={() => {
                                         if (!deleteCandidate) return;
-                                        deleteApplication(deleteCandidate.id);
+                                        const id = deleteCandidate.id;
                                         setDeleteCandidate(null);
+
+                                        void deleteApplicationAPI(id).catch((error) => {
+                                            console.error(
+                                                "Failed to delete application from pipeline:",
+                                                error
+                                            );
+                                        });
                                     }}
                                     className="px-3 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-500"
                                 >
