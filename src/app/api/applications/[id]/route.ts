@@ -11,19 +11,42 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 import { Prisma } from '@prisma/client';
 
+const roleTypeSchema = z.enum([
+    'SDE',
+    'SDET',
+    'ML',
+    'DevOps',
+    'Frontend',
+    'Backend',
+    'FullStack',
+    'Data',
+    'PM',
+    'MobileEngineer',
+]);
+
+const interviewRoundTypeSchema = z.enum([
+    'HR',
+    'TechnicalRound1',
+    'TechnicalRound2',
+    'SystemDesign',
+    'Managerial',
+    'Assignment',
+    'Final',
+]);
+
 const updateApplicationSchema = z.object({
     company: z.string().min(1).optional(),
     role: z.string().min(1).optional(),
     jobDescriptionUrl: z.string().url().optional().nullable(),
-    roleType: z.string().optional(),
+    roleType: roleTypeSchema.optional(),
     status: z.enum(['applied', 'shortlisted', 'interview', 'offer', 'rejected']).optional(),
     applicationDate: z.string().optional(),
     interviewDate: z.string().optional().nullable(),
-    currentRound: z.string().optional().nullable(),
+    currentRound: interviewRoundTypeSchema.optional().nullable(),
     notes: z.string().optional(),
     offerDetails: z.object({
         baseSalary: z.number().optional(),
-        equity: z.string().optional(),
+        equity: z.union([z.string(), z.number()]).optional(),
         bonus: z.number().optional(),
         currency: z.string().optional(),
         location: z.string().optional(),
@@ -39,11 +62,11 @@ const updateApplicationSchema = z.object({
 // GET /api/applications/[id]
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
 
         const application = await prisma.application.findFirst({
             where: {
@@ -81,11 +104,11 @@ export async function GET(
 // PUT /api/applications/[id]
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
         const body = await req.json();
         const validation = updateApplicationSchema.safeParse(body);
 
@@ -129,7 +152,7 @@ export async function PUT(
         if (data.offerDetails) {
             const offer = data.offerDetails;
             if (offer.baseSalary !== undefined) updateData.offerBaseSalary = offer.baseSalary;
-            if (offer.equity !== undefined) updateData.offerEquity = offer.equity;
+            if (offer.equity !== undefined) updateData.offerEquity = offer.equity.toString();
             if (offer.bonus !== undefined) updateData.offerBonus = offer.bonus;
             if (offer.currency !== undefined) updateData.offerCurrency = offer.currency;
             if (offer.location !== undefined) updateData.offerLocation = offer.location;
@@ -170,11 +193,11 @@ export async function PUT(
 // DELETE /api/applications/[id]
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
 
         // Check if application exists and belongs to user
         const existing = await prisma.application.findFirst({

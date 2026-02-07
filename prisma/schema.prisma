@@ -22,7 +22,7 @@ model User {
   targetRole    String?
   experienceLevel String? // Junior, Mid, Senior
   createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  updatedAt     DateTime  @default(now()) @updatedAt
 
   // Relations
   applications     Application[]
@@ -53,7 +53,7 @@ model Application {
   currentRound      String?   // Current interview round type
   notes             String    @default("")
   createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   // Offer details (JSON)
   offerBaseSalary   Float?
@@ -122,7 +122,7 @@ model Sprint {
   status          String    // active, completed, expired
   dailyPlans      Json      // Store daily plans as JSON
   createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  updatedAt       DateTime  @default(now()) @updatedAt
 
   // Relations
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -167,7 +167,7 @@ model UserProgress {
   longestStreak       Int      @default(0)
   lastActiveDate      DateTime?
   totalTasksCompleted Int      @default(0)
-  updatedAt           DateTime @updatedAt
+  updatedAt           DateTime @default(now()) @updatedAt
 
   // Relations
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -179,7 +179,7 @@ model UserPreferences {
   studyRemindersEnabled     Boolean  @default(false)
   calendarAutoSyncEnabled   Boolean  @default(false)
   leetcodeAutoSyncEnabled   Boolean  @default(false)
-  updatedAt                 DateTime @updatedAt
+  updatedAt                 DateTime @default(now()) @updatedAt
 
   // Relations
   user                      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -224,7 +224,7 @@ model LeetCodeConnection {
   mediumSolved    Int?
   hardSolved      Int?
   
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
 
   // Relations
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -9,15 +9,41 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 
+const roleTypeSchema = z.enum([
+    'SDE',
+    'SDET',
+    'ML',
+    'DevOps',
+    'Frontend',
+    'Backend',
+    'FullStack',
+    'Data',
+    'PM',
+    'MobileEngineer',
+]);
+
 const createApplicationSchema = z.object({
     company: z.string().min(1),
     role: z.string().min(1),
     jobDescriptionUrl: z.string().url().optional(),
-    roleType: z.string().optional(),
+    roleType: roleTypeSchema.optional(),
     status: z.enum(['applied', 'shortlisted', 'interview', 'offer', 'rejected']).default('applied'),
     applicationDate: z.string().optional(),
     interviewDate: z.string().optional(),
     notes: z.string().default(''),
+    offerDetails: z.object({
+        baseSalary: z.number().optional(),
+        equity: z.union([z.string(), z.number()]).optional(),
+        bonus: z.number().optional(),
+        currency: z.string().optional(),
+        location: z.string().optional(),
+        workMode: z.enum(['WFH', 'Hybrid', 'Office']).optional(),
+        joiningDate: z.string().optional(),
+        noticePeriod: z.string().optional(),
+        benefits: z.array(z.string()).optional(),
+        notes: z.string().optional(),
+        totalCTC: z.number().optional(),
+    }).optional(),
 });
 
 // GET /api/applications - Get all applications
@@ -64,6 +90,7 @@ export async function POST(req: NextRequest) {
         }
 
         const data = validation.data;
+        const offer = data.offerDetails;
 
         const application = await prisma.application.create({
             data: {
@@ -76,6 +103,17 @@ export async function POST(req: NextRequest) {
                 applicationDate: data.applicationDate ? new Date(data.applicationDate) : new Date(),
                 interviewDate: data.interviewDate ? new Date(data.interviewDate) : null,
                 notes: data.notes,
+                offerBaseSalary: offer?.baseSalary,
+                offerEquity: offer?.equity?.toString(),
+                offerBonus: offer?.bonus,
+                offerCurrency: offer?.currency,
+                offerLocation: offer?.location,
+                offerWorkMode: offer?.workMode,
+                offerJoiningDate: offer?.joiningDate ? new Date(offer.joiningDate) : null,
+                offerNoticePeriod: offer?.noticePeriod,
+                offerBenefits: offer?.benefits ?? [],
+                offerNotes: offer?.notes,
+                offerTotalCTC: offer?.totalCTC,
             },
             include: {
                 rounds: true,

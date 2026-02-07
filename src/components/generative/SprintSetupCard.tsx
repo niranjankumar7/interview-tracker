@@ -12,7 +12,7 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const sprintSetupCardSchema = z.object({
-    company: z.string().describe("The company name for the interview"),
+    company: z.string().optional().describe("The company name for the interview"),
     role: z
         .enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
         .optional()
@@ -24,7 +24,7 @@ export const sprintSetupCardSchema = z.object({
 });
 
 interface SprintSetupCardProps {
-    company: string;
+    company?: string;
     role?: RoleType;
     interviewDate?: string;
 }

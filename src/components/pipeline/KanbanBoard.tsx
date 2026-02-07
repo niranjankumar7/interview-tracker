@@ -102,7 +102,8 @@ export function KanbanBoard() {
     const applications = useStore((state) => state.applications);
     const sprints = useStore((state) => state.sprints);
     const updateApplication = useStore((state) => state.updateApplication);
-    const deleteApplication = useStore((state) => state.deleteApplication);
+    const updateApplicationAPI = useStore((state) => state.updateApplicationAPI);
+    const deleteApplicationAPI = useStore((state) => state.deleteApplicationAPI);
     const addSprint = useStore((state) => state.addSprint);
     const updateSprint = useStore((state) => state.updateSprint);
     const [searchQuery, setSearchQuery] = useState("");
@@ -120,22 +121,32 @@ export function KanbanBoard() {
         interviewDate: string;
         roleType: RoleType;
         previousStatus: ApplicationStatus;
+        statusPersisted: boolean;
     } | null>(null);
     const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
         null
     );
 
     const cancelInterviewSetup = useCallback(() => {
-        if (!interviewSetup) return;
-        if (interviewSetup.previousStatus !== "interview") {
+        if (interviewSetup && interviewSetup.previousStatus !== "interview") {
             updateApplication(interviewSetup.applicationId, {
                 status: interviewSetup.previousStatus,
             });
+            if (interviewSetup.statusPersisted) {
+                void updateApplicationAPI(interviewSetup.applicationId, {
+                    status: interviewSetup.previousStatus,
+                }).catch((error) => {
+                    console.error(
+                        "Failed to revert application status after interview setup cancel:",
+                        error
+                    );
+                });
+            }
         }
 
         setInterviewSetup(null);
         setInterviewSetupError(null);
-    }, [interviewSetup, updateApplication]);
+    }, [interviewSetup, updateApplication, updateApplicationAPI]);
 
     useEffect(() => {
         if (!interviewSetup) return;
@@ -298,84 +309,124 @@ export function KanbanBoard() {
         }
     };
 
-    const handleDrop = (
+    const handleDrop = async (
         e: DragEvent<HTMLDivElement>,
         newStatus: ApplicationStatus
     ) => {
         e.preventDefault();
-        const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
+        let rollbackStatus: (() => void) | null = null;
+        try {
+            const appId = e.dataTransfer.getData(DRAG_DATA_KEY);
 
-        if (!appId) return;
-        const app = applications.find((a) => a.id === appId);
-        if (!app) return;
+            if (!appId) return;
+            const app = applications.find((a) => a.id === appId);
+            if (!app) return;
+            const previousStatus = app.status;
+            rollbackStatus = () => {
+                updateApplication(appId, { status: previousStatus });
+            };
 
-        if (newStatus === "interview") {
-            const interviewDateIso = app.interviewDate;
-            const roleType = app.roleType;
-            const needsInterviewDetails = !interviewDateIso || !roleType;
+            if (newStatus === "interview") {
+                const interviewDateIso = app.interviewDate;
+                const roleType = app.roleType;
+                const needsInterviewDetails = !interviewDateIso || !roleType;
 
-            if (needsInterviewDetails) {
-                updateApplication(appId, { status: "interview" });
-                setInterviewSetupError(null);
-                const existingDateOnly = interviewDateIso
-                    ? getInterviewDateOnly(interviewDateIso)
-                    : null;
-                setInterviewSetup({
-                    applicationId: app.id,
-                    interviewDate:
-                        existingDateOnly ??
-                        format(
+                if (needsInterviewDetails) {
+                    updateApplication(appId, { status: "interview" });
+                    let statusPersisted = false;
+                    try {
+                        await updateApplicationAPI(appId, { status: "interview" });
+                        statusPersisted = true;
+                    } catch (error) {
+                        updateApplication(appId, { status: previousStatus });
+                        console.error(
+                            "Failed to persist interview status before opening setup modal:",
+                            error
+                        );
+                        return;
+                    }
+
+                    setInterviewSetupError(null);
+                    const existingDateOnly = interviewDateIso
+                        ? getInterviewDateOnly(interviewDateIso)
+                        : null;
+                    setInterviewSetup({
+                        applicationId: app.id,
+                        interviewDate:
+                            existingDateOnly ??
+                            format(
+                                addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
+                                "yyyy-MM-dd"
+                            ),
+                        roleType: roleType ?? "SDE",
+                        previousStatus,
+                        statusPersisted,
+                    });
+                    return;
+                }
+
+                const normalizedExistingDate = parseInterviewDate(interviewDateIso);
+                const normalizedToday = startOfDay(new Date());
+                const daysUntilInterview = differenceInDays(
+                    normalizedExistingDate ?? normalizedToday,
+                    normalizedToday
+                );
+
+                if (
+                    !normalizedExistingDate ||
+                    daysUntilInterview < 0
+                ) {
+                    updateApplication(appId, { status: "interview" });
+                    let statusPersisted = false;
+                    try {
+                        await updateApplicationAPI(appId, { status: "interview" });
+                        statusPersisted = true;
+                    } catch (error) {
+                        updateApplication(appId, { status: previousStatus });
+                        console.error(
+                            "Failed to persist interview status for invalid-date setup flow:",
+                            error
+                        );
+                        return;
+                    }
+
+                    setInterviewSetup({
+                        applicationId: app.id,
+                        interviewDate: format(
                             addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
                             "yyyy-MM-dd"
                         ),
-                    roleType: roleType ?? "SDE",
-                    previousStatus: app.status,
-                });
-                return;
-            }
+                        roleType: roleType ?? "SDE",
+                        previousStatus,
+                        statusPersisted,
+                    });
+                    setInterviewSetupError(
+                        "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
+                    );
+                    return;
+                }
 
-            const normalizedExistingDate = parseInterviewDate(interviewDateIso);
-            const normalizedToday = startOfDay(new Date());
-            const daysUntilInterview = differenceInDays(
-                normalizedExistingDate ?? normalizedToday,
-                normalizedToday
-            );
-
-            if (
-                !normalizedExistingDate ||
-                daysUntilInterview < 0
-            ) {
                 updateApplication(appId, { status: "interview" });
-                setInterviewSetup({
-                    applicationId: app.id,
-                    interviewDate: format(
-                        addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
-                        "yyyy-MM-dd"
-                    ),
-                    roleType: roleType ?? "SDE",
-                    previousStatus: app.status,
-                });
-                setInterviewSetupError(
-                    "The stored interview date is invalid or in the past. Please confirm an updated date to generate a sprint."
-                );
+                await updateApplicationAPI(appId, { status: "interview" });
+                ensureSprintForInterview(app.id, normalizedExistingDate, roleType);
                 return;
             }
 
-            updateApplication(appId, { status: "interview" });
-            ensureSprintForInterview(app.id, normalizedExistingDate, roleType);
-            return;
-        }
+            updateApplication(appId, { status: newStatus });
+            await updateApplicationAPI(appId, { status: newStatus });
 
-        updateApplication(appId, { status: newStatus });
-
-        if (newStatus === "rejected") {
-            const relatedSprints = sprints.filter(
-                (sprint) => sprint.applicationId === app.id
-            );
-            for (const sprint of relatedSprints) {
-                if (sprint.status !== "active") continue;
-                updateSprint(sprint.id, { status: "expired" });
+            if (newStatus === "rejected") {
+                const relatedSprints = sprints.filter(
+                    (sprint) => sprint.applicationId === app.id
+                );
+                for (const sprint of relatedSprints) {
+                    if (sprint.status !== "active") continue;
+                    updateSprint(sprint.id, { status: "expired" });
+                }
             }
+        } catch (error) {
+            rollbackStatus?.();
+            console.error("Failed to update application status from pipeline:", error);
         }
     };
 
@@ -449,7 +500,9 @@ export function KanbanBoard() {
                                 key={column.status}
                                 className="w-72 flex-shrink-0 flex flex-col bg-muted rounded-xl"
                                 onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, column.status)}
+                                onDrop={(e) => {
+                                    void handleDrop(e, column.status);
+                                }}
                             >
                                 {/* Column Header */}
                                 <div className="p-4 border-b border-border">
@@ -546,7 +599,12 @@ export function KanbanBoard() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                deleteApplication(app.id);
+                                                                void deleteApplicationAPI(app.id).catch((error) => {
+                                                                    console.error(
+                                                                        "Failed to delete application from pipeline:",
+                                                                        error
+                                                                    );
+                                                                });
                                                             }}
                                                             className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1"
                                                             title="Delete application"
@@ -686,9 +744,9 @@ export function KanbanBoard() {
                                         setInterviewSetup((prev) =>
                                             prev
                                                 ? {
-                                                      ...prev,
-                                                      interviewDate: e.target.value,
-                                                  }
+                                                    ...prev,
+                                                    interviewDate: e.target.value,
+                                                }
                                                 : prev
                                         );
                                     }}
@@ -708,9 +766,9 @@ export function KanbanBoard() {
                                         setInterviewSetup((prev) =>
                                             prev
                                                 ? {
-                                                      ...prev,
-                                                      roleType: e.target.value as RoleType,
-                                                  }
+                                                    ...prev,
+                                                    roleType: e.target.value as RoleType,
+                                                }
                                                 : prev
                                         );
                                     }}
@@ -743,55 +801,74 @@ export function KanbanBoard() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (!interviewSetup) return;
-                                        if (!interviewSetup.interviewDate) {
-                                            setInterviewSetupError(
-                                                "Please select an interview date."
-                                            );
-                                            return;
-                                        }
-
-                                        const parsedDate = parseInterviewDate(
-                                            interviewSetup.interviewDate
-                                        );
-                                        if (!parsedDate) {
-                                            setInterviewSetupError(
-                                                "Interview date is invalid."
-                                            );
-                                            return;
-                                        }
-
-                                        const normalizedToday = startOfDay(new Date());
-                                        if (
-                                            differenceInDays(
-                                                parsedDate,
-                                                normalizedToday
-                                            ) < 0
-                                        ) {
-                                            setInterviewSetupError(
-                                                "Interview date must be today or later."
-                                            );
-                                            return;
-                                        }
-
-                                        updateApplication(
-                                            interviewSetup.applicationId,
-                                            {
-                                                status: "interview",
-                                                interviewDate:
-                                                    interviewSetup.interviewDate,
-                                                roleType: interviewSetup.roleType,
+                                        void (async () => {
+                                            if (!interviewSetup) return;
+                                            if (!interviewSetup.interviewDate) {
+                                                setInterviewSetupError(
+                                                    "Please select an interview date."
+                                                );
+                                                return;
                                             }
-                                        );
 
-                                        ensureSprintForInterview(
-                                            interviewSetup.applicationId,
-                                            parsedDate,
-                                            interviewSetup.roleType
-                                        );
+                                            const parsedDate = parseInterviewDate(
+                                                interviewSetup.interviewDate
+                                            );
+                                            if (!parsedDate) {
+                                                setInterviewSetupError(
+                                                    "Interview date is invalid."
+                                                );
+                                                return;
+                                            }
 
-                                        setInterviewSetup(null);
-                                        setInterviewSetupError(null);
+                                            const normalizedToday = startOfDay(new Date());
+                                            if (
+                                                differenceInDays(
+                                                    parsedDate,
+                                                    normalizedToday
+                                                ) < 0
+                                            ) {
+                                                setInterviewSetupError(
+                                                    "Interview date must be today or later."
+                                                );
+                                                return;
+                                            }
+
+                                            await updateApplicationAPI(
+                                                interviewSetup.applicationId,
+                                                {
+                                                    status: "interview",
+                                                    interviewDate:
+                                                        interviewSetup.interviewDate,
+                                                    roleType: interviewSetup.roleType,
+                                                }
+                                            );
+                                            updateApplication(
+                                                interviewSetup.applicationId,
+                                                {
+                                                    status: "interview",
+                                                    interviewDate:
+                                                        interviewSetup.interviewDate,
+                                                    roleType: interviewSetup.roleType,
+                                                }
+                                            );
+
+                                            ensureSprintForInterview(
+                                                interviewSetup.applicationId,
+                                                parsedDate,
+                                                interviewSetup.roleType
+                                            );
+
+                                            setInterviewSetup(null);
+                                            setInterviewSetupError(null);
+                                        })().catch((error) => {
+                                            console.error(
+                                                "Failed to confirm interview details from pipeline:",
+                                                error
+                                            );
+                                            setInterviewSetupError(
+                                                "Unable to save interview details. Please try again."
+                                            );
+                                        });
                                     }}
                                     className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
                                 >
