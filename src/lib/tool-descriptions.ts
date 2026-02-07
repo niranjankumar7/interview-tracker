@@ -56,6 +56,10 @@ If the user provides ONLY a status word without a company name, you MUST ask for
 - User: "offer" → Ask: "Which company gave you an offer?"
 - User: "applied" → Redirect to addApplications tool; ask for company & role
 
+## DUPLICATE COMPANY HANDLING
+If multiple applications exist for the same company (different roles), ask for clarification:
+- "Which role at [company] should I update? You have: [role1], [role2]"
+
 ## Trigger Phrases (with variations)
 - "I got rejected from/by [company]" (both "from" and "by" are valid)
 - "[company] rejected me"
@@ -81,7 +85,7 @@ If the user provides ONLY a status word without a company name, you MUST ask for
 - rejected, didn't work out, said no, ghosted, did bad, withdrew, bombed → "rejected"
 - shortlisted, moved forward, next round, got shortlisted, cracked OA, recruiter call, oa link received → "shortlisted"
 - interview, scheduled, interview scheduled, phone screen, cleared screen, final round → "interview"
-- offer, got offer, received offer, accepted, got the bag, lowballed, negotiating → "offer"
+- offer, got offer, received offer, accepted, got the bag → "offer"
 
 ## Typo Tolerance
 Handle common typos - focus on meaning, not spelling:
@@ -122,6 +126,12 @@ IMPORTANT: Use this when the user mentions applying to companies.
 If the user just says "applied" without details, ASK for clarification:
 - User: "applied" → Ask: "Which company did you apply to? And for what role?"
 - User: "I applied" → Ask: "Which company and role?"
+
+## DUPLICATE COMPANY HANDLING
+If user is adding a company that already exists in the pipeline:
+- Ask: "You already have an application at [company]. Are you applying for a different role, or is this a duplicate?"
+- If different role, proceed with adding the new application
+- If duplicate, skip and inform user
 
 ## Trigger Phrases
 - "I applied for/to [company]"
