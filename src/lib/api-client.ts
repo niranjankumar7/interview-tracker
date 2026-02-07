@@ -30,6 +30,16 @@ export interface AuthResponse {
     message: string;
 }
 
+export interface RegisterResponse {
+    message: string;
+    user: {
+        id: string;
+        email: string;
+        name: string | null;
+        createdAt: string;
+    };
+}
+
 export interface UserProfile {
     id: string;
     email: string;
@@ -145,17 +155,17 @@ export const authApi = {
     /**
      * Register a new user
      */
-    async register(data: { email: string; password: string; name?: string }): Promise<AuthResponse> {
-        const response = await apiRequest<AuthResponse>('/api/auth/register', {
+    async register(
+        data: {
+            email: string;
+            password: string;
+            name?: string;
+        }
+    ): Promise<RegisterResponse> {
+        return apiRequest<RegisterResponse>('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify(data),
         });
-
-        if (response.token) {
-            setAuthToken(response.token);
-        }
-
-        return response;
     },
 
     /**
