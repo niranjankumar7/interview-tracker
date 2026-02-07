@@ -39,11 +39,11 @@ const updateApplicationSchema = z.object({
 // GET /api/applications/[id]
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
 
         const application = await prisma.application.findFirst({
             where: {
@@ -81,11 +81,11 @@ export async function GET(
 // PUT /api/applications/[id]
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
         const body = await req.json();
         const validation = updateApplicationSchema.safeParse(body);
 
@@ -170,11 +170,11 @@ export async function PUT(
 // DELETE /api/applications/[id]
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const user = await requireAuth(req);
-        const { id } = params;
+        const { id } = await params;
 
         // Check if application exists and belongs to user
         const existing = await prisma.application.findFirst({

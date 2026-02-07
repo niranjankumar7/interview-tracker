@@ -685,9 +685,9 @@ export function KanbanBoard() {
                                         setInterviewSetup((prev) =>
                                             prev
                                                 ? {
-                                                      ...prev,
-                                                      interviewDate: e.target.value,
-                                                  }
+                                                    ...prev,
+                                                    interviewDate: e.target.value,
+                                                }
                                                 : prev
                                         );
                                     }}
@@ -707,9 +707,9 @@ export function KanbanBoard() {
                                         setInterviewSetup((prev) =>
                                             prev
                                                 ? {
-                                                      ...prev,
-                                                      roleType: e.target.value as RoleType,
-                                                  }
+                                                    ...prev,
+                                                    roleType: e.target.value as RoleType,
+                                                }
                                                 : prev
                                         );
                                     }}
@@ -800,7 +800,7 @@ export function KanbanBoard() {
                                             setInterviewSetupError(
                                                 "Unable to save interview details. Please try again."
                                             );
-                                        })();
+                                        });
                                     }}
                                     className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
                                 >

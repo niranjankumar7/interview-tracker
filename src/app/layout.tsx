@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { NotificationRoot } from "@/components/notifications/NotificationRoot";
 import { Footer } from "@/components/layout/Footer";
@@ -36,15 +37,17 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <AuthGuard>
-              <DataSyncProvider>
-                <TamboProviderWrapper>
-                  <main id="main-content" className="flex flex-1 min-h-0 flex-col">
-                    {children}
-                  </main>
-                </TamboProviderWrapper>
-              </DataSyncProvider>
-            </AuthGuard>
+            <Suspense fallback={null}>
+              <AuthGuard>
+                <DataSyncProvider>
+                  <TamboProviderWrapper>
+                    <main id="main-content" className="flex flex-1 min-h-0 flex-col">
+                      {children}
+                    </main>
+                  </TamboProviderWrapper>
+                </DataSyncProvider>
+              </AuthGuard>
+            </Suspense>
           </AuthProvider>
         </ThemeProvider>
         <Footer />
