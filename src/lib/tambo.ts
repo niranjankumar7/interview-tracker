@@ -288,7 +288,7 @@ export const tools: TamboTool[] = [
   {
     name: "addApplications",
     description: toolDescriptions.addApplications,
-    tool: (input: {
+    tool: async (input: {
       applications: Array<{
         company: string;
         role?: string;
@@ -296,8 +296,9 @@ export const tools: TamboTool[] = [
         notes?: string;
       }>;
     }) => {
-      const addApplication = useStore.getState().addApplication;
+      const createApplicationAPI = useStore.getState().createApplicationAPI;
       const added: string[] = [];
+      const failed: string[] = [];
 
       // Handle various input formats that Tambo might send
       const apps = input?.applications || [];
@@ -314,22 +315,28 @@ export const tools: TamboTool[] = [
           continue;
         }
 
-        const newApp = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          company: companyName,
-          role: (typeof app === 'object' ? app?.role : undefined) || "Software Engineer",
-          status: (typeof app === 'object' ? app?.status : undefined) || "applied",
-          applicationDate: new Date().toISOString(),
-          rounds: [],
-          notes: (typeof app === 'object' ? app?.notes : undefined) || "",
-          createdAt: new Date().toISOString(),
-        };
-
-        addApplication(newApp);
-        added.push(companyName);
+        try {
+          await createApplicationAPI({
+            company: companyName,
+            role: (typeof app === 'object' ? app?.role : undefined) || "Software Engineer",
+            status: (typeof app === 'object' ? app?.status : undefined) || "applied",
+            notes: (typeof app === 'object' ? app?.notes : undefined) || "",
+            // Additional defaults required by API schema if not present
+            roleType: undefined,
+            applicationDate: new Date().toISOString(),
+          });
+          added.push(companyName);
+        } catch (error) {
+          console.error(`Failed to create application for ${companyName}:`, error);
+          failed.push(companyName);
+        }
       }
 
-      return { added, count: added.length };
+      return {
+        added,
+        failed: failed.length > 0 ? failed : undefined,
+        count: added.length
+      };
     },
     inputSchema: z.object({
       applications: z
@@ -348,13 +355,14 @@ export const tools: TamboTool[] = [
     }),
     outputSchema: z.object({
       added: z.array(z.string()),
+      failed: z.array(z.string()).optional(),
       count: z.number(),
     }),
   },
   {
     name: "updateApplicationStatus",
     description: toolDescriptions.updateApplicationStatus,
-    tool: (input: {
+    tool: async (input: {
       updates: Array<
         | string
         | {
@@ -365,7 +373,7 @@ export const tools: TamboTool[] = [
     }) => {
       const state = useStore.getState();
       const applications = state.applications;
-      const updateApplication = state.updateApplication;
+      const updateApplicationAPI = state.updateApplicationAPI;
       const results: Array<{ company: string; status: string; success: boolean }> = [];
 
       console.log("updateApplicationStatus input:", JSON.stringify(input, null, 2));
@@ -401,8 +409,13 @@ export const tools: TamboTool[] = [
         );
 
         if (app) {
-          updateApplication(app.id, { status: newStatus });
-          results.push({ company: companyName, status: newStatus, success: true });
+          try {
+            await updateApplicationAPI(app.id, { status: newStatus });
+            results.push({ company: companyName, status: newStatus, success: true });
+          } catch (error) {
+            console.error(`Failed to update status for ${companyName}:`, error);
+            results.push({ company: companyName, status: 'error', success: false });
+          }
         } else {
           results.push({ company: companyName, status: 'not found', success: false });
         }
@@ -436,13 +449,13 @@ export const tools: TamboTool[] = [
     name: "updateOfferDetails",
     description:
       "Save or update job offer details for an application. Prefer applicationId when known. If matching by company finds multiple applications, returns success=false with a candidates list; callers should prompt for an applicationId and retry. Sets status to offer only when compensation fields are provided (CTC/base/bonus/equity).",
-    tool: (input: {
+    tool: async (input: {
       applicationId?: string;
       company?: string;
       offerDetails: OfferDetailsToolInput;
     }) => {
       const state = useStore.getState();
-      const { applications, updateApplication } = state;
+      const { applications, updateApplicationAPI } = state;
       const { applicationId, company, offerDetails } = input;
 
       if (!applicationId && !company) {
@@ -503,23 +516,36 @@ export const tools: TamboTool[] = [
       const hasComp = hasOfferCompensation(offerDetails);
       const mappedWorkMode = normalizeOfferWorkMode(offerDetails.workMode);
 
-      updateApplication(app.id, {
-        ...(hasComp ? { status: "offer" } : {}),
-        offerDetails: {
-          ...app.offerDetails,
-          ...offerDetails,
-          workMode: mappedWorkMode || app.offerDetails?.workMode,
-          currency: offerDetails.currency || app.offerDetails?.currency || "INR",
-        }
-      });
+      try {
+        await updateApplicationAPI(app.id, {
+          ...(hasComp ? { status: "offer" } : {}),
+          offerDetails: {
+            baseSalary: offerDetails.baseSalary,
+            bonus: offerDetails.bonus,
+            equity: offerDetails.equity?.toString(),
+            totalCTC: offerDetails.totalCTC,
+            currency: offerDetails.currency || "INR",
+            location: offerDetails.location,
+            workMode: mappedWorkMode,
+            joiningDate: offerDetails.joiningDate,
+            notes: offerDetails.notes,
+          }
+        });
 
-      return {
-        success: true,
-        company: app.company,
-        message:
-          `Successfully saved offer details for ${app.company}. ` +
-          `Total CTC: ${offerDetails.totalCTC ?? app.offerDetails?.totalCTC ?? "Not set"}`
-      };
+        return {
+          success: true,
+          company: app.company,
+          message:
+            `Successfully saved offer details for ${app.company}. ` +
+            `Total CTC: ${offerDetails.totalCTC ?? "Not set"}`
+        };
+      } catch (error) {
+        console.error("Failed to update offer details:", error);
+        return {
+          success: false,
+          message: "Failed to save offer details due to a server error."
+        };
+      }
     },
     inputSchema: z
       .object({
