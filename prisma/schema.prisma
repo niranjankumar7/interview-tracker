@@ -140,7 +140,7 @@ model Sprint {
 
 model Question {
   id              String    @id @default(uuid())
-  userId          String
+  createdByUserId String
   applicationId   String?   // Optional - can be general questions
   questionText    String
   category        String    // DSA, SystemDesign, Behavioral, SQL, Other
@@ -149,10 +149,10 @@ model Question {
   dateAdded       DateTime  @default(now())
 
   // Relations
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser   User         @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
   application     Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
+  @@index([createdByUserId])
   @@index([applicationId])
   @@index([category])
 }

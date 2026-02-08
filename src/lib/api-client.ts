@@ -75,6 +75,15 @@ export interface UserProfile {
     } | null;
 }
 
+export interface UserProgressRecord {
+    userId: string;
+    currentStreak: number;
+    longestStreak: number;
+    lastActiveDate: string | null;
+    totalTasksCompleted: number;
+    updatedAt: string;
+}
+
 /**
  * Get auth token from localStorage
  */
@@ -227,6 +236,21 @@ export const userApi = {
             body: JSON.stringify(data),
         });
     },
+
+    /**
+     * Update user progress
+     */
+    async updateProgress(data: {
+        currentStreak?: number;
+        longestStreak?: number;
+        lastActiveDate?: string;
+        totalTasksCompleted?: number;
+    }): Promise<UserProgressRecord> {
+        return apiRequest<UserProgressRecord>('/api/user/progress', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
 };
 
 // ============================================
@@ -339,6 +363,13 @@ export const sprintsApi = {
     },
 
     /**
+     * Get single sprint
+     */
+    async getById(id: string): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}`);
+    },
+
+    /**
      * Create new sprint
      */
     async create(data: {
@@ -351,6 +382,46 @@ export const sprintsApi = {
         return apiRequest<Sprint>('/api/sprints', {
             method: 'POST',
             body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Update sprint
+     */
+    async update(id: string, data: {
+        status?: 'active' | 'completed' | 'expired';
+        dailyPlans?: any;
+        interviewDate?: string;
+        roleType?: string;
+        totalDays?: number;
+    }): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Complete or uncomplete a single task in a sprint plan
+     */
+    async completeTask(id: string, data: {
+        dayIndex: number;
+        blockIndex: number;
+        taskIndex: number;
+        completed: boolean;
+    }): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}/tasks/complete`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Delete sprint
+     */
+    async delete(id: string): Promise<void> {
+        await apiRequest(`/api/sprints/${id}`, {
+            method: 'DELETE',
         });
     },
 };

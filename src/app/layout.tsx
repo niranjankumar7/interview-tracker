@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col overflow-hidden`}
       >
         <ThemeProvider
           attribute="class"
@@ -41,7 +41,7 @@ export default function RootLayout({
               <AuthGuard>
                 <DataSyncProvider>
                   <TamboProviderWrapper>
-                    <main id="main-content" className="flex flex-1 min-h-0 flex-col">
+                    <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden">
                       {children}
                     </main>
                   </TamboProviderWrapper>

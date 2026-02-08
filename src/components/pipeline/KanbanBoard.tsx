@@ -489,11 +489,11 @@ export function KanbanBoard() {
 
     return (
         <>
-            <div className="h-full bg-background p-6 overflow-x-auto">
-                <div className="flex items-center gap-4 mb-4 min-w-max">
-                    <div className="flex items-center gap-3">
+            <div className="h-full bg-background p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                         <h2 className="text-lg font-semibold text-foreground">Search</h2>
-                        <div className="relative w-80">
+                        <div className="relative flex-1 sm:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 value={searchQuery}
@@ -511,34 +511,34 @@ export function KanbanBoard() {
                     )}
                 </div>
 
-                <div className="flex gap-4 min-w-max h-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                     {statusColumns.map((column) => {
                         const columnApps = applicationsByStatus[column.status];
 
                         return (
                             <div
                                 key={column.status}
-                                className="w-72 flex-shrink-0 flex flex-col bg-muted rounded-xl"
                                 onDragOver={handleDragOver}
-                                onDrop={(e) => {
-                                    void handleDrop(e, column.status);
-                                }}
+                                onDrop={(e) => void handleDrop(e, column.status)}
+                                className="flex flex-col min-h-[400px] bg-card rounded-lg border border-border"
                             >
                                 {/* Column Header */}
-                                <div className="p-4 border-b border-border">
+                                <div className="flex items-center justify-between p-3 border-b border-border">
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-3 h-3 rounded-full ${column.color}`} />
-                                        <h3 className="font-semibold text-foreground">{column.label}</h3>
-                                        <span className="ml-auto bg-background px-2 py-0.5 rounded-full text-sm text-muted-foreground">
-                                            {columnApps.length}
-                                        </span>
+                                        <div className={`w-2 h-2 rounded-full ${column.color}`} />
+                                        <h3 className="font-semibold text-sm text-foreground">
+                                            {column.label}
+                                        </h3>
                                     </div>
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                                        {columnApps.length}
+                                    </span>
                                 </div>
 
                                 {/* Cards Container */}
-                                <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                                <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                                     {columnApps.length === 0 ? (
-                                        <div className="text-center py-8 text-muted-foreground text-sm">
+                                        <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
                                             {isSearching
                                                 ? "No matches in this column for this search"
                                                 : column.status === "rejected"

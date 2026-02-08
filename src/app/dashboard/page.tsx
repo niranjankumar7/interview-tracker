@@ -415,12 +415,12 @@ export default function DashboardPage() {
                               : `${row.total.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
-                            {row.offer?.baseSalary === undefined
+                            {row.offer?.baseSalary === undefined || row.offer.baseSalary === null
                               ? "—"
                               : `${row.offer.baseSalary.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
-                            {row.offer?.bonus === undefined
+                            {row.offer?.bonus === undefined || row.offer.bonus === null
                               ? "—"
                               : `${row.offer.bonus.toLocaleString()} ${row.currency}`}
                           </td>

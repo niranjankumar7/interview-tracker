@@ -8,10 +8,12 @@ import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 export const pipelineSummaryPanelSchema = z.object({
-    status: z
-        .enum(APPLICATION_STATUSES)
-        .optional()
-        .describe(`Optional status filter. Valid values: ${APPLICATION_STATUSES.join(", ")}`),
+    status: z.preprocess(
+        (val) => val ?? undefined,
+        z.enum(APPLICATION_STATUSES)
+            .optional()
+            .describe(`Optional status filter. Valid values: ${APPLICATION_STATUSES.join(", ")}`)
+    ),
 });
 
 interface PipelineSummaryPanelProps {

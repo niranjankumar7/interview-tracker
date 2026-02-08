@@ -5,11 +5,11 @@ import { AppHeader } from "@/components/layout/AppHeader";
 
 export default function PipelinePage() {
     return (
-        <div className="flex flex-1 min-h-0 flex-col bg-background h-screen">
+        <div className="flex flex-1 min-h-0 flex-col bg-background">
             <AppHeader />
 
             {/* Main Content */}
-            <main className="flex-1 overflow-hidden">
+            <main className="flex-1 overflow-auto">
                 <KanbanBoard />
             </main>
         </div>

@@ -305,6 +305,34 @@ function normalizeApplicationFromApi(raw: Record<string, unknown>): Application 
     };
 }
 
+function normalizeQuestionFromApi(raw: Record<string, unknown>): Question {
+    const question = raw as unknown as Question & {
+        applicationId?: string;
+        createdAt?: string;
+        application?: { id?: string };
+        createdByUserId?: string;
+    };
+
+    const companyId =
+        question.companyId ??
+        question.applicationId ??
+        question.application?.id ??
+        undefined;
+
+    // Use a stable fallback to avoid reordering records on every re-sync.
+    const dateAdded =
+        question.dateAdded ??
+        question.createdAt ??
+        new Date(0).toISOString();
+
+    return {
+        ...question,
+        companyId,
+        dateAdded,
+        createdByUserId: question.createdByUserId,
+    };
+}
+
 // Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
 // Keeps IDs stable-ish and reduces same-millisecond collision risk.
 let fallbackQuestionIdLastTime = 0;
@@ -603,7 +631,7 @@ export const useStore = create<AppState>()(
                     }),
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+            completeTask: async (sprintId, dayIndex, blockIndex, taskIndex) => {
                 const existingTask =
                     get()
                         .sprints.find((sprint) => sprint.id === sprintId)
@@ -611,6 +639,7 @@ export const useStore = create<AppState>()(
 
                 if (!existingTask || existingTask.completed) return;
 
+                // Update local state first (optimistic update)
                 set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -671,6 +700,42 @@ export const useStore = create<AppState>()(
                         }
                     };
                 });
+
+                // Save to database
+                try {
+                    const updatedSprint = get().sprints.find(s => s.id === sprintId);
+                    const currentProgress = get().progress;
+
+                    if (updatedSprint) {
+                        const updatedTask =
+                            updatedSprint.dailyPlans?.[dayIndex]?.blocks?.[blockIndex]?.tasks?.[taskIndex];
+                        if (!updatedTask) {
+                            throw new Error('Task not found in sprint after optimistic update');
+                        }
+
+                        // Persist only the task delta instead of writing the full dailyPlans payload.
+                        await api.sprints.completeTask(sprintId, {
+                            dayIndex,
+                            blockIndex,
+                            taskIndex,
+                            completed: Boolean(updatedTask.completed),
+                        });
+
+                        // Update user progress in database
+                        await api.user.updateProgress({
+                            currentStreak: currentProgress.currentStreak,
+                            longestStreak: currentProgress.longestStreak,
+                            lastActiveDate: currentProgress.lastActiveDate,
+                            totalTasksCompleted: currentProgress.totalTasksCompleted,
+                        });
+
+                        console.log('✅ Task completion saved to database');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to save task completion to database:', error);
+                    // Note: Local state is already updated (optimistic update)
+                    // You might want to show a notification to the user here
+                }
             },
 
             updateProgress: (updates) =>
@@ -924,7 +989,11 @@ export const useStore = create<AppState>()(
             loadQuestionsFromAPI: async (filters) => {
                 try {
                     const questions = await api.questions.getAll(filters);
-                    set({ questions });
+                    set({
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
+                        ),
+                    });
                 } catch (error) {
                     console.error('Failed to load questions from API:', error);
                     throw error;
@@ -993,10 +1062,13 @@ export const useStore = create<AppState>()(
             createQuestionAPI: async (data) => {
                 try {
                     const question = await api.questions.create(data);
+                    const normalizedQuestion = normalizeQuestionFromApi(
+                        question as unknown as Record<string, unknown>
+                    );
                     set((state) => ({
-                        questions: [...state.questions, question]
+                        questions: [...state.questions, normalizedQuestion]
                     }));
-                    return question;
+                    return normalizedQuestion;
                 } catch (error) {
                     console.error('Failed to create question:', error);
                     throw error;
@@ -1026,7 +1098,9 @@ export const useStore = create<AppState>()(
                             )
                         ),
                         sprints,
-                        questions,
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
+                        ),
                     };
 
                     // Sync user profile data if available
