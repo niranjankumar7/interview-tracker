@@ -6,12 +6,21 @@
 import { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
+// JWT secret - MUST be set in environment variables
+let cachedJwtSecret: Uint8Array | null = null;
+
 function getJwtSecret(): Uint8Array {
+    if (cachedJwtSecret) return cachedJwtSecret;
+
     const jwtSecretString = process.env.JWT_SECRET;
     if (!jwtSecretString) {
-        throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.');
+        throw new Error(
+            'FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.'
+        );
     }
-    return new TextEncoder().encode(jwtSecretString);
+
+    cachedJwtSecret = new TextEncoder().encode(jwtSecretString);
+    return cachedJwtSecret;
 }
 
 export interface AuthUser {

@@ -72,7 +72,7 @@ export interface Application {
     id: string;
     company: string;
     role: string;
-    jobDescriptionUrl?: string;
+    jobDescriptionUrl?: string | null;
     roleType?: RoleType; // Structured role type for prep templates
     status: ApplicationStatus;
     applicationDate: string; // ISO date string
@@ -135,7 +135,7 @@ export interface Task {
 
 export interface Question {
     id: string;
-    companyId: string;
+    companyId?: string; // Optional - use undefined when no company, not empty string
     questionText: string;
     category: QuestionCategory;
     difficulty?: QuestionDifficulty;
