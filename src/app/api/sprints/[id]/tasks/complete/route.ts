@@ -12,6 +12,30 @@ const completeTaskSchema = z.object({
     completed: z.boolean(),
 });
 
+const persistedTaskSchema = z.object({
+    id: z.string(),
+    description: z.string(),
+    completed: z.boolean(),
+    category: z.string().optional(),
+    estimatedMinutes: z.number().optional(),
+});
+
+const persistedBlockSchema = z.object({
+    id: z.string(),
+    type: z.string(),
+    duration: z.string(),
+    completed: z.boolean(),
+    tasks: z.array(persistedTaskSchema),
+});
+
+const persistedDailyPlanSchema = z.object({
+    day: z.number().int().min(1),
+    date: z.string(),
+    focus: z.string(),
+    completed: z.boolean(),
+    blocks: z.array(persistedBlockSchema),
+});
+
 // PUT /api/sprints/[id]/tasks/complete
 export async function PUT(
     req: NextRequest,
@@ -71,13 +95,52 @@ export async function PUT(
                     ? 'completed'
                     : existingSprint.status;
 
-        const sprint = await prisma.sprint.update({
-            where: { id },
+        // Validate normalized payload before persistence to avoid writing malformed JSON.
+        const normalizedPlansResult = z.array(persistedDailyPlanSchema).safeParse(dailyPlans);
+        if (!normalizedPlansResult.success) {
+            return NextResponse.json(
+                {
+                    error: 'Invalid sprint daily plan structure',
+                    issues: normalizedPlansResult.error.issues,
+                },
+                { status: 400 }
+            );
+        }
+
+        const serializedDailyPlans: Prisma.InputJsonValue = JSON.parse(
+            JSON.stringify(normalizedPlansResult.data)
+        );
+
+        // Optimistic concurrency: only update if updatedAt has not changed since read.
+        const updateResult = await prisma.sprint.updateMany({
+            where: {
+                id,
+                userId: user.userId,
+                updatedAt: existingSprint.updatedAt,
+            },
             data: {
-                dailyPlans: dailyPlans as unknown as Prisma.InputJsonValue,
+                dailyPlans: serializedDailyPlans,
                 status: nextStatus,
             },
         });
+
+        if (updateResult.count === 0) {
+            return NextResponse.json(
+                {
+                    error: 'Sprint was updated elsewhere. Refresh and retry.',
+                    code: 'CONFLICT',
+                },
+                { status: 409 }
+            );
+        }
+
+        const sprint = await prisma.sprint.findFirst({
+            where: { id, userId: user.userId },
+        });
+
+        if (!sprint) {
+            return NextResponse.json({ error: 'Sprint not found' }, { status: 404 });
+        }
 
         return NextResponse.json(sprint);
     } catch (error) {

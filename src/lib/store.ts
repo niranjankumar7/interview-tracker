@@ -317,12 +317,18 @@ function normalizeQuestionFromApi(raw: Record<string, unknown>): Question {
         question.companyId ??
         question.applicationId ??
         question.application?.id ??
-        '';
+        undefined;
+
+    // Use a stable fallback to avoid reordering records on every re-sync.
+    const dateAdded =
+        question.dateAdded ??
+        question.createdAt ??
+        new Date(0).toISOString();
 
     return {
         ...question,
         companyId,
-        dateAdded: question.dateAdded ?? question.createdAt ?? new Date().toISOString(),
+        dateAdded,
         createdByUserId: question.createdByUserId,
     };
 }
