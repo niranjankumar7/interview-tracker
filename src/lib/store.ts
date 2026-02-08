@@ -985,7 +985,7 @@ export const useStore = create<AppState>()(
                     const questions = await api.questions.getAll(filters);
                     set({
                         questions: questions.map((q) =>
-                            normalizeQuestionFromApi(q as Record<string, unknown>)
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
                         ),
                     });
                 } catch (error) {
@@ -1057,7 +1057,7 @@ export const useStore = create<AppState>()(
                 try {
                     const question = await api.questions.create(data);
                     const normalizedQuestion = normalizeQuestionFromApi(
-                        question as Record<string, unknown>
+                        question as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         questions: [...state.questions, normalizedQuestion]
@@ -1093,7 +1093,7 @@ export const useStore = create<AppState>()(
                         ),
                         sprints,
                         questions: questions.map((q) =>
-                            normalizeQuestionFromApi(q as Record<string, unknown>)
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
                         ),
                     };
 
