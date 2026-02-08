@@ -157,6 +157,20 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
     (state?.selectedApplicationId === undefined || state.selectedApplicationId === "");
 
   const offerDetails = state ? buildOfferDetailsFromState(state) : undefined;
+  const alreadySaved = useMemo(() => {
+    if (!existingApplication) return false;
+    if (existingApplication.status === "offer") return true;
+
+    const existingOffer = existingApplication.offerDetails;
+    if (!existingOffer) return false;
+
+    return Object.values(existingOffer).some((value) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return true;
+    });
+  }, [existingApplication]);
   const offerTotalLabel = formatOfferTotalCTC(offerDetails) ?? "—";
 
   if (!state) {
@@ -209,7 +223,7 @@ export function OfferDetailsPanel(props: OfferDetailsPanelProps) {
     }
   };
 
-  if (state.isSaved) {
+  if (state.isSaved || alreadySaved) {
     return (
       <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-xl p-6 shadow-lg max-w-lg">
         <div className="flex items-center gap-3 mb-3">

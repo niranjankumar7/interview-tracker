@@ -2,9 +2,10 @@
 
 import { useStore } from "@/lib/store";
 import { autoTagCategory } from "@/utils/categoryTagger";
-import { QuestionCategory, Question } from "@/types";
+import { QuestionCategory } from "@/types";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { HelpCircle, Building2, Tag, CheckCircle2, Plus } from "lucide-react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 function normalizeCategoryInput(value: unknown): QuestionCategory | undefined {
@@ -90,12 +91,17 @@ export const addQuestionPanelSchema = z.object({
             .optional()
             .describe("The category of the question")
     ),
+    panelId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("Unique panel id to avoid state collisions")
+    ),
 });
 
 interface AddQuestionPanelProps {
     questionText?: string;
     company?: string;
     category?: QuestionCategory;
+    panelId?: string;
 }
 
 interface AddQuestionState {
@@ -112,8 +118,10 @@ export function AddQuestionPanel({
     questionText: initialText,
     company: initialCompany,
     category: initialCategory,
+    panelId,
 }: AddQuestionPanelProps) {
     const applications = useStore((state) => state.applications);
+    const questions = useStore((state) => state.questions);
     const createQuestionAPI = useStore((state) => state.createQuestionAPI);
 
     // Auto-detect category from question text
@@ -121,8 +129,19 @@ export function AddQuestionPanel({
         ? autoTagCategory(initialText)
         : initialCategory || "Other";
 
+    const componentId = useMemo(() => {
+        if (panelId) return `add-question-panel:${panelId}`;
+        const questionSlug = (initialText || "unknown")
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 80);
+        const companySlug = (initialCompany || "general").toLowerCase().trim();
+        return `add-question-panel:${companySlug}:${questionSlug}`;
+    }, [initialCompany, initialText, panelId]);
+
     const [state, setState] = useTamboComponentState<AddQuestionState>(
-        "add-question-panel",
+        componentId,
         {
             questionText: initialText || "",
             selectedCompany: initialCompany || "",
@@ -133,6 +152,29 @@ export function AddQuestionPanel({
             isSubmitting: false,
         }
     );
+
+    const alreadySaved = useMemo(() => {
+        if (!state) return false;
+        const normalizedText = state.questionText.trim().replace(/\s+/g, " ").toLowerCase();
+        if (!normalizedText) return false;
+
+        const selectedApp = applications.find(
+            (a) => a.company.toLowerCase() === state.selectedCompany.toLowerCase()
+        );
+        const selectedAppId = selectedApp?.id;
+
+        return questions.some((q) => {
+            const sameText =
+                q.questionText.trim().replace(/\s+/g, " ").toLowerCase() === normalizedText;
+            if (!sameText) return false;
+
+            if (selectedAppId) {
+                return q.companyId === selectedAppId;
+            }
+
+            return !q.companyId;
+        });
+    }, [applications, questions, state]);
 
     // Handle loading state
     if (!state) {
@@ -176,7 +218,7 @@ export function AddQuestionPanel({
         }
     };
 
-    if (state.isSubmitted) {
+    if (state.isSubmitted || alreadySaved) {
         return (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-md">
                 <div className="flex items-center gap-3 mb-3">

@@ -662,17 +662,19 @@ export function KanbanBoard() {
                                                         Click to view prep →
                                                     </div>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setFeedbackApplicationId(app.id);
-                                                        }}
-                                                        className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
-                                                    >
-                                                        <PanelRight className="w-4 h-4" />
-                                                        Round feedback
-                                                    </button>
+                                                    {app.status === "interview" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setFeedbackApplicationId(app.id);
+                                                            }}
+                                                            className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
+                                                        >
+                                                            <PanelRight className="w-4 h-4" />
+                                                            Round feedback
+                                                        </button>
+                                                    )}
                                                 </div>
                                             );
                                         })

@@ -7,7 +7,7 @@ import { RoleType, Application } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Calendar, Briefcase, Building2, CheckCircle2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -26,12 +26,17 @@ export const sprintSetupCardSchema = z.object({
         (val) => val ?? undefined,
         z.string().optional().describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'")
     ),
+    panelId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("Unique panel id to avoid state collisions")
+    ),
 });
 
 interface SprintSetupCardProps {
     company?: string;
     role?: RoleType;
     interviewDate?: string;
+    panelId?: string;
 }
 
 interface SprintSetupState {
@@ -146,6 +151,7 @@ export function SprintSetupCard({
     company: initialCompany,
     role: initialRole,
     interviewDate: initialDate,
+    panelId,
 }: SprintSetupCardProps) {
     const hydratedCompany = initialCompany || "";
     const hydratedRole: RoleType = initialRole ?? "SDE";
@@ -153,8 +159,16 @@ export function SprintSetupCard({
         initialDate || getDefaultDate()
     );
 
+    const componentId = useMemo(() => {
+        if (panelId) return `sprint-setup-card:${panelId}`;
+        const companySlug = (hydratedCompany || "unknown").toLowerCase().trim();
+        const roleSlug = hydratedRole.toLowerCase();
+        const dateSlug = hydratedInterviewDate || "unknown-date";
+        return `sprint-setup-card:${companySlug}:${roleSlug}:${dateSlug}`;
+    }, [hydratedCompany, hydratedInterviewDate, hydratedRole, panelId]);
+
     const [state, setState] = useTamboComponentState<SprintSetupState>(
-        "sprint-setup-card",
+        componentId,
         {
             company: hydratedCompany,
             role: hydratedRole,
@@ -174,6 +188,8 @@ export function SprintSetupCard({
 
     const createApplicationAPI = useStore((s) => s.createApplicationAPI);
     const createSprintAPI = useStore((s) => s.createSprintAPI);
+    const applications = useStore((s) => s.applications);
+    const sprints = useStore((s) => s.sprints);
 
     useSyncHydratedSprintSetupState(
         {
@@ -200,6 +216,25 @@ export function SprintSetupCard({
     }
 
     const validation = validateSprintSetupInput(state);
+    const existingSprintForCurrentInput = useMemo(() => {
+        const company = validation.company.toLowerCase();
+        if (!company || !validation.parsedDate) return false;
+        const targetDate = format(validation.parsedDate, "yyyy-MM-dd");
+
+        const matchedApplications = applications.filter((app) => {
+            const appDate = normalizeDateInputValue(app.interviewDate ?? "");
+            const sameCompany = app.company.toLowerCase().trim() === company;
+            const sameRole = (app.roleType ?? "SDE") === state.role;
+            const sameDate = appDate === targetDate;
+            return sameCompany && sameRole && sameDate;
+        });
+
+        if (matchedApplications.length === 0) return false;
+
+        return matchedApplications.some((app) =>
+            sprints.some((sprint) => sprint.applicationId === app.id)
+        );
+    }, [applications, sprints, state.role, validation.company, validation.parsedDate]);
 
     const handleConfirm = async () => {
         if (!validation.parsedDate || validation.companyError || validation.interviewDateError) {
@@ -263,7 +298,7 @@ export function SprintSetupCard({
         }
     };
 
-    if (state.isSubmitted) {
+    if (state.isSubmitted || existingSprintForCurrentInput) {
         return (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-md">
                 <div className="flex items-center gap-3 mb-4">
