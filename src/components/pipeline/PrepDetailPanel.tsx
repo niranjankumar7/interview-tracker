@@ -58,7 +58,7 @@ export function PrepDetailPanel(props: {
   const application = useStore((s) =>
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
-  const addInterviewRound = useStore((s) => s.addInterviewRound);
+  const createInterviewRoundAPI = useStore((s) => s.createInterviewRoundAPI);
   const saveRoundFeedback = useStore((s) => s.saveRoundFeedback);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
@@ -508,7 +508,7 @@ export function PrepDetailPanel(props: {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const scheduledDate = roundDraft.scheduledDate || undefined;
 
                       const newRound: InterviewRound = {
@@ -519,11 +519,23 @@ export function PrepDetailPanel(props: {
                         questionsAsked: [],
                       };
 
-                      const didAdd = addInterviewRound(application.id, newRound);
-                      if (!didAdd) {
-                        setAddRoundError("Round number already exists.");
+                      try {
+                        await createInterviewRoundAPI(application.id, newRound);
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error ? error.message : "Could not add round.";
+                        if (
+                          errorMessage.toLowerCase().includes("already exists") ||
+                          errorMessage.toLowerCase().includes("409")
+                        ) {
+                          setAddRoundError("Round number already exists.");
+                          return;
+                        }
+                        setAddRoundError("Couldn't save round right now. Please retry.");
                         return;
                       }
+
+                      setAddRoundError(null);
                       setIsAddRoundOpen(false);
                     }}
 

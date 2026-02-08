@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/contexts/AuthContext";
 import { APP_VERSION } from "@/lib/constants";
 import type { ExperienceLevel, ThemePreference } from "@/types";
 import {
@@ -55,6 +56,7 @@ const EXPORT_REVOKE_URL_DELAY_MS = 1000;
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const { setTheme, theme } = useTheme();
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const profile = useStore((s) => s.profile);
@@ -67,6 +69,7 @@ export default function SettingsPage() {
   const loadDemoData = useStore((s) => s.loadDemoData);
 
   const nameId = useId();
+  const emailId = useId();
   const targetRoleId = useId();
   const experienceId = useId();
 
@@ -170,6 +173,17 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-2">
+              <Label htmlFor={emailId}>Email</Label>
+              <Input
+                id={emailId}
+                value={user?.email || ""}
+                readOnly
+                disabled
+                className="bg-muted text-muted-foreground"
+              />
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor={targetRoleId}>Target role</Label>
               <Input
                 id={targetRoleId}
@@ -263,60 +277,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <LeetCodeSyncCard />
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Calendar sync
-            </CardTitle>
-            <CardDescription>
-              Read-only calendar sync to detect interview invites.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  Sync your calendar
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Calendar sync is disabled in this branch (already handled in another PR).
-                </div>
-              </div>
-              <Button variant="outline" disabled>
-                Sync calendar
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  Auto-sync on login
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  If enabled, we&apos;ll sync your calendar daily when you log in.
-                </div>
-              </div>
-              <Switch
-                checked={preferences.calendarAutoSyncEnabled}
-                onCheckedChange={(checked) => {
-                  if (
-                    checked &&
-                    !confirm(
-                      "Enable daily auto-sync? We'll sync your calendar once per day when you log in."
-                    )
-                  ) {
-                    return;
-                  }
-                  updatePreferences({ calendarAutoSyncEnabled: checked });
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -398,16 +358,35 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <LeetCodeSyncCard />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Calendar sync
+            </CardTitle>
+            <CardDescription>
+              Read-only calendar sync to detect interview invites.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3 rounded-lg border border-border p-4 bg-muted/40">
+              <div className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground/80">Feature coming soon.</span> We&apos;ll soon be able to scan your calendar for interview invites.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>About</CardTitle>
-            <CardDescription>App info and a quick description.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Version:</span> v{APP_VERSION}
+          <CardContent>
+            <div className="text-sm text-muted-foreground leading-relaxed">
+              {aboutText}
             </div>
-            <Textarea value={aboutText} readOnly className="resize-none" />
           </CardContent>
         </Card>
       </main>

@@ -5,7 +5,6 @@ import { InterviewRoundType, OfferDetails, RoleType, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
-    getAvailableRounds,
 } from "@/data/prep-templates";
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
@@ -313,14 +312,48 @@ export function PrepDetailPanel({
     const company = application?.company ?? null;
     const role = application?.role ?? null;
     const roleType: RoleType = application ? application.roleType || inferRoleType(application.role) : "SDE";
-
-    const availableRounds = roleType ? getAvailableRounds(roleType) : [];
-    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
     const selectedRoundFromStore = application?.currentRound;
+
+    const trackedRounds = useMemo(() => {
+        const rounds = [...(application?.rounds ?? [])]
+            .sort((a, b) => a.roundNumber - b.roundNumber)
+            .map((round) => round.roundType);
+
+        const seen = new Set<InterviewRoundType>();
+        const orderedUniqueRounds: InterviewRoundType[] = [];
+
+        for (const roundType of rounds) {
+            if (seen.has(roundType)) continue;
+            seen.add(roundType);
+            orderedUniqueRounds.push(roundType);
+        }
+
+        return orderedUniqueRounds;
+    }, [application?.rounds]);
+
+    const availableRounds = useMemo(() => {
+        if (trackedRounds.length > 0) return trackedRounds;
+        if (selectedRoundFromStore && selectedRoundFromStore !== "HR") {
+            return [selectedRoundFromStore];
+        }
+        return [SELECTED_ROUND_FALLBACK];
+    }, [selectedRoundFromStore, trackedRounds]);
+
+    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
     const selectedRound =
         selectedRoundFromStore && availableRounds.includes(selectedRoundFromStore)
             ? selectedRoundFromStore
             : defaultRound;
+
+    const selectedRoundScheduledDate = useMemo(() => {
+        const roundsForSelectedType = (application?.rounds ?? [])
+            .filter((round) => round.roundType === selectedRound && Boolean(round.scheduledDate))
+            .sort((a, b) => a.roundNumber - b.roundNumber);
+
+        return roundsForSelectedType[0]?.scheduledDate;
+    }, [application?.rounds, selectedRound]);
+
+    const headlineInterviewDate = selectedRoundScheduledDate ?? application?.interviewDate;
 
     const scrapeKey = isOpen && company && role ? `${appId}|${company}|${role}|${roleType}|${selectedRound}` : null;
 
@@ -368,11 +401,15 @@ export function PrepDetailPanel({
 
     if (!isOpen || !application) return null;
 
-    const prepContent = getRoundPrepContent(roleType, selectedRound);
+    const prepContent =
+        getRoundPrepContent(roleType, selectedRound) ??
+        (selectedRound === "TechnicalRound2"
+            ? getRoundPrepContent(roleType, "TechnicalRound1")
+            : undefined);
 
     const today = startOfDay(new Date());
 
-    const interviewDate = safeParseISODate(application.interviewDate);
+    const interviewDate = safeParseISODate(headlineInterviewDate);
 
     const daysUntilInterview = interviewDate
         ? differenceInDays(startOfDay(interviewDate), today)
@@ -490,10 +527,10 @@ export function PrepDetailPanel({
                                         <Briefcase className="w-4 h-4" />
                                         {application.role}
                                     </span>
-                                    {application.interviewDate && (
+                                    {headlineInterviewDate && (
                                         <span className="flex items-center gap-1">
                                             <Calendar className="w-4 h-4" />
-                                            {format(parseISO(application.interviewDate), "MMM d, yyyy")}
+                                            {format(parseISO(headlineInterviewDate), "MMM d, yyyy")}
                                         </span>
                                     )}
                                 </div>

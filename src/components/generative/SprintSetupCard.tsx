@@ -3,11 +3,12 @@
 import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
 import { tryParseDateInput } from "@/lib/date-parsing";
-import { RoleType, Application } from "@/types";
+import { isGenericRole, rolesEquivalent, sanitizeCompanyName } from "@/lib/application-intake";
+import { RoleType, Application, InterviewRound } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
-import { Calendar, Briefcase, Building2, CheckCircle2 } from "lucide-react";
-import { useEffect } from "react";
+import { Calendar, Briefcase, Building2 } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
@@ -50,6 +51,89 @@ type HydratedSprintSetupState = {
     role: RoleType;
     interviewDate: string;
 };
+
+const ROLE_LABELS: Record<RoleType, string> = {
+    SDE: "Software Engineer",
+    SDET: "Software Development Engineer in Test",
+    ML: "ML Engineer",
+    DevOps: "DevOps Engineer",
+    Frontend: "Frontend Developer",
+    Backend: "Backend Developer",
+    FullStack: "Full Stack Developer",
+    Data: "Data Engineer",
+    PM: "Product Manager",
+    MobileEngineer: "Mobile Engineer",
+};
+
+const ROUND_SEQUENCE: InterviewRound["roundType"][] = [
+    "TechnicalRound1",
+    "TechnicalRound2",
+    "SystemDesign",
+    "Managerial",
+    "Final",
+];
+
+function roleLabelForType(roleType: RoleType): string {
+    return ROLE_LABELS[roleType];
+}
+
+function getRoundTypeForRoundNumber(
+    roundNumber: number
+): InterviewRound["roundType"] {
+    if (roundNumber <= 1) return ROUND_SEQUENCE[0];
+    if (roundNumber > ROUND_SEQUENCE.length) return ROUND_SEQUENCE[ROUND_SEQUENCE.length - 1];
+    return ROUND_SEQUENCE[roundNumber - 1];
+}
+
+function toDateKey(value: string | Date | undefined): string | undefined {
+    if (!value) return undefined;
+
+    const dateValue = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(dateValue.getTime())) return undefined;
+    return format(dateValue, "yyyy-MM-dd");
+}
+
+function getNextRoundNumber(rounds: InterviewRound[]): number {
+    if (rounds.length === 0) return 1;
+    return Math.max(...rounds.map((round) => round.roundNumber)) + 1;
+}
+
+function findMatchingApplication(args: {
+    applications: Application[];
+    company: string;
+    roleType: RoleType;
+}): Application | undefined {
+    const normalizedCompany = sanitizeCompanyName(args.company).toLowerCase();
+    const roleLabel = roleLabelForType(args.roleType);
+
+    const candidates = args.applications
+        .filter(
+            (application) =>
+                sanitizeCompanyName(application.company).toLowerCase() === normalizedCompany
+        )
+        .sort((a, b) => {
+            const aTime = new Date(a.createdAt || a.applicationDate || 0).getTime();
+            const bTime = new Date(b.createdAt || b.applicationDate || 0).getTime();
+            return bTime - aTime;
+        });
+
+    if (candidates.length === 0) return undefined;
+
+    const exactRoleType = candidates.find(
+        (candidate) => candidate.roleType === args.roleType
+    );
+    if (exactRoleType) return exactRoleType;
+
+    const exactRole = candidates.find((candidate) =>
+        rolesEquivalent(candidate.role, roleLabel)
+    );
+    if (exactRole) return exactRole;
+
+    const genericRole = candidates.find((candidate) => isGenericRole(candidate.role));
+    if (genericRole) return genericRole;
+
+    return candidates[0];
+}
 
 function validateSprintSetupInput(state: SprintSetupState): {
     company: string;
@@ -148,8 +232,14 @@ export function SprintSetupCard({
         initialDate || getDefaultDate()
     );
 
+    const componentStateKey = useMemo(() => {
+        const normalizedCompany = sanitizeCompanyName(hydratedCompany).toLowerCase() || "unknown";
+        const dateKey = hydratedInterviewDate || "unscheduled";
+        return `sprint-setup-card:${normalizedCompany}:${hydratedRole}:${dateKey}`;
+    }, [hydratedCompany, hydratedInterviewDate, hydratedRole]);
+
     const [state, setState] = useTamboComponentState<SprintSetupState>(
-        "sprint-setup-card",
+        componentStateKey,
         {
             company: hydratedCompany,
             role: hydratedRole,
@@ -167,8 +257,12 @@ export function SprintSetupCard({
         }
     );
 
-    const addApplication = useStore((s) => s.addApplication);
-    const addSprint = useStore((s) => s.addSprint);
+    const applications = useStore((s) => s.applications);
+    const sprints = useStore((s) => s.sprints);
+    const createApplicationAPI = useStore((s) => s.createApplicationAPI);
+    const updateApplicationAPI = useStore((s) => s.updateApplicationAPI);
+    const createInterviewRoundAPI = useStore((s) => s.createInterviewRoundAPI);
+    const createSprintAPI = useStore((s) => s.createSprintAPI);
 
     useSyncHydratedSprintSetupState(
         {
@@ -195,6 +289,25 @@ export function SprintSetupCard({
     }
 
     const validation = validateSprintSetupInput(state);
+    const normalizedCompany = sanitizeCompanyName(validation.company);
+    const selectedDateKey = toDateKey(validation.parsedDate ?? state.interviewDate);
+    const matchedApplicationForCurrentInputs = normalizedCompany
+        ? findMatchingApplication({
+            applications,
+            company: normalizedCompany,
+            roleType: state.role,
+        })
+        : undefined;
+
+    const hasMatchingSprint = Boolean(
+        matchedApplicationForCurrentInputs &&
+        selectedDateKey &&
+        sprints.some(
+            (sprint) =>
+                sprint.applicationId === matchedApplicationForCurrentInputs.id &&
+                toDateKey(sprint.interviewDate) === selectedDateKey
+        )
+    );
 
     const handleConfirm = async () => {
         if (!validation.parsedDate || validation.companyError || validation.interviewDateError) {
@@ -220,24 +333,104 @@ export function SprintSetupCard({
         setState(submittingState);
 
         try {
-            // Create application
-            const application: Application = {
-                id: Date.now().toString(),
-                company: validation.company,
-                role: state.role,
+            const dateIso = validation.parsedDate.toISOString();
+            const companyName = sanitizeCompanyName(validation.company);
+            const roleLabel = roleLabelForType(state.role);
+            const interviewDateKey = toDateKey(validation.parsedDate);
+
+            if (!companyName) {
+                throw new Error("Please enter a valid company name.");
+            }
+            if (!interviewDateKey) {
+                throw new Error("Could not normalize interview date.");
+            }
+
+            let application =
+                findMatchingApplication({
+                    applications: useStore.getState().applications,
+                    company: companyName,
+                    roleType: state.role,
+                }) ?? null;
+
+            if (!application) {
+                application = await createApplicationAPI({
+                    company: companyName,
+                    role: roleLabel,
+                    roleType: state.role,
+                    status: "interview",
+                    applicationDate: new Date().toISOString(),
+                    interviewDate: dateIso,
+                    notes: "",
+                });
+            }
+
+            const latestApplication =
+                useStore
+                    .getState()
+                    .applications.find((candidate) => candidate.id === application.id) ??
+                application;
+            const existingRoundForDate = (latestApplication.rounds ?? []).find(
+                (round) => toDateKey(round.scheduledDate) === interviewDateKey
+            );
+
+            let targetRound = existingRoundForDate;
+            if (!targetRound) {
+                const nextRoundNumber = getNextRoundNumber(latestApplication.rounds ?? []);
+                const nextRoundType = getRoundTypeForRoundNumber(nextRoundNumber);
+
+                try {
+                    targetRound = await createInterviewRoundAPI(latestApplication.id, {
+                        roundNumber: nextRoundNumber,
+                        roundType: nextRoundType,
+                        scheduledDate: dateIso,
+                        notes: "",
+                        questionsAsked: [],
+                    });
+                } catch {
+                    const refreshedApp = useStore
+                        .getState()
+                        .applications.find((candidate) => candidate.id === latestApplication.id);
+                    targetRound = refreshedApp?.rounds?.find(
+                        (round) => toDateKey(round.scheduledDate) === interviewDateKey
+                    );
+                    if (!targetRound) {
+                        throw new Error("Couldn't create interview round.");
+                    }
+                }
+            }
+
+            const shouldUpdateRole =
+                isGenericRole(latestApplication.role) ||
+                !rolesEquivalent(latestApplication.role, roleLabel);
+            const shouldUpdateRoleType = latestApplication.roleType !== state.role;
+            const shouldNormalizeCompany =
+                sanitizeCompanyName(latestApplication.company) !== companyName;
+
+            await updateApplicationAPI(latestApplication.id, {
                 status: "interview",
-                applicationDate: new Date().toISOString(),
-                interviewDate: validation.parsedDate.toISOString(),
-                rounds: [],
-                notes: "",
-                createdAt: new Date().toISOString(),
-            };
+                interviewDate: dateIso,
+                currentRound: targetRound.roundType,
+                ...(shouldNormalizeCompany ? { company: companyName } : {}),
+                ...(shouldUpdateRole ? { role: roleLabel } : {}),
+                ...(shouldUpdateRoleType ? { roleType: state.role } : {}),
+            });
 
-            addApplication(application);
+            const hasSprintForDate = useStore.getState().sprints.some(
+                (sprint) =>
+                    sprint.applicationId === latestApplication.id &&
+                    toDateKey(sprint.interviewDate) === interviewDateKey
+            );
 
-            // Generate sprint
-            const sprint = generateSprint(application.id, validation.parsedDate, state.role);
-            addSprint(sprint);
+            if (!hasSprintForDate) {
+                const sprint = generateSprint(latestApplication.id, validation.parsedDate, state.role);
+                await createSprintAPI({
+                    applicationId: sprint.applicationId,
+                    interviewDate: sprint.interviewDate,
+                    roleType: sprint.roleType,
+                    totalDays: sprint.totalDays,
+                    dailyPlans: sprint.dailyPlans,
+                });
+            }
 
             setState({
                 ...submittingState,
@@ -254,27 +447,8 @@ export function SprintSetupCard({
         }
     };
 
-    if (state.isSubmitted) {
-        return (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-md">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-green-100 rounded-full">
-                        <CheckCircle2 className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-lg text-green-800">
-                            Sprint Created!
-                        </h3>
-                        <p className="text-sm text-green-600">
-                            Your interview prep plan for {state.company} is ready
-                        </p>
-                    </div>
-                </div>
-                <p className="text-sm text-gray-600">
-                    Ask me &ldquo;What should I do today?&rdquo; to see your daily tasks.
-                </p>
-            </div>
-        );
+    if (state.isSubmitted || hasMatchingSprint) {
+        return null;
     }
     const hasValues =
         validation.company.length > 0 && validation.interviewDate.length > 0;

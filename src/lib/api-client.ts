@@ -247,6 +247,41 @@ export const applicationsApi = {
     },
 
     /**
+     * Add interview round to an application
+     */
+    async createRound(id: string, data: {
+        roundNumber: number;
+        roundType: 'HR' | 'TechnicalRound1' | 'TechnicalRound2' | 'SystemDesign' | 'Managerial' | 'Assignment' | 'Final';
+        scheduledDate?: string;
+        notes?: string;
+        questionsAsked?: string[];
+    }): Promise<any> {
+        return apiRequest<any>(`/api/applications/${id}/rounds`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Update an existing interview round on an application
+     */
+    async updateRound(
+        id: string,
+        roundNumber: number,
+        data: {
+            roundType?: 'HR' | 'TechnicalRound1' | 'TechnicalRound2' | 'SystemDesign' | 'Managerial' | 'Assignment' | 'Final';
+            scheduledDate?: string | null;
+            notes?: string;
+            questionsAsked?: string[];
+        }
+    ): Promise<any> {
+        return apiRequest<any>(`/api/applications/${id}/rounds/${roundNumber}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
      * Delete application
      */
     async delete(id: string): Promise<void> {

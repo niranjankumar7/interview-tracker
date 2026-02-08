@@ -7,10 +7,19 @@ import { Calendar, Briefcase, Building2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
+const statusFilterSchema = z.preprocess(
+    (value) => {
+        if (typeof value !== "string") return undefined;
+        const normalized = value.toLowerCase().trim();
+        return APPLICATION_STATUSES.includes(normalized as ApplicationStatus)
+            ? normalized
+            : undefined;
+    },
+    z.enum(APPLICATION_STATUSES).optional()
+);
+
 export const pipelineSummaryPanelSchema = z.object({
-    status: z
-        .enum(APPLICATION_STATUSES)
-        .optional()
+    status: statusFilterSchema
         .describe(`Optional status filter. Valid values: ${APPLICATION_STATUSES.join(", ")}`),
 });
 

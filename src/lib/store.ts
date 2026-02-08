@@ -171,6 +171,19 @@ interface AppState {
         notes?: string;
         offerDetails?: OfferDetails;
     }) => Promise<Application>;
+    createInterviewRoundAPI: (applicationId: string, data: {
+        roundNumber: number;
+        roundType: InterviewRound['roundType'];
+        scheduledDate?: string;
+        notes?: string;
+        questionsAsked?: string[];
+    }) => Promise<InterviewRound>;
+    updateInterviewRoundAPI: (applicationId: string, roundNumber: number, data: {
+        roundType?: InterviewRound['roundType'];
+        scheduledDate?: string | null;
+        notes?: string;
+        questionsAsked?: string[];
+    }) => Promise<InterviewRound>;
     updateApplicationAPI: (id: string, updates: any) => Promise<void>;
     deleteApplicationAPI: (id: string) => Promise<void>;
     createSprintAPI: (data: {
@@ -240,6 +253,77 @@ function hasMeaningfulOfferValue(value: unknown): boolean {
     return true;
 }
 
+function toStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((entry): entry is string => typeof entry === 'string');
+}
+
+function normalizeInterviewRoundFromApi(raw: Record<string, unknown>): InterviewRound {
+    const feedbackRating =
+        typeof raw.feedbackRating === 'number' ? raw.feedbackRating : undefined;
+    const feedbackPros = toStringArray(raw.feedbackPros);
+    const feedbackCons = toStringArray(raw.feedbackCons);
+    const feedbackStruggledTopics = toStringArray(raw.feedbackStruggledTopics);
+    const feedbackNotes =
+        typeof raw.feedbackNotes === 'string' ? raw.feedbackNotes : undefined;
+
+    const hasFeedback =
+        feedbackRating !== undefined ||
+        feedbackPros.length > 0 ||
+        feedbackCons.length > 0 ||
+        feedbackStruggledTopics.length > 0 ||
+        Boolean(feedbackNotes && feedbackNotes.trim().length > 0);
+
+    const feedback = hasFeedback
+        ? {
+            rating: feedbackRating ?? 0,
+            pros: feedbackPros,
+            cons: feedbackCons,
+            struggledTopics: feedbackStruggledTopics,
+            notes: feedbackNotes ?? '',
+        }
+        : undefined;
+
+    const scheduledDateValue = raw.scheduledDate;
+    const scheduledDate =
+        typeof scheduledDateValue === 'string'
+            ? scheduledDateValue
+            : scheduledDateValue instanceof Date
+                ? scheduledDateValue.toISOString()
+                : undefined;
+
+    return {
+        roundNumber: Number(raw.roundNumber) || 1,
+        roundType: (raw.roundType as InterviewRound['roundType']) ?? 'TechnicalRound1',
+        scheduledDate,
+        notes: typeof raw.notes === 'string' ? raw.notes : '',
+        questionsAsked: toStringArray(raw.questionsAsked),
+        feedback,
+    };
+}
+
+function mergeRoundIntoApplication(
+    application: Application,
+    incomingRound: InterviewRound
+): Application {
+    const rounds = [...(application.rounds ?? [])];
+    const existingIndex = rounds.findIndex(
+        (entry) => entry.roundNumber === incomingRound.roundNumber
+    );
+
+    if (existingIndex >= 0) {
+        rounds[existingIndex] = {
+            ...rounds[existingIndex],
+            ...incomingRound,
+        };
+    } else {
+        rounds.push(incomingRound);
+    }
+
+    rounds.sort((a, b) => a.roundNumber - b.roundNumber);
+    return { ...application, rounds };
+}
+
 function normalizeApplicationFromApi(raw: Record<string, unknown>): Application {
     const existingOffer = (raw.offerDetails as OfferDetails | undefined) ?? {};
     const mergedOffer: OfferDetails = {
@@ -281,12 +365,17 @@ function normalizeApplicationFromApi(raw: Record<string, unknown>): Application 
     };
 
     const hasOfferDetails = Object.values(mergedOffer).some(hasMeaningfulOfferValue);
+    const rounds = Array.isArray(raw.rounds)
+        ? raw.rounds
+            .map((round) => normalizeInterviewRoundFromApi(round as Record<string, unknown>))
+            .sort((a, b) => a.roundNumber - b.roundNumber)
+        : [];
 
     const application = raw as unknown as Application;
     return {
         ...application,
         notes: application.notes ?? '',
-        rounds: application.rounds ?? [],
+        rounds,
         offerDetails: hasOfferDetails ? mergedOffer : undefined,
     };
 }
@@ -932,6 +1021,54 @@ export const useStore = create<AppState>()(
                     return normalizedApp;
                 } catch (error) {
                     console.error('Failed to create application:', error);
+                    throw error;
+                }
+            },
+
+            createInterviewRoundAPI: async (applicationId, data) => {
+                try {
+                    const round = await api.applications.createRound(applicationId, data);
+                    const normalizedRound = normalizeInterviewRoundFromApi(
+                        round as Record<string, unknown>
+                    );
+
+                    set((state) => ({
+                        applications: state.applications.map((app) =>
+                            app.id === applicationId
+                                ? mergeRoundIntoApplication(app, normalizedRound)
+                                : app
+                        ),
+                    }));
+
+                    return normalizedRound;
+                } catch (error) {
+                    console.error('Failed to create interview round:', error);
+                    throw error;
+                }
+            },
+
+            updateInterviewRoundAPI: async (applicationId, roundNumber, data) => {
+                try {
+                    const round = await api.applications.updateRound(
+                        applicationId,
+                        roundNumber,
+                        data
+                    );
+                    const normalizedRound = normalizeInterviewRoundFromApi(
+                        round as Record<string, unknown>
+                    );
+
+                    set((state) => ({
+                        applications: state.applications.map((app) =>
+                            app.id === applicationId
+                                ? mergeRoundIntoApplication(app, normalizedRound)
+                                : app
+                        ),
+                    }));
+
+                    return normalizedRound;
+                } catch (error) {
+                    console.error('Failed to update interview round:', error);
                     throw error;
                 }
             },
