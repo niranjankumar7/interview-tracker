@@ -291,6 +291,28 @@ function normalizeApplicationFromApi(raw: Record<string, unknown>): Application 
     };
 }
 
+function normalizeQuestionFromApi(raw: Record<string, unknown>): Question {
+    const question = raw as unknown as Question & {
+        applicationId?: string;
+        createdAt?: string;
+        application?: { id?: string };
+        createdByUserId?: string;
+    };
+
+    const companyId =
+        question.companyId ??
+        question.applicationId ??
+        question.application?.id ??
+        '';
+
+    return {
+        ...question,
+        companyId,
+        dateAdded: question.dateAdded ?? question.createdAt ?? new Date().toISOString(),
+        createdByUserId: question.createdByUserId,
+    };
+}
+
 // Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
 // Keeps IDs stable-ish and reduces same-millisecond collision risk.
 let fallbackQuestionIdLastTime = 0;
@@ -950,7 +972,11 @@ export const useStore = create<AppState>()(
             loadQuestionsFromAPI: async (filters) => {
                 try {
                     const questions = await api.questions.getAll(filters);
-                    set({ questions });
+                    set({
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as Record<string, unknown>)
+                        ),
+                    });
                 } catch (error) {
                     console.error('Failed to load questions from API:', error);
                     throw error;
@@ -1019,10 +1045,13 @@ export const useStore = create<AppState>()(
             createQuestionAPI: async (data) => {
                 try {
                     const question = await api.questions.create(data);
+                    const normalizedQuestion = normalizeQuestionFromApi(
+                        question as Record<string, unknown>
+                    );
                     set((state) => ({
-                        questions: [...state.questions, question]
+                        questions: [...state.questions, normalizedQuestion]
                     }));
-                    return question;
+                    return normalizedQuestion;
                 } catch (error) {
                     console.error('Failed to create question:', error);
                     throw error;
@@ -1055,7 +1084,9 @@ export const useStore = create<AppState>()(
                             normalizeApplicationFromApi(app as Record<string, unknown>)
                         ),
                         sprints,
-                        questions,
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as Record<string, unknown>)
+                        ),
                     };
 
                     // Sync user profile data if available

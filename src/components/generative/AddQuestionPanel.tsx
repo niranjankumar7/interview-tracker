@@ -7,6 +7,59 @@ import { useTamboComponentState } from "@tambo-ai/react";
 import { HelpCircle, Building2, Tag, CheckCircle2, Plus } from "lucide-react";
 import { z } from "zod";
 
+function normalizeCategoryInput(value: unknown): QuestionCategory | undefined {
+    if (!value || typeof value !== "string") {
+        return undefined;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return undefined;
+
+    if (
+        normalized === "dsa" ||
+        normalized.includes("data structure") ||
+        normalized.includes("algo") ||
+        normalized.includes("linked list") ||
+        normalized.includes("list ii") ||
+        normalized.includes("list 2") ||
+        normalized.includes("duplicates") ||
+        normalized.includes("array") ||
+        normalized.includes("string") ||
+        normalized.includes("leetcode")
+    ) {
+        return "DSA";
+    }
+
+    if (
+        normalized === "systemdesign" ||
+        normalized === "system design" ||
+        normalized === "system-design" ||
+        normalized.includes("design") ||
+        normalized.includes("architecture")
+    ) {
+        return "SystemDesign";
+    }
+
+    if (
+        normalized === "behavioral" ||
+        normalized === "behavioural" ||
+        normalized.includes("behavior") ||
+        normalized.includes("behaviour")
+    ) {
+        return "Behavioral";
+    }
+
+    if (normalized === "sql" || normalized.includes("database") || normalized === "db") {
+        return "SQL";
+    }
+
+    if (normalized === "other") {
+        return "Other";
+    }
+
+    return "Other";
+}
+
 // Props schema for Tambo registration
 export const addQuestionPanelSchema = z.object({
     questionText: z.preprocess(
@@ -18,7 +71,21 @@ export const addQuestionPanelSchema = z.object({
         z.string().optional().describe("The company this question is associated with")
     ),
     category: z.preprocess(
-        (val) => val ?? undefined,
+        (val) => {
+            if (Array.isArray(val)) {
+                const first = val[0];
+                if (typeof first === "string") {
+                    return normalizeCategoryInput(first) ?? "Other";
+                }
+                return "Other";
+            }
+
+            if (typeof val === "string") {
+                return normalizeCategoryInput(val) ?? "Other";
+            }
+
+            return val ?? undefined;
+        },
         z.enum(["DSA", "SystemDesign", "Behavioral", "SQL", "Other"])
             .optional()
             .describe("The category of the question")
@@ -47,7 +114,7 @@ export function AddQuestionPanel({
     category: initialCategory,
 }: AddQuestionPanelProps) {
     const applications = useStore((state) => state.applications);
-    const addQuestion = useStore((state) => state.addQuestion);
+    const createQuestionAPI = useStore((state) => state.createQuestionAPI);
 
     // Auto-detect category from question text
     const detectedCategory = initialText
@@ -93,21 +160,19 @@ export function AddQuestionPanel({
                 (a) => a.company.toLowerCase() === state.selectedCompany.toLowerCase()
             );
 
-            const question: Question = {
-                id: Date.now().toString(),
-                companyId: companyApp?.id || "general",
+            await createQuestionAPI({
                 questionText: state.questionText,
                 category: state.category,
                 difficulty: state.difficulty,
                 askedInRound: state.round || undefined,
-                dateAdded: new Date().toISOString(),
-            };
+                applicationId: companyApp?.id,
+            });
 
-            addQuestion(question);
             setState({ ...state, isSubmitted: true, isSubmitting: false });
         } catch (error) {
             console.error("Error adding question:", error);
             setState({ ...state, isSubmitting: false });
+            // TODO: Show error notification to user
         }
     };
 

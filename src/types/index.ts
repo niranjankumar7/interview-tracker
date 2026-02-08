@@ -141,6 +141,7 @@ export interface Question {
     difficulty?: QuestionDifficulty;
     askedInRound?: string;
     dateAdded: string;
+    createdByUserId?: string;
 }
 
 export interface UserProgress {

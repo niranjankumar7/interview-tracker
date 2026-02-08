@@ -172,7 +172,7 @@ async function main() {
         data: {
             applicationId: app1.id,
             roundNumber: 1,
-            roundType: 'technical',
+            roundType: 'TechnicalRound1',
             scheduledDate: new Date('2026-02-10'),
             notes: 'Phone screen with hiring manager. Discussed background and projects.',
             questionsAsked: [
@@ -191,7 +191,7 @@ async function main() {
         data: {
             applicationId: app1.id,
             roundNumber: 2,
-            roundType: 'technical',
+            roundType: 'TechnicalRound2',
             scheduledDate: new Date('2026-02-20'),
             notes: 'Coding interview scheduled. Focus on algorithms and data structures.',
             questionsAsked: [],
@@ -205,7 +205,7 @@ async function main() {
         data: {
             applicationId: app2.id,
             roundNumber: 1,
-            roundType: 'technical',
+            roundType: 'TechnicalRound1',
             scheduledDate: new Date('2026-01-20'),
             notes: 'Coding round - solved 2 medium problems',
             questionsAsked: [
@@ -224,7 +224,7 @@ async function main() {
         data: {
             applicationId: app2.id,
             roundNumber: 2,
-            roundType: 'system-design',
+            roundType: 'SystemDesign',
             scheduledDate: new Date('2026-01-25'),
             notes: 'System design round - designed a URL shortener',
             questionsAsked: [
@@ -246,7 +246,7 @@ async function main() {
     await prisma.question.createMany({
         data: [
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 applicationId: app1.id,
                 questionText: 'Implement a thread-safe LRU Cache with O(1) operations',
                 category: 'DSA',
@@ -254,7 +254,7 @@ async function main() {
                 askedInRound: 'Round 1: Technical',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 applicationId: app1.id,
                 questionText: 'Design a distributed rate limiter',
                 category: 'SystemDesign',
@@ -262,38 +262,38 @@ async function main() {
                 askedInRound: 'Round 2: System Design',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 applicationId: app2.id,
                 questionText: 'Tell me about a time you had a conflict with a team member',
                 category: 'Behavioral',
                 askedInRound: 'Round 1: Behavioral',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 questionText: 'Reverse a linked list',
                 category: 'DSA',
                 difficulty: 'Easy',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 questionText: 'Find the longest palindromic substring',
                 category: 'DSA',
                 difficulty: 'Medium',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 questionText: 'Design a parking lot system',
                 category: 'SystemDesign',
                 difficulty: 'Medium',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 questionText: 'Write a SQL query to find the second highest salary',
                 category: 'SQL',
                 difficulty: 'Medium',
             },
             {
-                userId: user1.id,
+                createdByUserId: user1.id,
                 questionText: 'Describe your leadership style',
                 category: 'Behavioral',
             },
