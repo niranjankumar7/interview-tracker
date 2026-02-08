@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { formatOfferTotalCTC } from "@/lib/offer-details";
 import { generateSprint } from "@/lib/sprintGenerator";
-import { Application, ApplicationStatus, RoleType } from "@/types";
+import { Application, ApplicationStatus, RoleType, Sprint } from "@/types";
 import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import {
     AlertTriangle,
@@ -18,6 +18,7 @@ import {
     Search,
     Trash2,
 } from "lucide-react";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { useDebounce } from "use-debounce";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
@@ -126,6 +127,14 @@ export function KanbanBoard() {
     const [interviewSetupError, setInterviewSetupError] = useState<string | null>(
         null
     );
+
+    const [deleteCandidate, setDeleteCandidate] = useState<Application | null>(null);
+    const [pendingSprintReplacement, setPendingSprintReplacement] = useState<{
+        applicationLabel: string;
+        canonicalSprintId: string;
+        nextSprint: Sprint;
+        activeDuplicateSprintIds: string[];
+    } | null>(null);
 
     const cancelInterviewSetup = useCallback(() => {
         if (interviewSetup && interviewSetup.previousStatus !== "interview") {
@@ -287,10 +296,21 @@ export function KanbanBoard() {
         }
 
         if (canonical.status === "active") {
-            const shouldReplace = window.confirm(
-                "An interview prep sprint already exists for this application. Regenerate it? This will replace your existing plan and reset any progress."
-            );
-            if (!shouldReplace) return;
+            const application = applications.find((a) => a.id === applicationId);
+            const applicationLabel = application
+                ? `${application.company} - ${application.role}`
+                : "this application";
+            const activeDuplicateSprintIds = relatedSprints
+                .filter((s) => s.id !== canonical.id && s.status === "active")
+                .map((s) => s.id);
+
+            setPendingSprintReplacement({
+                applicationLabel,
+                canonicalSprintId: canonical.id,
+                nextSprint,
+                activeDuplicateSprintIds,
+            });
+            return;
         }
 
         updateSprint(canonical.id, {
@@ -469,11 +489,11 @@ export function KanbanBoard() {
 
     return (
         <>
-            <div className="h-full bg-background p-6 overflow-x-auto">
-                <div className="flex items-center gap-4 mb-4 min-w-max">
-                    <div className="flex items-center gap-3">
+            <div className="h-full bg-background p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                         <h2 className="text-lg font-semibold text-foreground">Search</h2>
-                        <div className="relative w-80">
+                        <div className="relative flex-1 sm:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <input
                                 value={searchQuery}
@@ -491,37 +511,39 @@ export function KanbanBoard() {
                     )}
                 </div>
 
-                <div className="flex gap-4 min-w-max h-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                     {statusColumns.map((column) => {
                         const columnApps = applicationsByStatus[column.status];
 
                         return (
                             <div
                                 key={column.status}
-                                className="w-72 flex-shrink-0 flex flex-col bg-muted rounded-xl"
                                 onDragOver={handleDragOver}
-                                onDrop={(e) => {
-                                    void handleDrop(e, column.status);
-                                }}
+                                onDrop={(e) => void handleDrop(e, column.status)}
+                                className="flex flex-col min-h-[400px] bg-card rounded-lg border border-border"
                             >
                                 {/* Column Header */}
-                                <div className="p-4 border-b border-border">
+                                <div className="flex items-center justify-between p-3 border-b border-border">
                                     <div className="flex items-center gap-2">
-                                        <div className={`w-3 h-3 rounded-full ${column.color}`} />
-                                        <h3 className="font-semibold text-foreground">{column.label}</h3>
-                                        <span className="ml-auto bg-background px-2 py-0.5 rounded-full text-sm text-muted-foreground">
-                                            {columnApps.length}
-                                        </span>
+                                        <div className={`w-2 h-2 rounded-full ${column.color}`} />
+                                        <h3 className="font-semibold text-sm text-foreground">
+                                            {column.label}
+                                        </h3>
                                     </div>
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                                        {columnApps.length}
+                                    </span>
                                 </div>
 
                                 {/* Cards Container */}
-                                <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                                <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                                     {columnApps.length === 0 ? (
-                                        <div className="text-center py-8 text-muted-foreground text-sm">
+                                        <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
                                             {isSearching
                                                 ? "No matches in this column for this search"
-                                                : "Drop applications here"}
+                                                : column.status === "rejected"
+                                                    ? "Only rejected applications go here"
+                                                    : "Drop applications here"}
                                         </div>
                                     ) : (
                                         columnApps.map((app) => {
@@ -607,12 +629,7 @@ export function KanbanBoard() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                void deleteApplicationAPI(app.id).catch((error) => {
-                                                                    console.error(
-                                                                        "Failed to delete application from pipeline:",
-                                                                        error
-                                                                    );
-                                                                });
+                                                                setDeleteCandidate(app);
                                                             }}
                                                             className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1"
                                                             title="Delete application"
@@ -671,17 +688,20 @@ export function KanbanBoard() {
                                                         Click to view prep →
                                                     </div>
 
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setFeedbackApplicationId(app.id);
-                                                        }}
-                                                        className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2"
-                                                    >
-                                                        <PanelRight className="w-4 h-4" />
-                                                        Round feedback
-                                                    </button>
+                                                    {/* Round feedback button only shown for Interview status */}
+                                                    {app.status === "interview" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setFeedbackApplicationId(app.id);
+                                                            }}
+                                                            className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2"
+                                                        >
+                                                            <PanelRight className="w-4 h-4" />
+                                                            Round feedback
+                                                        </button>
+                                                    )}
                                                 </div>
                                             );
                                         })
@@ -888,6 +908,131 @@ export function KanbanBoard() {
                     </div>
                 </div>
             )}
+
+            <AlertDialog.Root
+                open={deleteCandidate !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeleteCandidate(null);
+                }}
+            >
+                <AlertDialog.Portal>
+                    <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-card shadow-xl border border-border p-5">
+                        <AlertDialog.Title className="text-lg font-semibold text-foreground">
+                            Delete application?
+                        </AlertDialog.Title>
+                        <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
+                            {deleteCandidate
+                                ? `This will permanently delete ${deleteCandidate.company} - ${deleteCandidate.role}. This action cannot be undone.`
+                                : "This action cannot be undone."}
+                        </AlertDialog.Description>
+
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <AlertDialog.Cancel asChild>
+                                <button
+                                    type="button"
+                                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </AlertDialog.Cancel>
+                            <AlertDialog.Action asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!deleteCandidate) return;
+                                        const id = deleteCandidate.id;
+                                        setDeleteCandidate(null);
+
+                                        void deleteApplicationAPI(id).catch((error) => {
+                                            console.error(
+                                                "Failed to delete application from pipeline:",
+                                                error
+                                            );
+                                        });
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-rose-600 text-white hover:bg-rose-500"
+                                >
+                                    Delete
+                                </button>
+                            </AlertDialog.Action>
+                        </div>
+                    </AlertDialog.Content>
+                </AlertDialog.Portal>
+            </AlertDialog.Root>
+
+            <AlertDialog.Root
+                open={pendingSprintReplacement !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPendingSprintReplacement(null);
+                }}
+            >
+                <AlertDialog.Portal>
+                    <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-card shadow-xl border border-border p-5">
+                        <AlertDialog.Title className="text-lg font-semibold text-foreground">
+                            Regenerate prep plan?
+                        </AlertDialog.Title>
+                        <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
+                            {pendingSprintReplacement
+                                ? `A prep plan already exists for ${pendingSprintReplacement.applicationLabel}. Regenerating will replace the existing plan and reset any progress.`
+                                : "A prep plan already exists. Regenerating will replace the existing plan and reset any progress."}
+                        </AlertDialog.Description>
+
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <AlertDialog.Cancel asChild>
+                                <button
+                                    type="button"
+                                    className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </AlertDialog.Cancel>
+                            <AlertDialog.Action asChild>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!pendingSprintReplacement) return;
+
+                                        updateSprint(
+                                            pendingSprintReplacement.canonicalSprintId,
+                                            {
+                                                interviewDate:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .interviewDate,
+                                                roleType:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .roleType,
+                                                totalDays:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .totalDays,
+                                                dailyPlans:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .dailyPlans,
+                                                status: pendingSprintReplacement.nextSprint.status,
+                                                createdAt:
+                                                    pendingSprintReplacement.nextSprint
+                                                        .createdAt,
+                                            }
+                                        );
+
+                                        for (const duplicateSprintId of pendingSprintReplacement.activeDuplicateSprintIds) {
+                                            updateSprint(duplicateSprintId, {
+                                                status: "expired",
+                                            });
+                                        }
+
+                                        setPendingSprintReplacement(null);
+                                    }}
+                                    className="px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
+                                >
+                                    Regenerate
+                                </button>
+                            </AlertDialog.Action>
+                        </div>
+                    </AlertDialog.Content>
+                </AlertDialog.Portal>
+            </AlertDialog.Root>
         </>
     );
 }

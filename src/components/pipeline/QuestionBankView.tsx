@@ -1,8 +1,8 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { QuestionCategory } from "@/types";
-import { useState } from "react";
+import { QuestionCategory, QUESTION_CATEGORIES, Question } from "@/types";
+import { useState, useCallback } from "react";
 import {
     Search,
     Filter,
@@ -10,7 +10,10 @@ import {
     Tag,
     BookOpen,
     CircleDot,
+    Plus,
+    X,
 } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 const categoryColors: Record<QuestionCategory, { bg: string; text: string }> = {
     DSA: { bg: "bg-blue-100 dark:bg-blue-950/40", text: "text-blue-700 dark:text-blue-200" },
@@ -26,12 +29,34 @@ const difficultyColors: Record<string, { bg: string; text: string }> = {
     Hard: { bg: "bg-red-100 dark:bg-red-950/40", text: "text-red-700 dark:text-red-200" },
 };
 
+/**
+ * Generate a unique ID with fallback for environments without crypto.randomUUID
+ */
+function generateId(): string {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers/test environments
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+}
+
 export function QuestionBankView() {
     const questions = useStore((state) => state.questions);
     const applications = useStore((state) => state.applications);
+    const addQuestion = useStore((state) => state.addQuestion);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<QuestionCategory | "All">("All");
     const [filterCompany, setFilterCompany] = useState<string>("All");
+
+    // Add Question Modal State
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [newQuestion, setNewQuestion] = useState({
+        questionText: "",
+        category: "Other" as QuestionCategory,
+        askedInRound: "",
+        companyId: undefined as string | undefined,
+    });
+    const [addError, setAddError] = useState<string | null>(null);
 
     // Get unique companies
     const companies = Array.from(
@@ -64,20 +89,101 @@ export function QuestionBankView() {
         return acc;
     }, {} as Record<QuestionCategory, typeof questions>);
 
+    const handleAddQuestion = useCallback(() => {
+        if (!newQuestion.questionText.trim()) {
+            setAddError("Please enter the question text.");
+            return;
+        }
+
+        // Validate companyId if provided - ensure it exists in applications
+        if (newQuestion.companyId) {
+            const appExists = applications.some(app => app.id === newQuestion.companyId);
+            if (!appExists) {
+                setAddError("Selected company no longer exists.");
+                return;
+            }
+        }
+
+        const question: Question = {
+            id: generateId(),
+            // Use undefined for companyId when not selected (avoid empty string footgun)
+            companyId: newQuestion.companyId || undefined,
+            questionText: newQuestion.questionText.trim(),
+            category: newQuestion.category,
+            askedInRound: newQuestion.askedInRound.trim() || undefined,
+            dateAdded: new Date().toISOString(),
+        };
+
+        addQuestion(question);
+
+        // Reset form and close modal
+        setNewQuestion({
+            questionText: "",
+            category: "Other",
+            askedInRound: "",
+            companyId: undefined,
+        });
+        setAddError(null);
+        setIsAddModalOpen(false);
+    }, [newQuestion, addQuestion, applications]);
+
+    const handleCloseModal = useCallback(() => {
+        setIsAddModalOpen(false);
+        setAddError(null);
+        setNewQuestion({
+            questionText: "",
+            category: "Other",
+            askedInRound: "",
+            companyId: undefined,
+        });
+    }, []);
+
+    const handleAddModalOpenChange = useCallback(
+        (open: boolean) => {
+            if (open) {
+                setIsAddModalOpen(true);
+                return;
+            }
+
+            handleCloseModal();
+        },
+        [handleCloseModal]
+    );
+
+    // Handle company selection - convert empty string to undefined
+    const handleCompanyChange = useCallback((value: string) => {
+        setNewQuestion(prev => ({
+            ...prev,
+            companyId: value === "" ? undefined : value
+        }));
+    }, []);
+
     return (
-        <div className="h-full bg-background overflow-auto">
-            <div className="max-w-4xl mx-auto p-6">
+        <Dialog.Root open={isAddModalOpen} onOpenChange={handleAddModalOpenChange}>
+            <div className="h-full bg-background overflow-auto">
+                <div className="max-w-4xl mx-auto p-6">
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-3 bg-indigo-100 rounded-xl dark:bg-indigo-950/40">
-                        <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-200" />
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-indigo-100 rounded-xl dark:bg-indigo-950/40">
+                            <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-200" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
+                            <p className="text-muted-foreground text-sm">
+                                {questions.length} questions saved
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">Question Bank</h1>
-                        <p className="text-muted-foreground text-sm">
-                            {questions.length} questions saved
-                        </p>
-                    </div>
+                    <Dialog.Trigger asChild>
+                        <button
+                            type="button"
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add Question
+                        </button>
+                    </Dialog.Trigger>
                 </div>
 
                 {/* Filters */}
@@ -144,11 +250,21 @@ export function QuestionBankView() {
                         <h3 className="font-semibold text-foreground mb-2">
                             No Questions Found
                         </h3>
-                        <p className="text-muted-foreground text-sm">
+                        <p className="text-muted-foreground text-sm mb-4">
                             {questions.length === 0
-                                ? 'Start adding questions by saying "Add question: ..."'
+                                ? "Add your first question to start building your question bank!"
                                 : "Try adjusting your filters"}
                         </p>
+                        {questions.length === 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-medium"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Your First Question
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="space-y-6">
@@ -218,7 +334,136 @@ export function QuestionBankView() {
                         ))}
                     </div>
                 )}
+                </div>
+
+                {/* Add Question Modal - Using Radix Dialog for accessibility */}
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                    <Dialog.Content
+                        className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-card rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-border">
+                            <div>
+                                <Dialog.Title className="text-lg font-semibold text-foreground">
+                                    Add Question
+                                </Dialog.Title>
+                                <Dialog.Description className="text-sm text-muted-foreground">
+                                    Record a question asked in an interview
+                                </Dialog.Description>
+                            </div>
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    className="p-2 hover:bg-muted rounded-lg"
+                                    aria-label="Close"
+                                >
+                                    <X className="w-5 h-5 text-muted-foreground" />
+                                </button>
+                            </Dialog.Close>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-5 space-y-4">
+                            {/* Question Text */}
+                            <div>
+                                <label htmlFor="question-text" className="block text-sm font-medium text-foreground mb-1">
+                                    Question <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    id="question-text"
+                                    value={newQuestion.questionText}
+                                    onChange={(e) => {
+                                        setAddError(null);
+                                        setNewQuestion(prev => ({ ...prev, questionText: e.target.value }));
+                                    }}
+                                    placeholder="Enter the question that was asked..."
+                                    rows={3}
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background resize-none"
+                                />
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                                <label htmlFor="question-category" className="block text-sm font-medium text-foreground mb-1">
+                                    Category
+                                </label>
+                                <select
+                                    id="question-category"
+                                    value={newQuestion.category}
+                                    onChange={(e) => setNewQuestion(prev => ({ ...prev, category: e.target.value as QuestionCategory }))}
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background"
+                                >
+                                    {QUESTION_CATEGORIES.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Interview Round */}
+                            <div>
+                                <label htmlFor="interview-round" className="block text-sm font-medium text-foreground mb-1">
+                                    Interview Round
+                                </label>
+                                <input
+                                    id="interview-round"
+                                    type="text"
+                                    value={newQuestion.askedInRound}
+                                    onChange={(e) => setNewQuestion(prev => ({ ...prev, askedInRound: e.target.value }))}
+                                    placeholder="e.g., Round 1, Technical, HR"
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background"
+                                />
+                            </div>
+
+                            {/* Company */}
+                            <div>
+                                <label htmlFor="question-company" className="block text-sm font-medium text-foreground mb-1">
+                                    Company (optional)
+                                </label>
+                                <select
+                                    id="question-company"
+                                    value={newQuestion.companyId ?? ""}
+                                    onChange={(e) => handleCompanyChange(e.target.value)}
+                                    className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-background"
+                                >
+                                    <option value="">No company</option>
+                                    {applications.map(app => (
+                                        <option key={app.id} value={app.id}>
+                                            {app.company} - {app.role}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Error Message */}
+                            {addError && (
+                                <div className="text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-200 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2" role="alert">
+                                    {addError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end gap-2 p-5 border-t border-border">
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 text-sm rounded-lg border border-border hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                            </Dialog.Close>
+                            <button
+                                type="button"
+                                onClick={handleAddQuestion}
+                                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500"
+                            >
+                                Add Question
+                            </button>
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
             </div>
-        </div>
+        </Dialog.Root>
     );
 }

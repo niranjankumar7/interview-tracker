@@ -173,7 +173,7 @@ export default function AuthPage() {
                             Email: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">john.doe@example.com</code>
                         </p>
                         <p className="text-xs text-blue-700 dark:text-blue-400">
-                            Password: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">password123</code>
+                            Password: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 py-0.5 rounded">TestPassword123!</code>
                         </p>
                     </div>
                 </div>

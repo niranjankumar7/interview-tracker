@@ -14,6 +14,7 @@ import {
     LeetCodeStats,
     OfferDetails,
 } from '@/types';
+import type { RawSprint } from '@/types/api';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
@@ -58,6 +59,19 @@ function mergeRoundFeedback(
         struggledTopics: next.struggledTopics ?? prev.struggledTopics,
         notes: next.notes ?? prev.notes,
     };
+}
+
+function normalizeDailyPlans(value: RawSprint['dailyPlans']): Sprint['dailyPlans'] {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return Array.isArray(parsed) ? (parsed as Sprint['dailyPlans']) : [];
+    } catch (error) {
+        console.error('Failed to parse sprint dailyPlans:', error);
+        return [];
+    }
 }
 
 interface AppState {
@@ -184,14 +198,14 @@ interface AppState {
         notes?: string;
         questionsAsked?: string[];
     }) => Promise<InterviewRound>;
-    updateApplicationAPI: (id: string, updates: any) => Promise<void>;
+    updateApplicationAPI: (id: string, updates: Partial<Application>) => Promise<void>;
     deleteApplicationAPI: (id: string) => Promise<void>;
     createSprintAPI: (data: {
         applicationId: string;
         interviewDate: string;
         roleType: string;
         totalDays: number;
-        dailyPlans: any;
+        dailyPlans: Sprint['dailyPlans'];
     }) => Promise<Sprint>;
     createQuestionAPI: (data: {
         questionText: string;
@@ -400,6 +414,34 @@ function normalizeApplicationFromApi(raw: Record<string, unknown>): Application 
     };
 }
 
+function normalizeQuestionFromApi(raw: Record<string, unknown>): Question {
+    const question = raw as unknown as Question & {
+        applicationId?: string;
+        createdAt?: string;
+        application?: { id?: string };
+        createdByUserId?: string;
+    };
+
+    const companyId =
+        question.companyId ??
+        question.applicationId ??
+        question.application?.id ??
+        undefined;
+
+    // Use a stable fallback to avoid reordering records on every re-sync.
+    const dateAdded =
+        question.dateAdded ??
+        question.createdAt ??
+        new Date(0).toISOString();
+
+    return {
+        ...question,
+        companyId,
+        dateAdded,
+        createdByUserId: question.createdByUserId,
+    };
+}
+
 // Fallback ID state for environments without `crypto.randomUUID`/`crypto.getRandomValues`.
 // Keeps IDs stable-ish and reduces same-millisecond collision risk.
 let fallbackQuestionIdLastTime = 0;
@@ -445,8 +487,8 @@ function getAskedInRoundLabel(
     return `Round ${roundNumber}: ${roundType}`;
 }
 
-function getQuestionDedupeKey(applicationId: string, normalizedText: string): string {
-    return `${applicationId}|${normalizedText}`;
+function getQuestionDedupeKey(companyId: string | undefined, normalizedText: string): string {
+    return `${companyId ?? 'none'}|${normalizedText}`;
 }
 
 function upsertQuestionsFromRoundInList(
@@ -698,7 +740,7 @@ export const useStore = create<AppState>()(
                     }),
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+            completeTask: async (sprintId, dayIndex, blockIndex, taskIndex) => {
                 const existingTask =
                     get()
                         .sprints.find((sprint) => sprint.id === sprintId)
@@ -706,6 +748,7 @@ export const useStore = create<AppState>()(
 
                 if (!existingTask || existingTask.completed) return;
 
+                // Update local state first (optimistic update)
                 set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -766,6 +809,42 @@ export const useStore = create<AppState>()(
                         }
                     };
                 });
+
+                // Save to database
+                try {
+                    const updatedSprint = get().sprints.find(s => s.id === sprintId);
+                    const currentProgress = get().progress;
+
+                    if (updatedSprint) {
+                        const updatedTask =
+                            updatedSprint.dailyPlans?.[dayIndex]?.blocks?.[blockIndex]?.tasks?.[taskIndex];
+                        if (!updatedTask) {
+                            throw new Error('Task not found in sprint after optimistic update');
+                        }
+
+                        // Persist only the task delta instead of writing the full dailyPlans payload.
+                        await api.sprints.completeTask(sprintId, {
+                            dayIndex,
+                            blockIndex,
+                            taskIndex,
+                            completed: Boolean(updatedTask.completed),
+                        });
+
+                        // Update user progress in database
+                        await api.user.updateProgress({
+                            currentStreak: currentProgress.currentStreak,
+                            longestStreak: currentProgress.longestStreak,
+                            lastActiveDate: currentProgress.lastActiveDate,
+                            totalTasksCompleted: currentProgress.totalTasksCompleted,
+                        });
+
+                        console.log('✅ Task completion saved to database');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to save task completion to database:', error);
+                    // Note: Local state is already updated (optimistic update)
+                    // You might want to show a notification to the user here
+                }
             },
 
             updateProgress: (updates) =>
@@ -991,7 +1070,9 @@ export const useStore = create<AppState>()(
                     const apps = await api.applications.getAll();
                     set({
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                     });
                 } catch (error) {
@@ -1003,14 +1084,9 @@ export const useStore = create<AppState>()(
             loadSprintsFromAPI: async () => {
                 try {
                     const rawSprints = await api.sprints.getAll();
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
-                    const sprints = rawSprints.map((sprint: any) => ({
+                    const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
                     set({ sprints });
                 } catch (error) {
@@ -1022,7 +1098,11 @@ export const useStore = create<AppState>()(
             loadQuestionsFromAPI: async (filters) => {
                 try {
                     const questions = await api.questions.getAll(filters);
-                    set({ questions });
+                    set({
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
+                        ),
+                    });
                 } catch (error) {
                     console.error('Failed to load questions from API:', error);
                     throw error;
@@ -1033,7 +1113,7 @@ export const useStore = create<AppState>()(
                 try {
                     const app = await api.applications.create(data);
                     const normalizedApp = normalizeApplicationFromApi(
-                        app as Record<string, unknown>
+                        app as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: [...state.applications, normalizedApp]
@@ -1103,7 +1183,7 @@ export const useStore = create<AppState>()(
                 try {
                     const updatedApp = await api.applications.update(id, updates);
                     const normalizedUpdatedApp = normalizeApplicationFromApi(
-                        updatedApp as Record<string, unknown>
+                        updatedApp as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: state.applications.map(app =>
@@ -1145,10 +1225,13 @@ export const useStore = create<AppState>()(
             createQuestionAPI: async (data) => {
                 try {
                     const question = await api.questions.create(data);
+                    const normalizedQuestion = normalizeQuestionFromApi(
+                        question as unknown as Record<string, unknown>
+                    );
                     set((state) => ({
-                        questions: [...state.questions, question]
+                        questions: [...state.questions, normalizedQuestion]
                     }));
-                    return question;
+                    return normalizedQuestion;
                 } catch (error) {
                     console.error('Failed to create question:', error);
                     throw error;
@@ -1165,23 +1248,22 @@ export const useStore = create<AppState>()(
                         api.user.getProfile().catch(() => null), // User profile is optional
                     ]);
 
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
-                    const sprints = rawSprints.map((sprint: any) => ({
+                    const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
 
                     // Build the update object
                     const update: Partial<AppState> = {
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                         sprints,
-                        questions,
+                        questions: questions.map((q) =>
+                            normalizeQuestionFromApi(q as unknown as Record<string, unknown>)
+                        ),
                     };
 
                     // Sync user profile data if available
@@ -1192,7 +1274,9 @@ export const useStore = create<AppState>()(
                                 ...get().profile,
                                 name: userProfile.name || get().profile.name,
                                 targetRole: userProfile.targetRole || get().profile.targetRole,
-                                experienceLevel: (userProfile.experienceLevel as any) || get().profile.experienceLevel,
+                                experienceLevel:
+                                    userProfile.experienceLevel ??
+                                    get().profile.experienceLevel,
                             };
                         }
 
@@ -1211,7 +1295,7 @@ export const useStore = create<AppState>()(
                         if (userProfile.preferences) {
                             update.preferences = {
                                 ...get().preferences,
-                                theme: (userProfile.preferences.theme as any) || get().preferences.theme,
+                                theme: userProfile.preferences.theme ?? get().preferences.theme,
                                 studyRemindersEnabled: userProfile.preferences.studyRemindersEnabled ?? get().preferences.studyRemindersEnabled,
                                 calendarAutoSyncEnabled: userProfile.preferences.calendarAutoSyncEnabled ?? get().preferences.calendarAutoSyncEnabled,
                                 leetcodeAutoSyncEnabled: userProfile.preferences.leetcodeAutoSyncEnabled ?? get().preferences.leetcodeAutoSyncEnabled,
@@ -1235,12 +1319,13 @@ export const useStore = create<AppState>()(
                                 hardSolved: userProfile.leetcode.hardSolved ?? 0,
                                 currentStreak: userProfile.leetcode.currentStreak ?? 0,
                                 longestStreak: userProfile.leetcode.longestStreak ?? 0,
-                                lastActiveDate: userProfile.leetcode.lastActiveDate,
+                                lastActiveDate:
+                                    userProfile.leetcode.lastActiveDate ?? undefined,
                             };
                         }
                     }
 
-                    set(update as any);
+                    set(update);
                 } catch (error) {
                     console.error('Failed to sync with backend:', error);
                     throw error;

@@ -17,17 +17,12 @@ import {
   subDays,
 } from "date-fns";
 import {
-  CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import {
   BarChart3,
@@ -142,23 +137,6 @@ export default function DashboardPage() {
 
   const { activityCounts: completedActivityCountsByDate, topicCounts: completedTopicCountsByDate } =
     useMemo(() => computeCompletionStats(sprints), [sprints]);
-
-  const topicProgressSeries = useMemo(() => {
-    const start = subDays(today, 29);
-    const days = Array.from({ length: 30 }, (_, idx) => addDays(start, idx));
-
-    let cumulative = 0;
-    return days.map((d) => {
-      const key = format(d, "yyyy-MM-dd");
-      cumulative += completedTopicCountsByDate.get(key) ?? 0;
-      return {
-        date: format(d, "MMM d"),
-        cumulative,
-      };
-    });
-  }, [completedTopicCountsByDate, today]);
-
-  const totalTopicsLast30 = topicProgressSeries.at(-1)?.cumulative ?? 0;
 
   const applicationPipelineData = useMemo(() => {
     const counts = new Map<ApplicationStatus, number>();
@@ -312,81 +290,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Card
-                title="Topic progress"
-                subtitle="Cumulative topics completed over the last 30 days"
-              >
-                {!mounted ? (
-                  <div className="h-[240px] bg-muted/20 rounded-lg animate-pulse" />
-                ) : totalTopicsLast30 === 0 ? (
-                  <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
-                    No topics completed in the last 30 days
-                  </div>
-                ) : (
-                  <div className="h-[240px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={topicProgressSeries}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" interval="preserveStartEnd" />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="cumulative"
-                          stroke="#2563EB"
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </Card>
-            </div>
 
-            <div>
-              <Card
-                title="Application pipeline"
-                subtitle="Distribution of applications by status"
-              >
-                {!mounted ? (
-                  <div className="h-[240px] bg-muted/20 rounded-lg animate-pulse" />
-                ) : applications.length === 0 ? (
-                  <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
-                    No applications yet
-                  </div>
-                ) : applicationPipelineData.length === 0 ? (
-                  <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
-                    Add statuses to see the pipeline breakdown
-                  </div>
-                ) : (
-                  <div className="h-[240px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={applicationPipelineData}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                        >
-                          {applicationPipelineData.map((entry) => (
-                            <Cell key={entry.name} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend verticalAlign="bottom" height={36} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </Card>
-            </div>
-          </div>
-
+          {/* Next Interviews - moved to first position */}
           <Card title="Next interviews" subtitle="Countdown to upcoming interviews">
             {upcomingInterviews.length === 0 ? (
               <div className="flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg p-10">
@@ -416,6 +321,45 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Application Pipeline - now in second position */}
+          <Card
+            title="Application pipeline"
+            subtitle="Distribution of applications by status"
+          >
+            {!mounted ? (
+              <div className="h-[240px] bg-muted/20 rounded-lg animate-pulse" />
+            ) : applications.length === 0 ? (
+              <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
+                No applications yet
+              </div>
+            ) : applicationPipelineData.length === 0 ? (
+              <div className="h-[240px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
+                Add statuses to see the pipeline breakdown
+              </div>
+            ) : (
+              <div className="h-[240px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={applicationPipelineData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {applicationPipelineData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
             )}
           </Card>
@@ -471,12 +415,12 @@ export default function DashboardPage() {
                               : `${row.total.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
-                            {row.offer?.baseSalary === undefined
+                            {row.offer?.baseSalary === undefined || row.offer.baseSalary === null
                               ? "—"
                               : `${row.offer.baseSalary.toLocaleString()} ${row.currency}`}
                           </td>
                           <td className="py-2 pr-4">
-                            {row.offer?.bonus === undefined
+                            {row.offer?.bonus === undefined || row.offer.bonus === null
                               ? "—"
                               : `${row.offer.bonus.toLocaleString()} ${row.currency}`}
                           </td>
@@ -498,6 +442,19 @@ export default function DashboardPage() {
                 </table>
               </div>
             )}
+          </Card>
+
+          {/* Topic Progress - moved to bottom with "Feature coming soon" */}
+          <Card
+            title="Topic progress"
+            subtitle="Cumulative topics completed over the last 30 days"
+          >
+            <div className="h-[120px] flex items-center justify-center text-sm text-muted-foreground bg-muted/20 rounded-lg">
+              <div className="text-center">
+                <p className="font-medium text-foreground">Feature coming soon</p>
+                <p className="text-xs mt-1">Track your topic completion progress here</p>
+              </div>
+            </div>
           </Card>
 
           <Card

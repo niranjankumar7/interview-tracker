@@ -7,27 +7,36 @@ import { isGenericRole, rolesEquivalent, sanitizeCompanyName } from "@/lib/appli
 import { RoleType, Application, InterviewRound, InterviewRoundType, interviewRoundTypes } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
-import { Calendar, Briefcase, Building2, Target } from "lucide-react";
+import { Calendar, Briefcase, Building2, CheckCircle2, Target } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { z } from "zod";
 
 // Props schema for Tambo registration
 export const sprintSetupCardSchema = z.object({
-    company: z.string().optional().describe("The company name for the interview"),
-    role: z
-        .enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
-        .optional()
-        .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)"),
-    interviewDate: z
-        .string()
-        .optional()
-        .describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'"),
+    company: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The company name for the interview")
+    ),
+    role: z.preprocess(
+        (val) => val ?? undefined,
+        z.enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
+            .optional()
+            .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)")
+    ),
+    interviewDate: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'")
+    ),
     roundType: z
         .string()
         .trim()
         .min(1)
         .optional()
         .describe("The type of interview round (e.g., TechnicalRound1, SystemDesign, Managerial, etc.)"),
+    panelId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("Unique panel id to avoid state collisions")
+    ),
 });
 
 interface SprintSetupCardProps {
@@ -35,6 +44,7 @@ interface SprintSetupCardProps {
     role?: RoleType;
     interviewDate?: string;
     roundType?: InterviewRoundType;
+    panelId?: string;
 }
 
 interface SprintSetupState {
@@ -259,6 +269,7 @@ export function SprintSetupCard({
     role: initialRole,
     interviewDate: initialDate,
     roundType: initialRoundType,
+    panelId,
 }: SprintSetupCardProps) {
     const applications = useStore((s) => s.applications);
 
@@ -291,8 +302,16 @@ export function SprintSetupCard({
         return `sprint-setup-card:${normalizedCompany}:${hydratedRole}:${dateKey}:${hydratedRoundType}`;
     }, [hydratedCompany, hydratedInterviewDate, hydratedRole, hydratedRoundType]);
 
+    const componentId = useMemo(() => {
+        if (panelId) return `sprint-setup-card:${panelId}`;
+        const companySlug = (hydratedCompany || "unknown").toLowerCase().trim();
+        const roleSlug = hydratedRole.toLowerCase();
+        const dateSlug = hydratedInterviewDate || "unknown-date";
+        return `sprint-setup-card:${companySlug}:${roleSlug}:${dateSlug}`;
+    }, [hydratedCompany, hydratedInterviewDate, hydratedRole, panelId]);
+
     const [state, setState] = useTamboComponentState<SprintSetupState>(
-        componentStateKey,
+        panelId ? componentId : componentStateKey,
         {
             company: hydratedCompany,
             role: hydratedRole,
@@ -511,7 +530,26 @@ export function SprintSetupCard({
     };
 
     if (state.isSubmitted || hasMatchingSprint) {
-        return null;
+        return (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-lg max-w-md">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-green-100 rounded-full">
+                        <CheckCircle2 className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-lg text-green-800">
+                            Sprint Created!
+                        </h3>
+                        <p className="text-sm text-green-600">
+                            Your interview prep plan for {state.company} is ready
+                        </p>
+                    </div>
+                </div>
+                <p className="text-sm text-gray-600">
+                    Ask me &ldquo;What should I do today?&rdquo; to see your daily tasks.
+                </p>
+            </div>
+        );
     }
     const hasValues =
         validation.company.length > 0 && validation.interviewDate.length > 0;
@@ -521,16 +559,16 @@ export function SprintSetupCard({
     const isFormValid = hasValues && !hasFieldErrors;
 
     return (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-md">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-lg max-w-md">
             <div className="flex items-center gap-3 mb-5">
-                <div className="p-2 bg-blue-100 rounded-full">
-                    <Calendar className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                    <h3 className="font-semibold text-lg text-gray-800">
+                    <h3 className="font-semibold text-lg text-foreground">
                         Setup Interview Sprint
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         Confirm your interview details
                     </p>
                 </div>
@@ -538,7 +576,7 @@ export function SprintSetupCard({
 
             <div className="space-y-4">
                 <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                         <Building2 className="w-4 h-4" />
                         Company
                     </label>
@@ -554,17 +592,17 @@ export function SprintSetupCard({
                             })
                         }
                         placeholder="e.g., Google, Amazon, Microsoft"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder:text-muted-foreground"
                     />
                     {state.companyError && (
-                        <p className="mt-2 text-sm text-red-600">
+                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                             {state.companyError}
                         </p>
                     )}
                 </div>
 
                 <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                         <Briefcase className="w-4 h-4" />
                         Role Type
                     </label>
@@ -577,7 +615,7 @@ export function SprintSetupCard({
                                 formError: undefined,
                             })
                         }
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                        className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
                         <option value="SDE">Software Development Engineer</option>
                         <option value="SDET">Software Dev Engineer in Test</option>
@@ -593,7 +631,7 @@ export function SprintSetupCard({
                 </div>
 
                 <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                         <Target className="w-4 h-4" />
                         Round Type
                     </label>
@@ -606,7 +644,7 @@ export function SprintSetupCard({
                                 formError: undefined,
                             })
                         }
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                        className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     >
                         {state.roundType &&
                             !interviewRoundTypes.includes(state.roundType as (typeof interviewRoundTypes)[number]) && (
@@ -621,7 +659,7 @@ export function SprintSetupCard({
                 </div>
 
                 <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                         <Calendar className="w-4 h-4" />
                         Interview Date
                     </label>
@@ -637,17 +675,17 @@ export function SprintSetupCard({
                             })
                         }
                         min={format(new Date(), "yyyy-MM-dd")}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     {state.interviewDateError && (
-                        <p className="mt-2 text-sm text-red-600">
+                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
                             {state.interviewDateError}
                         </p>
                     )}
                 </div>
 
                 {state.formError && (
-                    <p className="text-sm text-red-600">{state.formError}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{state.formError}</p>
                 )}
 
                 <button

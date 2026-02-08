@@ -20,16 +20,16 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const todaysPlanPanelSchema = z.object({
-    showAll: z
-        .boolean()
-        .optional()
-        .describe("Whether to show all active sprints or just the first one"),
-    focusApplicationId: z
-        .string()
-        .optional()
-        .describe(
+    showAll: z.preprocess(
+        (val) => val ?? true,
+        z.boolean().describe("Whether to show all active sprints (default: true, ALWAYS use true unless user explicitly asks for just one sprint)")
+    ),
+    focusApplicationId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe(
             "Optional application ID to show first (useful when deep-linking from notifications)"
-        ),
+        )
+    ),
 });
 
 interface TodaysPlanPanelProps {
@@ -72,14 +72,14 @@ export function TodaysPlanPanel({
 
     if (activeSprints.length === 0) {
         return (
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 text-center max-w-md border border-gray-200">
-                <div className="p-4 bg-gray-200 rounded-full w-fit mx-auto mb-4">
-                    <Calendar className="w-8 h-8 text-gray-500" />
+            <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-8 text-center max-w-md border border-border">
+                <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-semibold text-lg text-gray-700 mb-2">
+                <h3 className="font-semibold text-lg text-foreground mb-2">
                     No Active Sprints
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                     Create an interview sprint to get started! Try saying: &ldquo;I have an
                     interview at Google next Thursday for SDE&rdquo;
                 </p>
@@ -87,10 +87,10 @@ export function TodaysPlanPanel({
         );
     }
 
-    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]];
+    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]].filter(Boolean);
 
     return (
-        <div className="space-y-6 max-w-lg">
+        <div className="w-full max-w-4xl space-y-6">
             {/* Streak Banner */}
             {progress.currentStreak > 0 && (
                 <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl p-4 flex items-center justify-between shadow-lg">
@@ -128,7 +128,22 @@ export function TodaysPlanPanel({
                     dailyPlans.find((p) => !p.completed) ||
                     dailyPlans[0];
 
-                if (!planToShow) return null;
+                if (!planToShow) {
+                    return (
+                        <div
+                            key={sprint.id}
+                            className="bg-amber-50 border border-amber-200 rounded-xl p-5"
+                        >
+                            <h3 className="font-semibold text-amber-900">
+                                Sprint plan unavailable
+                            </h3>
+                            <p className="text-sm text-amber-800 mt-1">
+                                {app?.company ?? "This application"} has an active sprint with no
+                                daily plan data. Regenerate the sprint from the pipeline.
+                            </p>
+                        </div>
+                    );
+                }
 
                 const dayIndex = dailyPlans.findIndex(
                     (p) => p.day === planToShow.day

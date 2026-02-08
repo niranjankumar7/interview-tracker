@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules_old_*.tgz
 /.pnp
 .pnp.*
 .yarn/*
@@ -51,7 +52,6 @@ next-env.d.ts
 
 # agents
 .agents/
-
 
 .next_bad_*
 .next_bad_1770549029

@@ -1,7 +1,7 @@
 "use client";
 
 import { TodaysPlanPanel } from "@/components/generative/TodaysPlanPanel";
-import Link from "next/link";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 export function PrepClient({
   focusApplicationId,
@@ -9,27 +9,25 @@ export function PrepClient({
   focusApplicationId?: string;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Prep Plan</h1>
-            <p className="text-sm text-gray-500">Today&apos;s tasks across your active sprints</p>
-          </div>
-          <Link
-            href="/chat"
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
-          >
-            Back to app
-          </Link>
-        </div>
-      </header>
+    <div className="flex flex-1 min-h-0 flex-col bg-background">
+      <AppHeader />
 
-      <main className="max-w-4xl mx-auto p-6">
-        <TodaysPlanPanel
-          showAll={!focusApplicationId}
-          focusApplicationId={focusApplicationId}
-        />
+      <main className="flex-1 min-h-0 overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 pb-20 md:px-6">
+          <div className="mx-auto mb-6 w-full max-w-4xl">
+            <h1 className="text-2xl font-bold text-foreground">Prep Plan</h1>
+            <p className="text-sm text-muted-foreground">
+              Today&apos;s tasks across your active sprints
+            </p>
+          </div>
+
+          <div className="flex justify-center">
+            <TodaysPlanPanel
+              showAll={!focusApplicationId}
+              focusApplicationId={focusApplicationId}
+            />
+          </div>
+        </div>
       </main>
     </div>
   );

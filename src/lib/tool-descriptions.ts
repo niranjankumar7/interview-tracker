@@ -517,8 +517,20 @@ A component that shows the user's daily prep tasks.
 - "What's on my agenda?"
 - "Today's tasks"
 - "What do I need to do today?"
+- "Show today's plan"
+- "What's my plan?"
+- "Daily tasks"
 
 Shows tasks organized by morning and evening blocks with checkboxes.
+
+## IMPORTANT: Always Show All Sprints
+By default, ALWAYS show all active sprints (showAll: true or omit the prop entirely).
+Only set showAll: false if the user explicitly asks to see just one sprint.
+This ensures users see their complete daily plan across all their interviews.
+
+IMPORTANT: Keep this component visible and persistent in the chat. Do NOT clear it after showing.
+The user needs to see their tasks to complete them. This component should remain visible
+until the user explicitly asks to close it or changes the topic.
 `.trim(),
 
   PlanForDatePanel: `
@@ -529,7 +541,17 @@ A component that shows the user's prep tasks for a specific date.
 - "What's scheduled for tomorrow?"
 - "What do I need to do on Monday?"
 - "Show tasks for next week"
+- "What's the plan for tomorrow?"
+- "What should I do tomorrow?"
 - "interview scheduled, [company] [role] next Wednesday"
+
+## IMPORTANT: Date Extraction
+When the user asks about a plan for a date, you MUST extract the date string and pass it as the targetDate prop.
+Examples:
+- "What's the plan for tomorrow?" → targetDate: "tomorrow"
+- "Show my plan for next Friday" → targetDate: "next Friday"
+- "What should I do on Monday?" → targetDate: "Monday"
+- "Show tasks for 2024-12-31" → targetDate: "2024-12-31"
 
 Use instead of TodaysPlanPanel when user mentions any non-today date.
 `.trim(),
