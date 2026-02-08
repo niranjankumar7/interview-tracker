@@ -68,7 +68,7 @@ export type InterviewRoundUpsertDeps = {
   ) => Promise<void>;
 };
 
-function mergeNotes(existing: string | undefined, incoming: string | undefined): string | undefined {
+export function mergeNotes(existing: string | undefined, incoming: string | undefined): string | undefined {
   const current = existing?.trim();
   const next = incoming?.trim();
 
@@ -83,36 +83,43 @@ function mergeNotes(existing: string | undefined, incoming: string | undefined):
   return `${current}. ${next}`;
 }
 
-function pickApplicationForUpsert(
-  matches: ApplicationForRoundUpsert[],
+function pickPreferredCandidate<T extends { company: string }>(
+  matches: T[]
+): T | undefined {
+  if (matches.length === 0) return undefined;
+  if (matches.length === 1) return matches[0];
+
+  const canonicalNameMatches = matches.filter((candidate) => {
+    const trimmed = (candidate.company || "").trim();
+    if (!trimmed) return false;
+    return sanitizeCompanyName(candidate.company).toLowerCase() === trimmed.toLowerCase();
+  });
+  if (canonicalNameMatches.length === 1) {
+    return canonicalNameMatches[0];
+  }
+
+  return undefined;
+}
+
+export function pickApplicationForUpsert<T extends ApplicationForRoundUpsert>(
+  matches: T[],
   incomingRole: string | undefined
-): ApplicationForRoundUpsert | undefined {
+): T | undefined {
   if (matches.length === 0) return undefined;
 
   if (incomingRole) {
     const exactRoleMatches = matches.filter((candidate) =>
       rolesEquivalent(candidate.role, incomingRole)
     );
-    const exactRoleMatch =
-      exactRoleMatches.find(
-        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
-      ) ?? exactRoleMatches[0];
+    const exactRoleMatch = pickPreferredCandidate(exactRoleMatches);
     if (exactRoleMatch) return exactRoleMatch;
 
     const genericMatches = matches.filter((candidate) => isGenericRole(candidate.role));
-    const genericRoleMatch =
-      genericMatches.find(
-        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
-      ) ?? genericMatches[0];
+    const genericRoleMatch = pickPreferredCandidate(genericMatches);
     if (genericRoleMatch) return genericRoleMatch;
   }
 
-  if (matches.length === 1) {
-    const [single] = matches;
-    return single;
-  }
-
-  return undefined;
+  return pickPreferredCandidate(matches);
 }
 
 function findApplicationsByRole(

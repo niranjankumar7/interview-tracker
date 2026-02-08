@@ -36,27 +36,35 @@ export async function POST(
             );
         }
 
-        const app = await prisma.application.findFirst({
-            where: { id, userId: user.userId },
-        });
-        if (!app) {
-            return NextResponse.json(
-                { error: "Application not found" },
-                { status: 404 }
-            );
-        }
-
         const data = validation.data;
-        const round = await prisma.interviewRound.create({
+        const updatedApplication = await prisma.application.update({
+            where: { id, userId: user.userId },
             data: {
-                applicationId: id,
-                roundNumber: data.roundNumber,
-                roundType: data.roundType,
-                scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : null,
-                notes: data.notes,
-                questionsAsked: data.questionsAsked,
+                rounds: {
+                    create: {
+                        roundNumber: data.roundNumber,
+                        roundType: data.roundType,
+                        scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : null,
+                        notes: data.notes,
+                        questionsAsked: data.questionsAsked,
+                    },
+                },
+            },
+            select: {
+                rounds: {
+                    where: { roundNumber: data.roundNumber },
+                    take: 1,
+                },
             },
         });
+
+        const [round] = updatedApplication.rounds;
+        if (!round) {
+            return NextResponse.json(
+                { error: "Created round could not be loaded" },
+                { status: 500 }
+            );
+        }
 
         return NextResponse.json(round, { status: 201 });
     } catch (error) {
@@ -71,6 +79,15 @@ export async function POST(
             return NextResponse.json(
                 { error: "Round number already exists for this application." },
                 { status: 409 }
+            );
+        }
+        if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2025"
+        ) {
+            return NextResponse.json(
+                { error: "Application not found" },
+                { status: 404 }
             );
         }
 

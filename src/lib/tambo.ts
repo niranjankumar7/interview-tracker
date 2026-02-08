@@ -30,6 +30,8 @@ import {
   sanitizeCompanyName,
 } from "@/lib/application-intake";
 import {
+  mergeNotes,
+  pickApplicationForUpsert,
   upsertInterviewRoundsBatch,
 } from "@/lib/interview-round-upsert";
 import { useStore } from "@/lib/store";
@@ -102,53 +104,6 @@ function findApplicationsByCompany(
   );
 
   return { ok: true, companyName, matches } as const;
-}
-
-function mergeNotes(existing: string | undefined, incoming: string | undefined): string | undefined {
-  const current = existing?.trim();
-  const next = incoming?.trim();
-
-  if (!next) return current;
-  if (!current) return next;
-
-  const currentLower = current.toLowerCase();
-  const nextLower = next.toLowerCase();
-  if (currentLower.includes(nextLower)) return current;
-  if (nextLower.includes(currentLower)) return next;
-
-  return `${current}. ${next}`;
-}
-
-function pickApplicationForUpsert(
-  matches: StoredApplication[],
-  incomingRole: string | undefined
-): StoredApplication | undefined {
-  if (matches.length === 0) return undefined;
-
-  if (incomingRole) {
-    const exactRoleMatches = matches.filter((candidate) =>
-      rolesEquivalent(candidate.role, incomingRole)
-    );
-    const exactRoleMatch =
-      exactRoleMatches.find(
-        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
-      ) ?? exactRoleMatches[0];
-    if (exactRoleMatch) return exactRoleMatch;
-
-    const genericMatches = matches.filter((candidate) => isGenericRole(candidate.role));
-    const genericRoleMatch =
-      genericMatches.find(
-        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
-      ) ?? genericMatches[0];
-    if (genericRoleMatch) return genericRoleMatch;
-  }
-
-  if (matches.length === 1) {
-    const [single] = matches;
-    return single;
-  }
-
-  return undefined;
 }
 
 const permissiveStatusUpdateInputSchema = z

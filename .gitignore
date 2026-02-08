@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/testing/media/
+/testing/**/*.resolved*
+/testing/**/*.metadata.json
 
 # next.js
 /.next/
@@ -48,3 +51,8 @@ next-env.d.ts
 
 # agents
 .agents/
+
+
+.next_bad_*
+.next_bad_1770549029
+.next_bad_1770548899

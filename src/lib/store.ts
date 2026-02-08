@@ -258,7 +258,25 @@ function toStringArray(value: unknown): string[] {
     return value.filter((entry): entry is string => typeof entry === 'string');
 }
 
-function normalizeInterviewRoundFromApi(raw: Record<string, unknown>): InterviewRound {
+function parsePositiveRoundNumber(value: unknown): number | undefined {
+    const numericValue =
+        typeof value === 'number'
+            ? value
+            : typeof value === 'string'
+                ? Number(value)
+                : NaN;
+    if (!Number.isInteger(numericValue) || numericValue <= 0) {
+        return undefined;
+    }
+    return numericValue;
+}
+
+function normalizeInterviewRoundFromApi(raw: Record<string, unknown>): InterviewRound | null {
+    const roundNumber = parsePositiveRoundNumber(raw.roundNumber);
+    if (roundNumber === undefined) {
+        return null;
+    }
+
     const feedbackRating =
         typeof raw.feedbackRating === 'number' ? raw.feedbackRating : undefined;
     const feedbackPros = toStringArray(raw.feedbackPros);
@@ -291,12 +309,11 @@ function normalizeInterviewRoundFromApi(raw: Record<string, unknown>): Interview
             : scheduledDateValue instanceof Date
                 ? scheduledDateValue.toISOString()
                 : undefined;
+    const roundTypeValue = typeof raw.roundType === 'string' ? raw.roundType.trim() : '';
 
     return {
-        roundNumber: Number(raw.roundNumber) || 1,
-        roundType:
-            (raw.roundType as InterviewRound['roundType']) ??
-            `Round ${Number(raw.roundNumber) || 1}`,
+        roundNumber,
+        roundType: roundTypeValue || `Round ${roundNumber}`,
         scheduledDate,
         notes: typeof raw.notes === 'string' ? raw.notes : '',
         questionsAsked: toStringArray(raw.questionsAsked),
@@ -370,6 +387,7 @@ function normalizeApplicationFromApi(raw: Record<string, unknown>): Application 
     const rounds = Array.isArray(raw.rounds)
         ? raw.rounds
             .map((round) => normalizeInterviewRoundFromApi(round as Record<string, unknown>))
+            .filter((round): round is InterviewRound => round !== null)
             .sort((a, b) => a.roundNumber - b.roundNumber)
         : [];
 
@@ -1033,6 +1051,9 @@ export const useStore = create<AppState>()(
                     const normalizedRound = normalizeInterviewRoundFromApi(
                         round as Record<string, unknown>
                     );
+                    if (!normalizedRound) {
+                        throw new Error('Invalid interview round payload returned by API');
+                    }
 
                     set((state) => ({
                         applications: state.applications.map((app) =>
@@ -1059,6 +1080,9 @@ export const useStore = create<AppState>()(
                     const normalizedRound = normalizeInterviewRoundFromApi(
                         round as Record<string, unknown>
                     );
+                    if (!normalizedRound) {
+                        throw new Error('Invalid interview round payload returned by API');
+                    }
 
                     set((state) => ({
                         applications: state.applications.map((app) =>

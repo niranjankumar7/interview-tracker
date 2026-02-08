@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-middleware";
@@ -42,28 +43,13 @@ export async function PUT(
             );
         }
 
-        const app = await prisma.application.findFirst({
+        const app = await prisma.application.findUnique({
             where: { id, userId: user.userId },
+            select: { id: true },
         });
         if (!app) {
             return NextResponse.json(
                 { error: "Application not found" },
-                { status: 404 }
-            );
-        }
-
-        const existingRound = await prisma.interviewRound.findUnique({
-            where: {
-                applicationId_roundNumber: {
-                    applicationId: id,
-                    roundNumber: numericRoundNumber,
-                },
-            },
-        });
-
-        if (!existingRound) {
-            return NextResponse.json(
-                { error: "Round not found" },
                 { status: 404 }
             );
         }
@@ -74,6 +60,9 @@ export async function PUT(
                 applicationId_roundNumber: {
                     applicationId: id,
                     roundNumber: numericRoundNumber,
+                },
+                application: {
+                    userId: user.userId,
                 },
             },
             data: {
@@ -90,6 +79,15 @@ export async function PUT(
     } catch (error) {
         if (error instanceof Error && error.message === "Unauthorized") {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2025"
+        ) {
+            return NextResponse.json(
+                { error: "Round not found" },
+                { status: 404 }
+            );
         }
 
         console.error("Update interview round error:", error);
