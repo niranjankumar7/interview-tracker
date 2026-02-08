@@ -251,7 +251,7 @@ export const applicationsApi = {
      */
     async createRound(id: string, data: {
         roundNumber: number;
-        roundType: 'HR' | 'TechnicalRound1' | 'TechnicalRound2' | 'SystemDesign' | 'Managerial' | 'Assignment' | 'Final';
+        roundType: string;
         scheduledDate?: string;
         notes?: string;
         questionsAsked?: string[];
@@ -269,7 +269,7 @@ export const applicationsApi = {
         id: string,
         roundNumber: number,
         data: {
-            roundType?: 'HR' | 'TechnicalRound1' | 'TechnicalRound2' | 'SystemDesign' | 'Managerial' | 'Assignment' | 'Final';
+            roundType?: string;
             scheduledDate?: string | null;
             notes?: string;
             questionsAsked?: string[];

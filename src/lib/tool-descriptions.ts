@@ -152,13 +152,10 @@ IMPORTANT:
 - "Add another interview round for [company]"
 - "Update interview dates for [company]"
 
-## Round Mapping
-- roundNumber 1 -> TechnicalRound1
-- roundNumber 2 -> TechnicalRound2
-- roundNumber 3 -> SystemDesign
-- roundNumber 4 -> Managerial
-
-If both roundType and roundNumber are provided, keep them consistent.
+## Round Labels
+- Round names are user/company specific. Keep the label from user intent when available
+  (examples: "Tech Screen", "Manager Round", "Bar Raiser", "HR").
+- If roundType is missing but roundNumber exists, the system will use a neutral label like "Round 3".
 `.trim(),
 
   addApplications: `
@@ -391,10 +388,10 @@ Example: "ML Engineer"
 `.trim(),
     roundType: `
 Optional interview round type.
-Valid values: HR, TechnicalRound1, TechnicalRound2, SystemDesign, Managerial, Assignment, Final
+Use free text from the user when possible (examples: "Tech Screen", "Manager Round", "HR").
 `.trim(),
     roundNumber: `
-Optional round number. If provided, this helps map to progression (1 => Tech 1, 2 => Tech 2).
+Optional round number. If provided without roundType, the round can still be tracked as "Round N".
 `.trim(),
     scheduledDate: `
 Interview round date. Accept natural language or ISO date.

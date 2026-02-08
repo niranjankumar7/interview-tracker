@@ -4,10 +4,10 @@ import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
 import { tryParseDateInput } from "@/lib/date-parsing";
 import { isGenericRole, rolesEquivalent, sanitizeCompanyName } from "@/lib/application-intake";
-import { RoleType, Application, InterviewRound } from "@/types";
+import { RoleType, Application, InterviewRound, InterviewRoundType, interviewRoundTypes } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
-import { Calendar, Briefcase, Building2 } from "lucide-react";
+import { Calendar, Briefcase, Building2, Target } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { z } from "zod";
 
@@ -22,18 +22,26 @@ export const sprintSetupCardSchema = z.object({
         .string()
         .optional()
         .describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'"),
+    roundType: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("The type of interview round (e.g., TechnicalRound1, SystemDesign, Managerial, etc.)"),
 });
 
 interface SprintSetupCardProps {
     company?: string;
     role?: RoleType;
     interviewDate?: string;
+    roundType?: InterviewRoundType;
 }
 
 interface SprintSetupState {
     company: string;
     role: RoleType;
     interviewDate: string;
+    roundType: InterviewRoundType;
     isSubmitted: boolean;
     isSubmitting: boolean;
     companyError?: string;
@@ -43,6 +51,7 @@ interface SprintSetupState {
         company: string;
         role: RoleType;
         interviewDate: string;
+        roundType: InterviewRoundType;
     };
 }
 
@@ -50,6 +59,7 @@ type HydratedSprintSetupState = {
     company: string;
     role: RoleType;
     interviewDate: string;
+    roundType: InterviewRoundType;
 };
 
 const ROLE_LABELS: Record<RoleType, string> = {
@@ -65,7 +75,17 @@ const ROLE_LABELS: Record<RoleType, string> = {
     MobileEngineer: "Mobile Engineer",
 };
 
-const ROUND_SEQUENCE: InterviewRound["roundType"][] = [
+const INTERVIEW_ROUND_TYPE_LABELS: Record<(typeof interviewRoundTypes)[number], string> = {
+    HR: "HR Round",
+    TechnicalRound1: "Technical Round 1",
+    TechnicalRound2: "Technical Round 2",
+    SystemDesign: "System Design",
+    Managerial: "Managerial Round",
+    Assignment: "One-Week Assignment",
+    Final: "Final Round",
+};
+
+const ROUND_SEQUENCE: InterviewRoundType[] = [
     "TechnicalRound1",
     "TechnicalRound2",
     "SystemDesign",
@@ -73,16 +93,30 @@ const ROUND_SEQUENCE: InterviewRound["roundType"][] = [
     "Final",
 ];
 
+function getRoundTypeLabel(roundType: InterviewRoundType): string {
+    return INTERVIEW_ROUND_TYPE_LABELS[roundType as (typeof interviewRoundTypes)[number]] ?? roundType;
+}
+
 function roleLabelForType(roleType: RoleType): string {
     return ROLE_LABELS[roleType];
 }
 
-function getRoundTypeForRoundNumber(
-    roundNumber: number
-): InterviewRound["roundType"] {
-    if (roundNumber <= 1) return ROUND_SEQUENCE[0];
-    if (roundNumber > ROUND_SEQUENCE.length) return ROUND_SEQUENCE[ROUND_SEQUENCE.length - 1];
-    return ROUND_SEQUENCE[roundNumber - 1];
+function getNextRoundType(rounds: InterviewRound[]): InterviewRoundType {
+    if (rounds.length === 0) return ROUND_SEQUENCE[0];
+
+    // Find the last round in the sequence that has been completed or scheduled
+    const lastRound = rounds.sort((a, b) => b.roundNumber - a.roundNumber)[0];
+    if (!lastRound) return ROUND_SEQUENCE[0];
+
+    const lastRoundTypeIndex = ROUND_SEQUENCE.indexOf(lastRound.roundType);
+
+    // If exact match found in sequence, suggest next
+    if (lastRoundTypeIndex !== -1 && lastRoundTypeIndex < ROUND_SEQUENCE.length - 1) {
+        return ROUND_SEQUENCE[lastRoundTypeIndex + 1];
+    }
+
+    // Fallback logic or default to next logical step if outside sequence
+    return "TechnicalRound1";
 }
 
 function toDateKey(value: string | Date | undefined): string | undefined {
@@ -168,17 +202,12 @@ function useSyncHydratedSprintSetupState(
     state: SprintSetupState | undefined,
     setState: (nextState: SprintSetupState) => void
 ) {
-    // Sync rules:
-    // - Never overwrite state once a submission has started.
-    // - Seed `hydrated` from props on first render.
-    // - When props change, only overwrite the form if the user hasn't edited
-    //   since the last hydration.
-
     useEffect(() => {
         const nextHydrated = {
             company: hydrated.company,
             role: hydrated.role,
             interviewDate: hydrated.interviewDate,
+            roundType: hydrated.roundType,
         };
 
         if (!state || state.isSubmitted || state.isSubmitting) {
@@ -195,13 +224,16 @@ function useSyncHydratedSprintSetupState(
         const hydratedChanged =
             prevHydrated.company !== nextHydrated.company ||
             prevHydrated.role !== nextHydrated.role ||
-            prevHydrated.interviewDate !== nextHydrated.interviewDate;
+            prevHydrated.interviewDate !== nextHydrated.interviewDate ||
+            prevHydrated.roundType !== nextHydrated.roundType;
+
         if (!hydratedChanged) return;
 
         const stateMatchesPrevHydrated =
             state.company === prevHydrated.company &&
             state.role === prevHydrated.role &&
-            state.interviewDate === prevHydrated.interviewDate;
+            state.interviewDate === prevHydrated.interviewDate &&
+            state.roundType === prevHydrated.roundType;
 
         if (stateMatchesPrevHydrated) {
             setState({
@@ -209,6 +241,7 @@ function useSyncHydratedSprintSetupState(
                 company: nextHydrated.company,
                 role: nextHydrated.role,
                 interviewDate: nextHydrated.interviewDate,
+                roundType: nextHydrated.roundType,
                 companyError: undefined,
                 interviewDateError: undefined,
                 formError: undefined,
@@ -218,25 +251,45 @@ function useSyncHydratedSprintSetupState(
         }
 
         setState({ ...state, hydrated: nextHydrated });
-    }, [hydrated.company, hydrated.role, hydrated.interviewDate, setState, state]);
+    }, [hydrated.company, hydrated.role, hydrated.interviewDate, hydrated.roundType, setState, state]);
 }
 
 export function SprintSetupCard({
     company: initialCompany,
     role: initialRole,
     interviewDate: initialDate,
+    roundType: initialRoundType,
 }: SprintSetupCardProps) {
+    const applications = useStore((s) => s.applications);
+
+    // Determine default round type based on existing application or prediction
+    const getDefaultRoundTypeForApp = (companyName: string, roleType: RoleType): InterviewRoundType => {
+        const app = findMatchingApplication({
+            applications,
+            company: companyName,
+            roleType,
+        });
+
+        if (app) {
+            return getNextRoundType(app.rounds);
+        }
+
+        return "TechnicalRound1";
+    };
+
     const hydratedCompany = initialCompany || "";
     const hydratedRole: RoleType = initialRole ?? "SDE";
     const hydratedInterviewDate = normalizeDateInputValue(
         initialDate || getDefaultDate()
     );
+    const hydratedRoundType: InterviewRoundType = initialRoundType ?? getDefaultRoundTypeForApp(hydratedCompany, hydratedRole);
+
 
     const componentStateKey = useMemo(() => {
         const normalizedCompany = sanitizeCompanyName(hydratedCompany).toLowerCase() || "unknown";
         const dateKey = hydratedInterviewDate || "unscheduled";
-        return `sprint-setup-card:${normalizedCompany}:${hydratedRole}:${dateKey}`;
-    }, [hydratedCompany, hydratedInterviewDate, hydratedRole]);
+        return `sprint-setup-card:${normalizedCompany}:${hydratedRole}:${dateKey}:${hydratedRoundType}`;
+    }, [hydratedCompany, hydratedInterviewDate, hydratedRole, hydratedRoundType]);
 
     const [state, setState] = useTamboComponentState<SprintSetupState>(
         componentStateKey,
@@ -244,6 +297,7 @@ export function SprintSetupCard({
             company: hydratedCompany,
             role: hydratedRole,
             interviewDate: hydratedInterviewDate,
+            roundType: hydratedRoundType,
             isSubmitted: false,
             isSubmitting: false,
             companyError: undefined,
@@ -253,22 +307,26 @@ export function SprintSetupCard({
                 company: hydratedCompany,
                 role: hydratedRole,
                 interviewDate: hydratedInterviewDate,
+                roundType: hydratedRoundType,
             },
         }
     );
 
-    const applications = useStore((s) => s.applications);
     const sprints = useStore((s) => s.sprints);
     const createApplicationAPI = useStore((s) => s.createApplicationAPI);
     const updateApplicationAPI = useStore((s) => s.updateApplicationAPI);
     const createInterviewRoundAPI = useStore((s) => s.createInterviewRoundAPI);
     const createSprintAPI = useStore((s) => s.createSprintAPI);
 
+    // Update round type when company/role changes if user hasn't manually set it?
+    // For now, let's keep it simple and just rely on initial hydration or user selection.
+
     useSyncHydratedSprintSetupState(
         {
             company: hydratedCompany,
             role: hydratedRole,
             interviewDate: hydratedInterviewDate,
+            roundType: hydratedRoundType,
         },
         state,
         setState
@@ -280,6 +338,7 @@ export function SprintSetupCard({
             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg max-w-md animate-pulse">
                 <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
                 <div className="space-y-3">
+                    <div className="h-10 bg-gray-200 rounded"></div>
                     <div className="h-10 bg-gray-200 rounded"></div>
                     <div className="h-10 bg-gray-200 rounded"></div>
                     <div className="h-10 bg-gray-200 rounded"></div>
@@ -376,7 +435,9 @@ export function SprintSetupCard({
             let targetRound = existingRoundForDate;
             if (!targetRound) {
                 const nextRoundNumber = getNextRoundNumber(latestApplication.rounds ?? []);
-                const nextRoundType = getRoundTypeForRoundNumber(nextRoundNumber);
+
+                // Use the user-selected round type
+                const nextRoundType = state.roundType;
 
                 try {
                     targetRound = await createInterviewRoundAPI(latestApplication.id, {
@@ -423,6 +484,8 @@ export function SprintSetupCard({
 
             if (!hasSprintForDate) {
                 const sprint = generateSprint(latestApplication.id, validation.parsedDate, state.role);
+                // Also update the sprint generation to potentially use the round type context if needed in future
+                // For now generateSprint uses the application's currentRound which we updated above
                 await createSprintAPI({
                     applicationId: sprint.applicationId,
                     interviewDate: sprint.interviewDate,
@@ -526,6 +589,34 @@ export function SprintSetupCard({
                         <option value="Data">Data Engineer / Analyst</option>
                         <option value="PM">Product Manager</option>
                         <option value="MobileEngineer">Mobile Engineer</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                        <Target className="w-4 h-4" />
+                        Round Type
+                    </label>
+                    <select
+                        value={state.roundType}
+                        onChange={(e) =>
+                            setState({
+                                ...state,
+                                roundType: e.target.value as InterviewRoundType,
+                                formError: undefined,
+                            })
+                        }
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                    >
+                        {state.roundType &&
+                            !interviewRoundTypes.includes(state.roundType as (typeof interviewRoundTypes)[number]) && (
+                                <option value={state.roundType}>{getRoundTypeLabel(state.roundType)}</option>
+                            )}
+                        {interviewRoundTypes.map((type) => (
+                            <option key={type} value={type}>
+                                {getRoundTypeLabel(type)}
+                            </option>
+                        ))}
                     </select>
                 </div>
 

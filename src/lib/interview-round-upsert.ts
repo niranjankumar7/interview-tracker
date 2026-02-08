@@ -6,17 +6,7 @@ import {
 } from "@/lib/application-intake";
 import { tryParseDateInput } from "@/lib/date-parsing";
 
-export const INTERVIEW_ROUND_TYPES = [
-  "HR",
-  "TechnicalRound1",
-  "TechnicalRound2",
-  "SystemDesign",
-  "Managerial",
-  "Assignment",
-  "Final",
-] as const;
-
-export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+export type InterviewRoundType = string;
 type ApplicationStatus = "applied" | "shortlisted" | "interview" | "offer" | "rejected";
 
 type InterviewRoundLite = {
@@ -142,19 +132,67 @@ function findApplicationsByRole(
   return applications.filter((candidate) => isGenericRole(candidate.role));
 }
 
+function toRoundTypeLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((token) => {
+      if (/^[0-9]+$/.test(token)) return token;
+      if (token.toLowerCase() === "hr") return "HR";
+      return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 function parseInterviewRoundType(value: string | undefined): InterviewRoundType | undefined {
   if (!value) return undefined;
 
   const normalized = value.trim();
-  return INTERVIEW_ROUND_TYPES.find((roundType) => roundType === normalized);
+  if (!normalized) return undefined;
+
+  const compact = normalized.toLowerCase().replace(/[\s_-]+/g, "");
+
+  if (compact === "hr" || compact.includes("humanresources")) return "HR";
+  if (
+    compact.includes("technicalround1") ||
+    compact.includes("techround1") ||
+    compact.includes("technical1") ||
+    compact.includes("tech1")
+  ) {
+    return "TechnicalRound1";
+  }
+  if (
+    compact.includes("technicalround2") ||
+    compact.includes("techround2") ||
+    compact.includes("technical2") ||
+    compact.includes("tech2")
+  ) {
+    return "TechnicalRound2";
+  }
+  if (compact.includes("systemdesign") || compact.includes("sysdesign")) return "SystemDesign";
+  if (
+    compact.includes("managerial") ||
+    compact.includes("managerround") ||
+    compact.includes("hiringmanager")
+  ) {
+    return "Managerial";
+  }
+  if (compact.includes("assignment") || compact.includes("takehome")) return "Assignment";
+  if (compact.includes("final")) return "Final";
+
+  const roundNumberMatch = compact.match(/^round(\d+)$/);
+  if (roundNumberMatch?.[1]) {
+    return `Round ${Number.parseInt(roundNumberMatch[1], 10)}`;
+  }
+
+  return toRoundTypeLabel(normalized);
 }
 
 function inferRoundTypeFromNumber(roundNumber: number): InterviewRoundType {
-  if (roundNumber <= 1) return "TechnicalRound1";
-  if (roundNumber === 2) return "TechnicalRound2";
-  if (roundNumber === 3) return "SystemDesign";
-  if (roundNumber === 4) return "Managerial";
-  return "Final";
+  return `Round ${roundNumber}`;
 }
 
 function getRoundNumberForType(

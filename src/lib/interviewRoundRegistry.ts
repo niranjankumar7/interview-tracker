@@ -7,9 +7,13 @@ import {
     UserCog,
     ClipboardCheck,
     Trophy,
+    Target,
 } from "lucide-react";
 
-import { isInterviewRoundType, type InterviewRoundType } from "@/types/interviewRound";
+import {
+    isKnownInterviewRoundType,
+    type KnownInterviewRoundType,
+} from "@/types/interviewRound";
 
 export interface InterviewRoundTheme {
     label: string;
@@ -76,17 +80,50 @@ export const interviewRoundRegistry = {
         tabInactiveClassName:
             "bg-white text-red-700 hover:bg-red-50 border border-red-200",
     },
-} satisfies Record<InterviewRoundType, InterviewRoundTheme>;
+} satisfies Record<KnownInterviewRoundType, InterviewRoundTheme>;
 
-export function getInterviewRoundTheme(roundType: InterviewRoundType): InterviewRoundTheme;
-export function getInterviewRoundTheme(
-    roundType: string | null | undefined
-): InterviewRoundTheme | undefined;
-export function getInterviewRoundTheme(
-    roundType: string | null | undefined
-): InterviewRoundTheme | undefined {
-    if (!roundType) return undefined;
-    if (!isInterviewRoundType(roundType)) return undefined;
+const UNKNOWN_ROUND_THEME: Omit<InterviewRoundTheme, "label"> = {
+    icon: Target,
+    badgeClassName:
+        "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700",
+    tabActiveClassName: "bg-slate-700 text-white shadow-md",
+    tabInactiveClassName:
+        "bg-white text-slate-700 hover:bg-slate-50 border border-slate-200",
+};
 
-    return interviewRoundRegistry[roundType];
+function formatRoundLabel(rawRoundType: string): string {
+    const normalized = rawRoundType.trim();
+    if (!normalized) return "Interview Round";
+
+    const words = normalized
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ")
+        .map((token) => {
+            if (/^[0-9]+$/.test(token)) return token;
+            if (token.toLowerCase() === "hr") return "HR";
+            return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+        });
+
+    return words.join(" ");
+}
+
+export function getInterviewRoundTheme(roundType: string | null | undefined): InterviewRoundTheme {
+    if (!roundType) {
+        return {
+            ...UNKNOWN_ROUND_THEME,
+            label: "Interview Round",
+        };
+    }
+
+    if (isKnownInterviewRoundType(roundType)) {
+        return interviewRoundRegistry[roundType];
+    }
+
+    return {
+        ...UNKNOWN_ROUND_THEME,
+        label: formatRoundLabel(roundType),
+    };
 }

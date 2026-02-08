@@ -8,15 +8,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-middleware";
 
-const interviewRoundTypeSchema = z.enum([
-    "HR",
-    "TechnicalRound1",
-    "TechnicalRound2",
-    "SystemDesign",
-    "Managerial",
-    "Assignment",
-    "Final",
-]);
+const interviewRoundTypeSchema = z.string().trim().min(1).max(120);
 
 const updateRoundSchema = z.object({
     roundType: interviewRoundTypeSchema.optional(),

@@ -1,5 +1,4 @@
 import { sanitizeCompanyName } from "@/lib/application-intake";
-import { INTERVIEW_ROUND_TYPES } from "@/lib/interview-round-upsert";
 
 type ApplicationStatus = "applied" | "shortlisted" | "interview" | "offer" | "rejected";
 
@@ -21,7 +20,7 @@ export type NormalizedRoundUpdate = {
   applicationId?: string;
   company?: string;
   role?: string;
-  roundType?: (typeof INTERVIEW_ROUND_TYPES)[number];
+  roundType?: string;
   roundNumber?: number;
   scheduledDate: string;
   notes?: string;
@@ -125,39 +124,74 @@ export function normalizeStatusUpdatesInput(input: unknown): NormalizedStatusUpd
     .filter((entry): entry is NormalizedStatusUpdate => Boolean(entry));
 }
 
-function normalizeRoundType(raw: unknown): (typeof INTERVIEW_ROUND_TYPES)[number] | undefined {
+function toRoundTypeLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((token) => {
+      if (/^[0-9]+$/.test(token)) return token;
+      if (token.toLowerCase() === "hr") return "HR";
+      return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+function normalizeRoundType(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   const normalized = raw.trim();
   if (!normalized) return undefined;
 
-  const exact = INTERVIEW_ROUND_TYPES.find((roundType) => roundType === normalized);
-  if (exact) return exact;
+  const compact = normalized.toLowerCase().replace(/[\s_-]+/g, "");
 
-  const lower = normalized.toLowerCase().replace(/[\s_-]+/g, "");
-
-  if (lower.includes("tech1") || lower.includes("technical1") || lower.includes("round1")) {
-    return "TechnicalRound1";
-  }
-  if (lower.includes("tech2") || lower.includes("technical2") || lower.includes("round2")) {
-    return "TechnicalRound2";
-  }
-  if (lower.includes("systemdesign") || lower.includes("sysdesign")) {
-    return "SystemDesign";
-  }
-  if (lower.includes("manager")) {
-    return "Managerial";
-  }
-  if (lower.includes("assignment")) {
-    return "Assignment";
-  }
-  if (lower.includes("final")) {
-    return "Final";
-  }
-  if (lower === "hr" || lower.includes("humanresources")) {
+  if (compact === "hr" || compact.includes("humanresources")) {
     return "HR";
   }
+  if (
+    compact.includes("technicalround1") ||
+    compact.includes("techround1") ||
+    compact.includes("technical1") ||
+    compact.includes("tech1")
+  ) {
+    return "TechnicalRound1";
+  }
+  if (
+    compact.includes("technicalround2") ||
+    compact.includes("techround2") ||
+    compact.includes("technical2") ||
+    compact.includes("tech2")
+  ) {
+    return "TechnicalRound2";
+  }
+  if (compact.includes("systemdesign") || compact.includes("sysdesign")) {
+    return "SystemDesign";
+  }
+  if (
+    compact.includes("managerial") ||
+    compact.includes("managerround") ||
+    compact.includes("hiringmanager")
+  ) {
+    return "Managerial";
+  }
+  if (compact.includes("assignment") || compact.includes("takehome")) {
+    return "Assignment";
+  }
+  if (compact.includes("final")) {
+    return "Final";
+  }
 
-  return undefined;
+  const roundNumberMatch = compact.match(/^round(\d+)$/);
+  if (roundNumberMatch?.[1]) {
+    return `Round ${Number.parseInt(roundNumberMatch[1], 10)}`;
+  }
+
+  if (/^[0-9]+$/.test(compact)) {
+    return `Round ${Number.parseInt(compact, 10)}`;
+  }
+
+  return toRoundTypeLabel(normalized);
 }
 
 function normalizeRoundNumber(raw: unknown): number | undefined {
@@ -175,13 +209,9 @@ function normalizeRoundNumber(raw: unknown): number | undefined {
 
 function inferRoundTypeFromNumber(
   roundNumber: number | undefined
-): (typeof INTERVIEW_ROUND_TYPES)[number] | undefined {
+): string | undefined {
   if (!roundNumber) return undefined;
-  if (roundNumber <= 1) return "TechnicalRound1";
-  if (roundNumber === 2) return "TechnicalRound2";
-  if (roundNumber === 3) return "SystemDesign";
-  if (roundNumber === 4) return "Managerial";
-  return "Final";
+  return `Round ${roundNumber}`;
 }
 
 function normalizeDateField(raw: unknown): string | undefined {

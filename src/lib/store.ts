@@ -294,7 +294,9 @@ function normalizeInterviewRoundFromApi(raw: Record<string, unknown>): Interview
 
     return {
         roundNumber: Number(raw.roundNumber) || 1,
-        roundType: (raw.roundType as InterviewRound['roundType']) ?? 'TechnicalRound1',
+        roundType:
+            (raw.roundType as InterviewRound['roundType']) ??
+            `Round ${Number(raw.roundNumber) || 1}`,
         scheduledDate,
         notes: typeof raw.notes === 'string' ? raw.notes : '',
         questionsAsked: toStringArray(raw.questionsAsked),
