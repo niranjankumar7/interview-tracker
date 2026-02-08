@@ -1,6 +1,6 @@
 # Interview Tracker / Blueprint
 
-**Blueprint** (formerly Interview Tracker) is a comprehensive job application and interview preparation tracking tool. It helps you organize your job search, track application statuses, prepare for interviews with AI-driven assistants, and manage your daily sprint plans.
+**Blueprint** is a comprehensive job application and interview preparation tracking tool. It helps you organize your job search, track application statuses, prepare for interviews with AI-driven assistants, and manage your daily sprint plans.
 
 ## Features
 
