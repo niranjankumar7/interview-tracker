@@ -542,6 +542,7 @@ export function KanbanBoard() {
                                             const roundTheme = app.currentRound
                                                 ? getInterviewRoundTheme(app.currentRound)
                                                 : undefined;
+                                            const roundCount = app.rounds?.length ?? 0;
 
                                             let roundBadge: React.ReactNode = null;
                                             if (app.currentRound) {
@@ -567,6 +568,13 @@ export function KanbanBoard() {
                                                     );
                                                 }
                                             }
+
+                                            const roundCountBadge =
+                                                roundCount > 0 ? (
+                                                    <div className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700">
+                                                        {roundCount} round{roundCount === 1 ? "" : "s"}
+                                                    </div>
+                                                ) : null;
 
                                             return (
                                                 <div
@@ -656,6 +664,7 @@ export function KanbanBoard() {
 
                                                     {/* Current Round Badge */}
                                                     {roundBadge}
+                                                    {roundCountBadge}
 
                                                     {/* Click to view prep hint */}
                                                     <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">

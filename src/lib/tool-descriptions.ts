@@ -18,11 +18,13 @@ type ToolDescriptionKey =
 // Tools with empty or trivial input schemas don't need entries.
 type SchemaDescriptions = {
   updateApplicationStatus: {
+    applicationId: string;
     company: string;
     newStatus: string;
     updates: string;
   };
   upsertInterviewRounds: {
+    applicationId: string;
     company: string;
     role: string;
     roundType: string;
@@ -63,6 +65,7 @@ export const toolDescriptions = {
 Update the status of one or more job applications.
 
 CRITICAL: Use this tool when the user mentions a status change in natural language.
+Prefer applicationId when available; use company name otherwise.
 
 ## INCOMPLETE PROMPT HANDLING (VERY IMPORTANT)
 If the user provides ONLY a status word without a company name, you MUST ask for clarification:
@@ -111,10 +114,11 @@ Handle common typos - focus on meaning, not spelling:
 - "Micrsoft" → "Microsoft"
 
 ## Extraction Rules
-1. Extract COMPANY NAME first - this is REQUIRED.
-2. Handle preposition variations: "rejected BY" and "rejected FROM" are equivalent.
-3. If a role is mentioned, ignore it for this tool call (this tool only updates status).
-4. If status is unclear, ask: "Should I mark [company] as [status]?"
+1. If applicationId is available, use it first.
+2. Otherwise extract COMPANY NAME.
+3. Handle preposition variations: "rejected BY" and "rejected FROM" are equivalent.
+4. If a role is mentioned, ignore it for this tool call (this tool only updates status).
+5. If status is unclear, ask: "Should I mark [company] as [status]?"
 
 ## Real User Examples
 - "I got rejected by Microsoft for a developer" → {company: "Microsoft", newStatus: "rejected"}
@@ -137,6 +141,7 @@ Add or update interview rounds on an existing application (e.g., Tech 1, Tech 2 
 
 IMPORTANT:
 - Use this for prompts like "set tech 1 on Feb 14 and tech 2 on Feb 18".
+- Prefer applicationId if known; otherwise use company/role matching.
 - Prefer updating the existing company/role application instead of creating a new card.
 - If company has multiple roles and role is not specified, ask for clarification.
 
@@ -337,7 +342,7 @@ Get all topics the user has marked as completed.
 export const schemaDescriptions = {
   updateApplicationStatus: {
     company: `
-Company name to update. REQUIRED field.
+Company name to update. Optional if applicationId is provided.
 
 Extract from phrases (handle preposition variations):
 - "I got rejected from Microsoft" → "Microsoft"
@@ -345,7 +350,11 @@ Extract from phrases (handle preposition variations):
 - "Microsoft SDE Cloud" → "Microsoft" (remove role suffix)
 - "rejected - [company]" → extract company after dash
 
-If company is missing, ASK: "Which company?"
+Prefer applicationId when available; use company otherwise.
+`.trim(),
+    applicationId: `
+Optional application id for precise updates when company matching is ambiguous.
+Example: "fd4338ab-688b-4351-a83e-c8d608683c64"
 `.trim(),
     newStatus: `
 The new status. Map natural language:
@@ -362,12 +371,18 @@ Real examples:
 - "rejected from softbank" → [{company: "Softbank", newStatus: "rejected"}]
 - "did bad in the interview, got rejected, Apple SD round" → [{company: "Apple", newStatus: "rejected"}]
 - "rejected by airbnb, meta and netflix" → 3 separate updates
+- "Set status to interview for application fd4338ab-688b-4351-a83e-c8d608683c64"
+  → [{applicationId:"fd4338ab-688b-4351-a83e-c8d608683c64", newStatus:"interview"}]
 `.trim(),
   },
 
   upsertInterviewRounds: {
+    applicationId: `
+Optional application id for exact targeting. Prefer this if known.
+Example: "fd4338ab-688b-4351-a83e-c8d608683c64"
+`.trim(),
     company: `
-Company name whose interview round should be updated.
+Company name whose interview round should be updated. Optional if applicationId is provided.
 Example: "Google"
 `.trim(),
     role: `
@@ -398,6 +413,8 @@ Examples:
       {company:"Google", role:"ML Engineer", roundNumber:2, scheduledDate:"2026-02-18"}]
 - "Add another round for Meta PM on Feb 20"
   -> [{company:"Meta", role:"PM", scheduledDate:"2026-02-20"}]
+- "Round 1 on Feb 25 for app fd4338ab-688b-4351-a83e-c8d608683c64"
+  -> [{applicationId:"fd4338ab-688b-4351-a83e-c8d608683c64", roundNumber:1, scheduledDate:"2026-02-25"}]
 `.trim(),
   },
 

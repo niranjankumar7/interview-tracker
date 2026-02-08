@@ -29,8 +29,14 @@ import {
   rolesEquivalent,
   sanitizeCompanyName,
 } from "@/lib/application-intake";
-import { tryParseDateInput } from "@/lib/date-parsing";
+import {
+  upsertInterviewRoundsBatch,
+} from "@/lib/interview-round-upsert";
 import { useStore } from "@/lib/store";
+import {
+  normalizeRoundUpdatesInput,
+  normalizeStatusUpdatesInput,
+} from "@/lib/tool-input-normalizers";
 import { toolDescriptions, schemaDescriptions, componentDescriptions } from "@/lib/tool-descriptions";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
@@ -38,9 +44,6 @@ import { z } from "zod";
 
 type StoreState = ReturnType<typeof useStore.getState>;
 type StoredApplication = StoreState["applications"][number];
-type StoredInterviewRound = StoredApplication["rounds"][number];
-
-type InterviewRoundType = StoredInterviewRound["roundType"];
 
 type OfferDetailsToolInput = {
   currency?: string;
@@ -148,40 +151,60 @@ function pickApplicationForUpsert(
   return undefined;
 }
 
-function parseInterviewRoundType(
-  value: string | undefined
-): InterviewRoundType | undefined {
-  if (!value) return undefined;
+const permissiveStatusUpdateInputSchema = z
+  .object({
+    updates: z.array(z.unknown()).optional(),
+    update: z.array(z.unknown()).optional(),
+    data: z.unknown().optional(),
+    applicationId: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.applicationId),
+    company: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.company),
+    newStatus: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.newStatus),
+    status: z.string().optional(),
+    state: z.string().optional(),
+  });
 
-  const normalized = value.trim();
-  const validRoundTypes: InterviewRoundType[] = [
-    "HR",
-    "TechnicalRound1",
-    "TechnicalRound2",
-    "SystemDesign",
-    "Managerial",
-    "Assignment",
-    "Final",
-  ];
-
-  return validRoundTypes.find((roundType) => roundType === normalized);
-}
-
-function inferRoundTypeFromNumber(roundNumber: number): InterviewRoundType {
-  if (roundNumber <= 1) return "TechnicalRound1";
-  if (roundNumber === 2) return "TechnicalRound2";
-  if (roundNumber === 3) return "SystemDesign";
-  if (roundNumber === 4) return "Managerial";
-  return "Final";
-}
-
-function getRoundNumberForType(
-  rounds: StoredInterviewRound[],
-  roundType: InterviewRoundType
-): number | undefined {
-  const existing = rounds.find((round) => round.roundType === roundType);
-  return existing?.roundNumber;
-}
+const permissiveRoundUpdateInputSchema = z
+  .object({
+    updates: z.array(z.unknown()).optional(),
+    update: z.array(z.unknown()).optional(),
+    data: z.unknown().optional(),
+    applicationId: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.applicationId),
+    company: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.company),
+    role: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.role),
+    roundType: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.roundType),
+    roundNumber: z
+      .union([z.number(), z.string()])
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.roundNumber),
+    scheduledDate: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.scheduledDate),
+    date: z.string().optional(),
+    interviewDate: z.string().optional(),
+    notes: z.string().optional().describe(schemaDescriptions.upsertInterviewRounds.notes),
+  });
 
 /**
  * tools
@@ -623,62 +646,95 @@ export const tools: TamboTool[] = [
   {
     name: "updateApplicationStatus",
     description: toolDescriptions.updateApplicationStatus,
-    tool: async (input: {
-      updates: Array<
-        | string
-        | {
-          company: string;
-          newStatus: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
-        }
-      >;
-    }) => {
-      const state = useStore.getState();
-      const applications = state.applications;
-      const updateApplicationAPI = state.updateApplicationAPI;
+    tool: async (input: unknown) => {
       const results: Array<{ company: string; status: string; success: boolean }> = [];
 
       console.log("updateApplicationStatus input:", JSON.stringify(input, null, 2));
 
-      const updates = input?.updates || [];
+      const updates = normalizeStatusUpdatesInput(input);
+
+      if (updates.length === 0) {
+        return {
+          updated: [],
+          failed: ["invalid_input"],
+          count: 0,
+        };
+      }
 
       for (const update of updates) {
-        let companyName: string = '';
-        let newStatus: "applied" | "shortlisted" | "interview" | "offer" | "rejected" = 'applied';
+        const companyName = sanitizeCompanyName(update.company || "");
+        const applicationId = update.applicationId?.trim() || "";
+        const newStatus = update.newStatus;
 
-        if (typeof update === 'string') {
-          // Handle string format like "Google:shortlisted" or "Google|shortlisted"
-          const parts = update.split(/[:|]/);
-          companyName = sanitizeCompanyName(parts[0] || '');
-          const statusPart = parts[1]?.toLowerCase().trim();
-          if (statusPart && ['applied', 'shortlisted', 'interview', 'offer', 'rejected'].includes(statusPart)) {
-            newStatus = statusPart as typeof newStatus;
-          }
-        } else if (update && typeof update === 'object') {
-          // Handle object format {company: "Google", newStatus: "shortlisted"}
-          companyName = sanitizeCompanyName(update.company || '');
-          newStatus = update.newStatus || 'applied';
-        }
-
-        if (!companyName) {
-          results.push({ company: 'unknown', status: 'failed', success: false });
+        if (!applicationId && !companyName) {
+          results.push({ company: "unknown", status: "failed", success: false });
           continue;
         }
 
-        // Find the application by company name (case-insensitive, also sanitize stored names)
-        const app = applications.find(
-          (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
-        );
+        const resolveApp = () => {
+          const applications = useStore.getState().applications;
+
+          if (applicationId) {
+            const byId = applications.find((candidate) => candidate.id === applicationId);
+            if (byId) return byId;
+          }
+
+          if (!companyName) return undefined;
+
+          const matches = applications.filter(
+            (candidate) =>
+              sanitizeCompanyName(candidate.company).toLowerCase() ===
+              companyName.toLowerCase()
+          );
+
+          if (matches.length === 0) return undefined;
+          if (matches.length === 1) return matches[0];
+
+          const interviewingMatches = matches.filter(
+            (candidate) => candidate.status === "interview"
+          );
+          if (interviewingMatches.length === 1) return interviewingMatches[0];
+
+          return matches[0];
+        };
+
+        let app = resolveApp();
+
+        if (!app) {
+          try {
+            await useStore.getState().syncWithBackend();
+            app = resolveApp();
+          } catch (error) {
+            console.error("Status update sync retry failed:", error);
+          }
+        }
 
         if (app) {
           try {
-            await updateApplicationAPI(app.id, { status: newStatus });
-            results.push({ company: companyName, status: newStatus, success: true });
+            await useStore.getState().updateApplicationAPI(app.id, { status: newStatus });
+            results.push({
+              company:
+                sanitizeCompanyName(app.company) || companyName || applicationId || "unknown",
+              status: newStatus,
+              success: true,
+            });
           } catch (error) {
-            console.error(`Failed to update status for ${companyName}:`, error);
-            results.push({ company: companyName, status: 'error', success: false });
+            console.error(
+              `Failed to update status for ${companyName || applicationId}:`,
+              error
+            );
+            results.push({
+              company: companyName || applicationId || "unknown",
+              status: "error",
+              success: false,
+            });
           }
         } else {
-          results.push({ company: companyName, status: 'not found', success: false });
+          results.push({
+            company: companyName || applicationId || "unknown",
+            status: "not found",
+            success: false,
+          });
         }
       }
 
@@ -688,18 +744,9 @@ export const tools: TamboTool[] = [
         count: results.filter((r) => r.success).length,
       };
     },
-    inputSchema: z.object({
-      updates: z
-        .array(
-          z.object({
-            company: z.string().describe(schemaDescriptions.updateApplicationStatus.company),
-            newStatus: z
-              .enum(["applied", "shortlisted", "interview", "offer", "rejected"])
-              .describe(schemaDescriptions.updateApplicationStatus.newStatus),
-          })
-        )
-        .describe(schemaDescriptions.updateApplicationStatus.updates),
-    }),
+    inputSchema: permissiveStatusUpdateInputSchema.describe(
+      schemaDescriptions.updateApplicationStatus.updates
+    ),
     outputSchema: z.object({
       updated: z.array(z.string()),
       failed: z.array(z.string()),
@@ -709,159 +756,39 @@ export const tools: TamboTool[] = [
   {
     name: "upsertInterviewRounds",
     description: toolDescriptions.upsertInterviewRounds,
-    tool: async (input: {
-      updates: Array<{
-        company: string;
-        role?: string;
-        roundType?: InterviewRoundType;
-        roundNumber?: number;
-        scheduledDate: string;
-        notes?: string;
-      }>;
-    }) => {
-      const updates = input?.updates || [];
-      const updated: string[] = [];
-      const failed: string[] = [];
-
-      for (const update of updates) {
-        const companyName = sanitizeCompanyName(update.company || "");
-        if (!companyName) {
-          failed.push("unknown");
-          continue;
-        }
-
-        const currentState = useStore.getState();
-        const companyMatches = currentState.applications.filter(
-          (candidate) =>
-            sanitizeCompanyName(candidate.company).toLowerCase() === companyName.toLowerCase()
-        );
-
-        const incomingRole = normalizeRoleText(update.role);
-        const targetApplication =
-          incomingRole
-            ? pickApplicationForUpsert(companyMatches, incomingRole)
-            : companyMatches.length === 1
-              ? companyMatches[0]
-              : undefined;
-
-        if (!targetApplication) {
-          failed.push(companyName);
-          continue;
-        }
-
-        const parsedDate = tryParseDateInput(update.scheduledDate);
-        if (!parsedDate) {
-          failed.push(companyName);
-          continue;
-        }
-
-        const scheduledDateIso = parsedDate.toISOString();
-
-        const latestApplication =
-          useStore
-            .getState()
-            .applications.find((candidate) => candidate.id === targetApplication.id) ??
-          targetApplication;
-        const existingRounds = [...(latestApplication.rounds ?? [])].sort(
-          (a, b) => a.roundNumber - b.roundNumber
-        );
-
-        const providedRoundNumber =
-          typeof update.roundNumber === "number" && update.roundNumber > 0
-            ? Math.floor(update.roundNumber)
-            : undefined;
-        const providedRoundType = parseInterviewRoundType(update.roundType);
-        const nextRoundNumber =
-          existingRounds.length > 0
-            ? Math.max(...existingRounds.map((round) => round.roundNumber)) + 1
-            : 1;
-
-        const targetRoundNumber =
-          providedRoundNumber ??
-          (providedRoundType
-            ? getRoundNumberForType(existingRounds, providedRoundType)
-            : undefined) ??
-          nextRoundNumber;
-        const targetRoundType =
-          providedRoundType ?? inferRoundTypeFromNumber(targetRoundNumber);
-
-        const existingRound = existingRounds.find(
-          (round) => round.roundNumber === targetRoundNumber
-        );
-        const mergedRoundNotes = mergeNotes(existingRound?.notes, update.notes) ?? "";
-
-        try {
-          const { createInterviewRoundAPI, updateInterviewRoundAPI, updateApplicationAPI } =
-            useStore.getState();
-
-          if (existingRound) {
-            await updateInterviewRoundAPI(latestApplication.id, targetRoundNumber, {
-              roundType: targetRoundType,
-              scheduledDate: scheduledDateIso,
-              notes: mergedRoundNotes,
-            });
-          } else {
-            await createInterviewRoundAPI(latestApplication.id, {
-              roundNumber: targetRoundNumber,
-              roundType: targetRoundType,
-              scheduledDate: scheduledDateIso,
-              notes: mergedRoundNotes,
-              questionsAsked: [],
-            });
-          }
-
-          const shouldUpdateRole =
-            incomingRole &&
-            (isGenericRole(latestApplication.role) ||
-              !rolesEquivalent(latestApplication.role, incomingRole));
-
-          await updateApplicationAPI(latestApplication.id, {
-            status: "interview",
-            interviewDate: scheduledDateIso,
-            currentRound: targetRoundType,
-            ...(shouldUpdateRole ? { role: incomingRole } : {}),
-          });
-
-          updated.push(
-            `${companyName} → Round ${targetRoundNumber} (${targetRoundType}) on ${scheduledDateIso.slice(
-              0,
-              10
-            )}`
-          );
-        } catch (error) {
-          console.error(`Failed to upsert round for ${companyName}:`, error);
-          failed.push(companyName);
-        }
+    tool: async (input: unknown) => {
+      const updates = normalizeRoundUpdatesInput(input);
+      if (updates.length === 0) {
+        return {
+          updated: [],
+          failed: ["invalid_input"],
+          count: 0,
+        };
       }
 
-      return {
-        updated,
-        failed,
-        count: updated.length,
-      };
+      return upsertInterviewRoundsBatch(updates, {
+        getApplications: () => useStore.getState().applications,
+        refreshApplications: async () => {
+          await useStore.getState().syncWithBackend();
+        },
+        createRound: async (applicationId, data) => {
+          await useStore.getState().createInterviewRoundAPI(applicationId, data);
+        },
+        updateRound: async (applicationId, roundNumber, data) => {
+          await useStore.getState().updateInterviewRoundAPI(
+            applicationId,
+            roundNumber,
+            data
+          );
+        },
+        updateApplication: async (applicationId, data) => {
+          await useStore.getState().updateApplicationAPI(applicationId, data);
+        },
+      });
     },
-    inputSchema: z.object({
-      updates: z
-        .array(
-          z.object({
-            company: z.string().describe(schemaDescriptions.upsertInterviewRounds.company),
-            role: z.string().optional().describe(schemaDescriptions.upsertInterviewRounds.role),
-            roundType: z
-              .enum(["HR", "TechnicalRound1", "TechnicalRound2", "SystemDesign", "Managerial", "Assignment", "Final"])
-              .optional()
-              .describe(schemaDescriptions.upsertInterviewRounds.roundType),
-            roundNumber: z
-              .number()
-              .int()
-              .positive()
-              .optional()
-              .describe(schemaDescriptions.upsertInterviewRounds.roundNumber),
-            scheduledDate: z.string().describe(schemaDescriptions.upsertInterviewRounds.scheduledDate),
-            notes: z.string().optional().describe(schemaDescriptions.upsertInterviewRounds.notes),
-          })
-        )
-        .describe(schemaDescriptions.upsertInterviewRounds.updates),
-    }),
+    inputSchema: permissiveRoundUpdateInputSchema.describe(
+      schemaDescriptions.upsertInterviewRounds.updates
+    ),
     outputSchema: z.object({
       updated: z.array(z.string()),
       failed: z.array(z.string()),

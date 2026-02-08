@@ -1,0 +1,359 @@
+import {
+  isGenericRole,
+  normalizeRoleText,
+  rolesEquivalent,
+  sanitizeCompanyName,
+} from "@/lib/application-intake";
+import { tryParseDateInput } from "@/lib/date-parsing";
+
+export const INTERVIEW_ROUND_TYPES = [
+  "HR",
+  "TechnicalRound1",
+  "TechnicalRound2",
+  "SystemDesign",
+  "Managerial",
+  "Assignment",
+  "Final",
+] as const;
+
+export type InterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+type ApplicationStatus = "applied" | "shortlisted" | "interview" | "offer" | "rejected";
+
+type InterviewRoundLite = {
+  roundNumber: number;
+  roundType: InterviewRoundType;
+  notes?: string;
+};
+
+export type ApplicationForRoundUpsert = {
+  id: string;
+  company: string;
+  role: string;
+  status?: ApplicationStatus;
+  rounds?: InterviewRoundLite[];
+};
+
+export type InterviewRoundUpdateInput = {
+  applicationId?: string;
+  company?: string;
+  role?: string;
+  roundType?: string;
+  roundNumber?: number;
+  scheduledDate: string;
+  notes?: string;
+};
+
+type RoundWritePayload = {
+  roundType: InterviewRoundType;
+  scheduledDate: string;
+  notes: string;
+};
+
+export type InterviewRoundUpsertDeps = {
+  getApplications: () => ApplicationForRoundUpsert[];
+  refreshApplications?: () => Promise<void>;
+  createRound: (
+    applicationId: string,
+    data: {
+      roundNumber: number;
+      roundType: InterviewRoundType;
+      scheduledDate: string;
+      notes: string;
+      questionsAsked: string[];
+    }
+  ) => Promise<void>;
+  updateRound: (
+    applicationId: string,
+    roundNumber: number,
+    data: RoundWritePayload
+  ) => Promise<void>;
+  updateApplication: (
+    applicationId: string,
+    data: {
+      status: "interview";
+      interviewDate: string;
+      currentRound: InterviewRoundType;
+      role?: string;
+    }
+  ) => Promise<void>;
+};
+
+function mergeNotes(existing: string | undefined, incoming: string | undefined): string | undefined {
+  const current = existing?.trim();
+  const next = incoming?.trim();
+
+  if (!next) return current;
+  if (!current) return next;
+
+  const currentLower = current.toLowerCase();
+  const nextLower = next.toLowerCase();
+  if (currentLower.includes(nextLower)) return current;
+  if (nextLower.includes(currentLower)) return next;
+
+  return `${current}. ${next}`;
+}
+
+function pickApplicationForUpsert(
+  matches: ApplicationForRoundUpsert[],
+  incomingRole: string | undefined
+): ApplicationForRoundUpsert | undefined {
+  if (matches.length === 0) return undefined;
+
+  if (incomingRole) {
+    const exactRoleMatches = matches.filter((candidate) =>
+      rolesEquivalent(candidate.role, incomingRole)
+    );
+    const exactRoleMatch =
+      exactRoleMatches.find(
+        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
+      ) ?? exactRoleMatches[0];
+    if (exactRoleMatch) return exactRoleMatch;
+
+    const genericMatches = matches.filter((candidate) => isGenericRole(candidate.role));
+    const genericRoleMatch =
+      genericMatches.find(
+        (candidate) => (candidate.company || "").trim() === sanitizeCompanyName(candidate.company)
+      ) ?? genericMatches[0];
+    if (genericRoleMatch) return genericRoleMatch;
+  }
+
+  if (matches.length === 1) {
+    const [single] = matches;
+    return single;
+  }
+
+  return undefined;
+}
+
+function findApplicationsByRole(
+  applications: ApplicationForRoundUpsert[],
+  incomingRole: string | undefined
+): ApplicationForRoundUpsert[] {
+  if (!incomingRole) return [];
+
+  const exactRoleMatches = applications.filter((candidate) =>
+    rolesEquivalent(candidate.role, incomingRole)
+  );
+  if (exactRoleMatches.length > 0) {
+    return exactRoleMatches;
+  }
+
+  // Fallback for older cards that still have generic roles.
+  return applications.filter((candidate) => isGenericRole(candidate.role));
+}
+
+function parseInterviewRoundType(value: string | undefined): InterviewRoundType | undefined {
+  if (!value) return undefined;
+
+  const normalized = value.trim();
+  return INTERVIEW_ROUND_TYPES.find((roundType) => roundType === normalized);
+}
+
+function inferRoundTypeFromNumber(roundNumber: number): InterviewRoundType {
+  if (roundNumber <= 1) return "TechnicalRound1";
+  if (roundNumber === 2) return "TechnicalRound2";
+  if (roundNumber === 3) return "SystemDesign";
+  if (roundNumber === 4) return "Managerial";
+  return "Final";
+}
+
+function getRoundNumberForType(
+  rounds: InterviewRoundLite[],
+  roundType: InterviewRoundType
+): number | undefined {
+  const existing = rounds.find((round) => round.roundType === roundType);
+  return existing?.roundNumber;
+}
+
+function resolveTargetApplication(
+  params: {
+    update: InterviewRoundUpdateInput;
+    applications: ApplicationForRoundUpsert[];
+    lastResolvedApplicationId: string | null;
+  }
+): ApplicationForRoundUpsert | undefined {
+  const { update, applications, lastResolvedApplicationId } = params;
+  const incomingRole = normalizeRoleText(update.role);
+  const explicitCompany = sanitizeCompanyName(update.company || "");
+
+  if (update.applicationId) {
+    return applications.find((candidate) => candidate.id === update.applicationId);
+  }
+
+  if (explicitCompany) {
+    const companyMatches = applications.filter(
+      (candidate) =>
+        sanitizeCompanyName(candidate.company).toLowerCase() === explicitCompany.toLowerCase()
+    );
+
+    if (incomingRole) {
+      return pickApplicationForUpsert(companyMatches, incomingRole);
+    }
+
+    if (companyMatches.length === 1) {
+      return companyMatches[0];
+    }
+
+    const interviewingMatches = companyMatches.filter(
+      (candidate) => candidate.status === "interview"
+    );
+    if (interviewingMatches.length === 1) {
+      return interviewingMatches[0];
+    }
+
+    const matchesWithRounds = companyMatches.filter(
+      (candidate) => (candidate.rounds?.length ?? 0) > 0
+    );
+    if (matchesWithRounds.length === 1) {
+      return matchesWithRounds[0];
+    }
+
+    return undefined;
+  }
+
+  if (incomingRole) {
+    const roleMatches = findApplicationsByRole(applications, incomingRole);
+    if (roleMatches.length === 1) {
+      return roleMatches[0];
+    }
+  } else if (lastResolvedApplicationId) {
+    return applications.find((candidate) => candidate.id === lastResolvedApplicationId);
+  }
+
+  // Cross-turn fallback: if exactly one interview card exists, treat it as context target.
+  const inInterview = applications.filter((candidate) => candidate.status === "interview");
+  if (inInterview.length === 1) {
+    return inInterview[0];
+  }
+
+  return undefined;
+}
+
+export async function upsertInterviewRoundsBatch(
+  updates: InterviewRoundUpdateInput[],
+  deps: InterviewRoundUpsertDeps
+): Promise<{
+  updated: string[];
+  failed: string[];
+  count: number;
+}> {
+  const updated: string[] = [];
+  const failed: string[] = [];
+  let lastResolvedApplicationId: string | null = null;
+
+  for (const update of updates) {
+    const incomingRole = normalizeRoleText(update.role);
+    const explicitCompany = sanitizeCompanyName(update.company || "");
+
+    let applications = deps.getApplications();
+    let targetApplication = resolveTargetApplication({
+      update,
+      applications,
+      lastResolvedApplicationId,
+    });
+
+    if (!targetApplication && deps.refreshApplications) {
+      await deps.refreshApplications();
+      applications = deps.getApplications();
+      targetApplication = resolveTargetApplication({
+        update,
+        applications,
+        lastResolvedApplicationId,
+      });
+    }
+
+    if (!targetApplication) {
+      failed.push(update.applicationId || explicitCompany || incomingRole || "unknown");
+      continue;
+    }
+
+    lastResolvedApplicationId = targetApplication.id;
+    const companyName = sanitizeCompanyName(targetApplication.company) || explicitCompany;
+
+    const parsedDate = tryParseDateInput(update.scheduledDate);
+    if (!parsedDate) {
+      failed.push(companyName || incomingRole || "unknown");
+      continue;
+    }
+
+    const scheduledDateIso = parsedDate.toISOString();
+
+    const latestApplication =
+      deps
+        .getApplications()
+        .find((candidate) => candidate.id === targetApplication.id) ?? targetApplication;
+
+    const existingRounds = [...(latestApplication.rounds ?? [])].sort(
+      (a, b) => a.roundNumber - b.roundNumber
+    );
+
+    const providedRoundNumber =
+      typeof update.roundNumber === "number" && update.roundNumber > 0
+        ? Math.floor(update.roundNumber)
+        : undefined;
+    const providedRoundType = parseInterviewRoundType(update.roundType);
+    const nextRoundNumber =
+      existingRounds.length > 0
+        ? Math.max(...existingRounds.map((round) => round.roundNumber)) + 1
+        : 1;
+
+    const targetRoundNumber =
+      providedRoundNumber ??
+      (providedRoundType
+        ? getRoundNumberForType(existingRounds, providedRoundType)
+        : undefined) ??
+      nextRoundNumber;
+    const targetRoundType = providedRoundType ?? inferRoundTypeFromNumber(targetRoundNumber);
+
+    const existingRound = existingRounds.find(
+      (round) => round.roundNumber === targetRoundNumber
+    );
+    const mergedRoundNotes = mergeNotes(existingRound?.notes, update.notes) ?? "";
+
+    try {
+      if (existingRound) {
+        await deps.updateRound(latestApplication.id, targetRoundNumber, {
+          roundType: targetRoundType,
+          scheduledDate: scheduledDateIso,
+          notes: mergedRoundNotes,
+        });
+      } else {
+        await deps.createRound(latestApplication.id, {
+          roundNumber: targetRoundNumber,
+          roundType: targetRoundType,
+          scheduledDate: scheduledDateIso,
+          notes: mergedRoundNotes,
+          questionsAsked: [],
+        });
+      }
+
+      const shouldUpdateRole =
+        incomingRole &&
+        (isGenericRole(latestApplication.role) ||
+          !rolesEquivalent(latestApplication.role, incomingRole));
+
+      await deps.updateApplication(latestApplication.id, {
+        status: "interview",
+        interviewDate: scheduledDateIso,
+        currentRound: targetRoundType,
+        ...(shouldUpdateRole ? { role: incomingRole } : {}),
+      });
+
+      updated.push(
+        `${companyName || "unknown"} -> Round ${targetRoundNumber} (${targetRoundType}) on ${scheduledDateIso.slice(
+          0,
+          10
+        )}`
+      );
+    } catch (error) {
+      console.error(`Failed to upsert round for ${companyName}:`, error);
+      failed.push(companyName || incomingRole || "unknown");
+    }
+  }
+
+  return {
+    updated,
+    failed,
+    count: updated.length,
+  };
+}
