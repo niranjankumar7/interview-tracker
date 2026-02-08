@@ -214,7 +214,7 @@ function parseHTMLResults(company: string, html: string): ScrapedInterviewData {
  * Format round type for search query
  */
 function formatRoundForSearch(round: InterviewRoundType): string {
-    const roundMap: Record<InterviewRoundType, string> = {
+    const roundMap: Record<string, string> = {
         'HR': 'HR behavioral',
         'TechnicalRound1': 'first round coding',
         'TechnicalRound2': 'second round technical',
@@ -223,7 +223,7 @@ function formatRoundForSearch(round: InterviewRoundType): string {
         'Assignment': 'take home assignment',
         'Final': 'final onsite'
     };
-    return roundMap[round] || 'technical interview';
+    return roundMap[round] || round.replace(/[_-]+/g, ' ');
 }
 
 /**
