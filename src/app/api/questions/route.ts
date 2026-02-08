@@ -1,6 +1,6 @@
 /**
  * API Route: /api/questions
- * GET - Get all questions for authenticated user
+ * GET - Get all questions (global question bank)
  * POST - Create a new question
  */
 
@@ -21,13 +21,13 @@ const createQuestionSchema = z.object({
 // GET /api/questions
 export async function GET(req: NextRequest) {
     try {
-        const user = await requireAuth(req);
+        await requireAuth(req);
         const { searchParams } = new URL(req.url);
         const applicationId = searchParams.get('applicationId');
         const category = searchParams.get('category');
 
         // Build where clause with proper typing
-        const where: Prisma.QuestionWhereInput = { userId: user.userId };
+        const where: Prisma.QuestionWhereInput = {};
         if (applicationId) where.applicationId = applicationId;
         if (category) where.category = category;
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
         const question = await prisma.question.create({
             data: {
-                userId: user.userId,
+                createdByUserId: user.userId,
                 applicationId: data.applicationId,
                 questionText: data.questionText,
                 category: data.category,

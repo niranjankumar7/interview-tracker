@@ -499,7 +499,7 @@ export function KanbanBoard() {
                             <div
                                 key={column.status}
                                 onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, column.status)}
+                                onDrop={(e) => void handleDrop(e, column.status)}
                                 className="flex flex-col min-h-[400px] bg-card rounded-lg border border-border"
                             >
                                 {/* Column Header */}
@@ -519,7 +519,9 @@ export function KanbanBoard() {
                                 <div className="flex-1 p-2 space-y-2 overflow-y-auto">
                                     {columnApps.length === 0 ? (
                                         <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-                                            No applications
+                                            {isSearching
+                                                ? "No matches in this column for this search"
+                                                : "Drop applications here"}
                                         </div>
                                     ) : (
                                         columnApps.map((app) => {

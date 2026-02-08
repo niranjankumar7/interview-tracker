@@ -7,11 +7,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
+import { Prisma } from '@prisma/client';
 
 const updateProgressSchema = z.object({
     currentStreak: z.number().int().min(0).optional(),
     longestStreak: z.number().int().min(0).optional(),
-    lastActiveDate: z.string().optional(),
+    lastActiveDate: z
+        .string()
+        .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+            message: 'Invalid lastActiveDate',
+        })
+        .optional(),
     totalTasksCompleted: z.number().int().min(0).optional(),
 });
 
@@ -32,11 +38,32 @@ export async function PUT(req: NextRequest) {
         const data = validation.data;
 
         // Prepare update data
-        const updateData: any = {};
+        const updateData: Prisma.UserProgressUpdateInput = {};
         if (data.currentStreak !== undefined) updateData.currentStreak = data.currentStreak;
         if (data.longestStreak !== undefined) updateData.longestStreak = data.longestStreak;
-        if (data.lastActiveDate !== undefined) updateData.lastActiveDate = new Date(data.lastActiveDate);
+        if (data.lastActiveDate !== undefined) {
+            const parsedLastActiveDate = new Date(data.lastActiveDate);
+            if (Number.isNaN(parsedLastActiveDate.getTime())) {
+                return NextResponse.json(
+                    { error: 'Invalid lastActiveDate' },
+                    { status: 400 }
+                );
+            }
+            updateData.lastActiveDate = parsedLastActiveDate;
+        }
         if (data.totalTasksCompleted !== undefined) updateData.totalTasksCompleted = data.totalTasksCompleted;
+
+        let createLastActiveDate: Date | null = null;
+        if (data.lastActiveDate !== undefined) {
+            const parsedCreateLastActiveDate = new Date(data.lastActiveDate);
+            if (Number.isNaN(parsedCreateLastActiveDate.getTime())) {
+                return NextResponse.json(
+                    { error: 'Invalid lastActiveDate' },
+                    { status: 400 }
+                );
+            }
+            createLastActiveDate = parsedCreateLastActiveDate;
+        }
 
         // Update or create progress record
         const progress = await prisma.userProgress.upsert({
@@ -46,7 +73,7 @@ export async function PUT(req: NextRequest) {
                 userId: auth.userId,
                 currentStreak: data.currentStreak ?? 0,
                 longestStreak: data.longestStreak ?? 0,
-                lastActiveDate: data.lastActiveDate ? new Date(data.lastActiveDate) : null,
+                lastActiveDate: createLastActiveDate,
                 totalTasksCompleted: data.totalTasksCompleted ?? 0,
             },
         });

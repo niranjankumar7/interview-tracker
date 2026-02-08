@@ -108,22 +108,6 @@ export function TodaysPlanPanel({
                 </div>
             )}
 
-            {/* Show message if no sprints to display */}
-            {sprintsToShow.length === 0 && activeSprints.length === 0 && (
-                <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-8 text-center max-w-md border border-border">
-                    <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
-                        <Calendar className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="font-semibold text-lg text-foreground mb-2">
-                        No Active Sprints
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                        Create an interview sprint to get started! Try saying: &ldquo;I have an
-                        interview at Google next Thursday for SDE&rdquo;
-                    </p>
-                </div>
-            )}
-
             {sprintsToShow.map((sprint) => {
                 const app = applications.find((a) => a.id === sprint.applicationId);
                 const struggledTopicMatchers =
@@ -145,12 +129,20 @@ export function TodaysPlanPanel({
                     dailyPlans[0];
 
                 if (!planToShow) {
-                    console.warn('⚠️ Sprint has no daily plans:', {
-                        sprintId: sprint.id,
-                        company: app?.company,
-                        message: 'This sprint was created with empty dailyPlans. Delete it and create a new one.'
-                    });
-                    return null;
+                    return (
+                        <div
+                            key={sprint.id}
+                            className="bg-amber-50 border border-amber-200 rounded-xl p-5"
+                        >
+                            <h3 className="font-semibold text-amber-900">
+                                Sprint plan unavailable
+                            </h3>
+                            <p className="text-sm text-amber-800 mt-1">
+                                {app?.company ?? "This application"} has an active sprint with no
+                                daily plan data. Regenerate the sprint from the pipeline.
+                            </p>
+                        </div>
+                    );
                 }
 
                 const dayIndex = dailyPlans.findIndex(

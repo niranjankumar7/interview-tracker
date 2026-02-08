@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
+import { Prisma } from '@prisma/client';
 
 const roleTypeSchema = z.enum([
     'SDE',
@@ -53,7 +54,12 @@ const dailyPlanSchema = z.object({
 const updateSprintSchema = z.object({
     status: z.enum(['active', 'completed', 'expired']).optional(),
     dailyPlans: z.array(dailyPlanSchema).optional(),
-    interviewDate: z.string().optional(),
+    interviewDate: z
+        .string()
+        .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+            message: 'Invalid interviewDate',
+        })
+        .optional(),
     roleType: roleTypeSchema.optional(),
     totalDays: z.number().int().min(1).max(30).optional(),
 });
@@ -139,10 +145,19 @@ export async function PUT(
         }
 
         // Prepare update data
-        const updateData: any = {};
+        const updateData: Prisma.SprintUpdateInput = {};
         if (data.status !== undefined) updateData.status = data.status;
         if (data.dailyPlans !== undefined) updateData.dailyPlans = data.dailyPlans;
-        if (data.interviewDate !== undefined) updateData.interviewDate = new Date(data.interviewDate);
+        if (data.interviewDate !== undefined) {
+            const parsedInterviewDate = new Date(data.interviewDate);
+            if (Number.isNaN(parsedInterviewDate.getTime())) {
+                return NextResponse.json(
+                    { error: 'Invalid interviewDate' },
+                    { status: 400 }
+                );
+            }
+            updateData.interviewDate = parsedInterviewDate;
+        }
         if (data.roleType !== undefined) updateData.roleType = data.roleType;
         if (data.totalDays !== undefined) updateData.totalDays = data.totalDays;
 

@@ -50,6 +50,15 @@ export interface UserProfile {
     leetcode: any | null;
 }
 
+export interface UserProgressRecord {
+    userId: string;
+    currentStreak: number;
+    longestStreak: number;
+    lastActiveDate: string | null;
+    totalTasksCompleted: number;
+    updatedAt: string;
+}
+
 /**
  * Get auth token from localStorage
  */
@@ -204,8 +213,8 @@ export const userApi = {
         longestStreak?: number;
         lastActiveDate?: string;
         totalTasksCompleted?: number;
-    }): Promise<any> {
-        return apiRequest<any>('/api/user/progress', {
+    }): Promise<UserProgressRecord> {
+        return apiRequest<UserProgressRecord>('/api/user/progress', {
             method: 'PUT',
             body: JSON.stringify(data),
         });
@@ -355,6 +364,21 @@ export const sprintsApi = {
         totalDays?: number;
     }): Promise<any> {
         return apiRequest<any>(`/api/sprints/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Complete or uncomplete a single task in a sprint plan
+     */
+    async completeTask(id: string, data: {
+        dayIndex: number;
+        blockIndex: number;
+        taskIndex: number;
+        completed: boolean;
+    }): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}/tasks/complete`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });

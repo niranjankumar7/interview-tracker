@@ -665,10 +665,18 @@ export const useStore = create<AppState>()(
                     const currentProgress = get().progress;
 
                     if (updatedSprint) {
-                        // Update sprint in database
-                        await api.sprints.update(sprintId, {
-                            dailyPlans: updatedSprint.dailyPlans,
-                            status: updatedSprint.status,
+                        const updatedTask =
+                            updatedSprint.dailyPlans?.[dayIndex]?.blocks?.[blockIndex]?.tasks?.[taskIndex];
+                        if (!updatedTask) {
+                            throw new Error('Task not found in sprint after optimistic update');
+                        }
+
+                        // Persist only the task delta instead of writing the full dailyPlans payload.
+                        await api.sprints.completeTask(sprintId, {
+                            dayIndex,
+                            blockIndex,
+                            taskIndex,
+                            completed: Boolean(updatedTask.completed),
                         });
 
                         // Update user progress in database
