@@ -14,6 +14,7 @@ import {
     LeetCodeStats,
     OfferDetails,
 } from '@/types';
+import type { RawSprint } from '@/types/api';
 import { APP_VERSION } from '@/lib/constants';
 import { appDataExportSchema, appDataSnapshotSchema } from '@/lib/app-data';
 import { normalizeTopic } from '@/lib/topic-matcher';
@@ -58,6 +59,19 @@ function mergeRoundFeedback(
         struggledTopics: next.struggledTopics ?? prev.struggledTopics,
         notes: next.notes ?? prev.notes,
     };
+}
+
+function normalizeDailyPlans(value: RawSprint['dailyPlans']): Sprint['dailyPlans'] {
+    if (Array.isArray(value)) return value;
+    if (typeof value !== 'string') return [];
+
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return Array.isArray(parsed) ? (parsed as Sprint['dailyPlans']) : [];
+    } catch (error) {
+        console.error('Failed to parse sprint dailyPlans:', error);
+        return [];
+    }
 }
 
 interface AppState {
@@ -171,14 +185,14 @@ interface AppState {
         notes?: string;
         offerDetails?: OfferDetails;
     }) => Promise<Application>;
-    updateApplicationAPI: (id: string, updates: any) => Promise<void>;
+    updateApplicationAPI: (id: string, updates: Partial<Application>) => Promise<void>;
     deleteApplicationAPI: (id: string) => Promise<void>;
     createSprintAPI: (data: {
         applicationId: string;
         interviewDate: string;
         roleType: string;
         totalDays: number;
-        dailyPlans: any;
+        dailyPlans: Sprint['dailyPlans'];
     }) => Promise<Sprint>;
     createQuestionAPI: (data: {
         questionText: string;
@@ -358,8 +372,8 @@ function getAskedInRoundLabel(
     return `Round ${roundNumber}: ${roundType}`;
 }
 
-function getQuestionDedupeKey(applicationId: string, normalizedText: string): string {
-    return `${applicationId}|${normalizedText}`;
+function getQuestionDedupeKey(companyId: string | undefined, normalizedText: string): string {
+    return `${companyId ?? 'none'}|${normalizedText}`;
 }
 
 function upsertQuestionsFromRoundInList(
@@ -941,7 +955,9 @@ export const useStore = create<AppState>()(
                     const apps = await api.applications.getAll();
                     set({
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                     });
                 } catch (error) {
@@ -953,14 +969,9 @@ export const useStore = create<AppState>()(
             loadSprintsFromAPI: async () => {
                 try {
                     const rawSprints = await api.sprints.getAll();
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
-                    const sprints = rawSprints.map((sprint: any) => ({
+                    const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
                     set({ sprints });
                 } catch (error) {
@@ -987,7 +998,7 @@ export const useStore = create<AppState>()(
                 try {
                     const app = await api.applications.create(data);
                     const normalizedApp = normalizeApplicationFromApi(
-                        app as Record<string, unknown>
+                        app as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: [...state.applications, normalizedApp]
@@ -1003,7 +1014,7 @@ export const useStore = create<AppState>()(
                 try {
                     const updatedApp = await api.applications.update(id, updates);
                     const normalizedUpdatedApp = normalizeApplicationFromApi(
-                        updatedApp as Record<string, unknown>
+                        updatedApp as unknown as Record<string, unknown>
                     );
                     set((state) => ({
                         applications: state.applications.map(app =>
@@ -1068,20 +1079,17 @@ export const useStore = create<AppState>()(
                         api.user.getProfile().catch(() => null), // User profile is optional
                     ]);
 
-                    // Ensure dailyPlans is properly parsed (backend might return it as JSON string)
-                    const sprints = rawSprints.map((sprint: any) => ({
+                    const sprints = rawSprints.map((sprint) => ({
                         ...sprint,
-                        dailyPlans: Array.isArray(sprint.dailyPlans)
-                            ? sprint.dailyPlans
-                            : typeof sprint.dailyPlans === 'string'
-                                ? JSON.parse(sprint.dailyPlans)
-                                : [],
+                        dailyPlans: normalizeDailyPlans(sprint.dailyPlans),
                     }));
 
                     // Build the update object
                     const update: Partial<AppState> = {
                         applications: apps.map((app) =>
-                            normalizeApplicationFromApi(app as Record<string, unknown>)
+                            normalizeApplicationFromApi(
+                                app as unknown as Record<string, unknown>
+                            )
                         ),
                         sprints,
                         questions: questions.map((q) =>
@@ -1097,7 +1105,9 @@ export const useStore = create<AppState>()(
                                 ...get().profile,
                                 name: userProfile.name || get().profile.name,
                                 targetRole: userProfile.targetRole || get().profile.targetRole,
-                                experienceLevel: (userProfile.experienceLevel as any) || get().profile.experienceLevel,
+                                experienceLevel:
+                                    userProfile.experienceLevel ??
+                                    get().profile.experienceLevel,
                             };
                         }
 
@@ -1116,7 +1126,7 @@ export const useStore = create<AppState>()(
                         if (userProfile.preferences) {
                             update.preferences = {
                                 ...get().preferences,
-                                theme: (userProfile.preferences.theme as any) || get().preferences.theme,
+                                theme: userProfile.preferences.theme ?? get().preferences.theme,
                                 studyRemindersEnabled: userProfile.preferences.studyRemindersEnabled ?? get().preferences.studyRemindersEnabled,
                                 calendarAutoSyncEnabled: userProfile.preferences.calendarAutoSyncEnabled ?? get().preferences.calendarAutoSyncEnabled,
                                 leetcodeAutoSyncEnabled: userProfile.preferences.leetcodeAutoSyncEnabled ?? get().preferences.leetcodeAutoSyncEnabled,
@@ -1140,12 +1150,13 @@ export const useStore = create<AppState>()(
                                 hardSolved: userProfile.leetcode.hardSolved ?? 0,
                                 currentStreak: userProfile.leetcode.currentStreak ?? 0,
                                 longestStreak: userProfile.leetcode.longestStreak ?? 0,
-                                lastActiveDate: userProfile.leetcode.lastActiveDate,
+                                lastActiveDate:
+                                    userProfile.leetcode.lastActiveDate ?? undefined,
                             };
                         }
                     }
 
-                    set(update as any);
+                    set(update);
                 } catch (error) {
                     console.error('Failed to sync with backend:', error);
                     throw error;
