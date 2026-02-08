@@ -21,17 +21,18 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const planForDatePanelSchema = z.object({
-    targetDate: z
-        .string()
-        .describe(
-            "Target date to show the prep plan for. Accepts YYYY-MM-DD or relative values like 'tomorrow' / 'next friday'."
-        ),
-    applicationId: z
-        .string()
-        .optional()
-        .describe(
+    targetDate: z.preprocess(
+        (val) => val ?? "tomorrow",
+        z.string().describe(
+            "Target date to show the prep plan for. Accepts YYYY-MM-DD or relative values like 'tomorrow' / 'next friday'. REQUIRED: Extract the date from the user's query (e.g., 'tomorrow', 'next friday', 'in 3 days')."
+        )
+    ),
+    applicationId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe(
             "Optional application ID to focus the plan on a single active sprint"
-        ),
+        )
+    ),
 });
 
 interface PlanForDatePanelProps {

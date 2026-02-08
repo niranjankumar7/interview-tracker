@@ -12,15 +12,20 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const sprintSetupCardSchema = z.object({
-    company: z.string().optional().describe("The company name for the interview"),
-    role: z
-        .enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
-        .optional()
-        .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)"),
-    interviewDate: z
-        .string()
-        .optional()
-        .describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'"),
+    company: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The company name for the interview")
+    ),
+    role: z.preprocess(
+        (val) => val ?? undefined,
+        z.enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
+            .optional()
+            .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)")
+    ),
+    interviewDate: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The interview date in YYYY-MM-DD format or a relative description like 'next Thursday'")
+    ),
 });
 
 interface SprintSetupCardProps {

@@ -15,42 +15,62 @@ import { Building2, CheckCircle2, Briefcase } from "lucide-react";
 import { z } from "zod";
 
 export const offerDetailsPanelSchema = z.object({
-  applicationId: z
-    .string()
-    .optional()
-    .describe("If known, attach offer to this application"),
-  panelId: z
-    .string()
-    .optional()
-    .describe("Unique panel id to prevent state collisions"),
-  company: z
-    .string()
-    .optional()
-    .describe("Company name (used to find which application to attach the offer to)"),
-  totalCTC: z
-    .number()
-    .optional()
-    .describe("Total annual compensation (CTC), if provided as a single number"),
-  baseSalary: z.number().optional().describe("Base salary"),
-  bonus: z.number().optional().describe("Annual bonus"),
-  equity: z
-    .union([z.number(), z.string()])
-    .optional()
-    .describe("Equity details (number or description, e.g. '10k RSUs')"),
-  currency: z
-    .string()
-    .optional()
-    .describe("Currency code or label (defaults to INR)")
-    .default("INR"),
-  workMode: z
-    .enum(["WFH", "Hybrid", "Office"])
-    .optional()
-    .describe("Work mode"),
-  location: z.string().optional().describe("Location"),
-  joiningDate: z.string().optional().describe("Joining date (YYYY-MM-DD)"),
-  noticePeriod: z.string().optional().describe("Notice period"),
-  benefits: z.array(z.string()).optional().describe("Benefits/perks list"),
-  notes: z.string().optional().describe("Any additional notes"),
+  applicationId: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("If known, attach offer to this application")
+  ),
+  panelId: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Unique panel id to prevent state collisions")
+  ),
+  company: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Company name (used to find which application to attach the offer to)")
+  ),
+  totalCTC: z.preprocess(
+    (val) => val ?? undefined,
+    z.number().optional().describe("Total annual compensation (CTC), if provided as a single number")
+  ),
+  baseSalary: z.preprocess(
+    (val) => val ?? undefined,
+    z.number().optional().describe("Base salary")
+  ),
+  bonus: z.preprocess(
+    (val) => val ?? undefined,
+    z.number().optional().describe("Annual bonus")
+  ),
+  equity: z.preprocess(
+    (val) => val ?? undefined,
+    z.union([z.number(), z.string()]).optional().describe("Equity details (number or description, e.g. '10k RSUs')")
+  ),
+  currency: z.preprocess(
+    (val) => val ?? "INR",
+    z.string().describe("Currency code or label (defaults to INR)")
+  ),
+  workMode: z.preprocess(
+    (val) => val ?? undefined,
+    z.enum(["WFH", "Hybrid", "Office"]).optional().describe("Work mode")
+  ),
+  location: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Location")
+  ),
+  joiningDate: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Joining date (YYYY-MM-DD)")
+  ),
+  noticePeriod: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Notice period")
+  ),
+  benefits: z.preprocess(
+    (val) => val ?? undefined,
+    z.array(z.string()).optional().describe("Benefits/perks list")
+  ),
+  notes: z.preprocess(
+    (val) => val ?? undefined,
+    z.string().optional().describe("Any additional notes")
+  ),
 });
 
 type OfferDetailsPanelProps = z.infer<typeof offerDetailsPanelSchema>;

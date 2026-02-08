@@ -20,16 +20,16 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const todaysPlanPanelSchema = z.object({
-    showAll: z
-        .boolean()
-        .optional()
-        .describe("Whether to show all active sprints or just the first one"),
-    focusApplicationId: z
-        .string()
-        .optional()
-        .describe(
+    showAll: z.preprocess(
+        (val) => val ?? true,
+        z.boolean().describe("Whether to show all active sprints (default: true, ALWAYS use true unless user explicitly asks for just one sprint)")
+    ),
+    focusApplicationId: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe(
             "Optional application ID to show first (useful when deep-linking from notifications)"
-        ),
+        )
+    ),
 });
 
 interface TodaysPlanPanelProps {
@@ -87,7 +87,7 @@ export function TodaysPlanPanel({
         );
     }
 
-    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]];
+    const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]].filter(Boolean);
 
     return (
         <div className="space-y-6 max-w-lg">
@@ -105,6 +105,22 @@ export function TodaysPlanPanel({
                         <p className="text-2xl font-bold">{progress.totalTasksCompleted}</p>
                         <p className="text-xs opacity-80">tasks done</p>
                     </div>
+                </div>
+            )}
+
+            {/* Show message if no sprints to display */}
+            {sprintsToShow.length === 0 && activeSprints.length === 0 && (
+                <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-8 text-center max-w-md border border-border">
+                    <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
+                        <Calendar className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="font-semibold text-lg text-foreground mb-2">
+                        No Active Sprints
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                        Create an interview sprint to get started! Try saying: &ldquo;I have an
+                        interview at Google next Thursday for SDE&rdquo;
+                    </p>
                 </div>
             )}
 
@@ -128,7 +144,14 @@ export function TodaysPlanPanel({
                     dailyPlans.find((p) => !p.completed) ||
                     dailyPlans[0];
 
-                if (!planToShow) return null;
+                if (!planToShow) {
+                    console.warn('⚠️ Sprint has no daily plans:', {
+                        sprintId: sprint.id,
+                        company: app?.company,
+                        message: 'This sprint was created with empty dailyPlans. Delete it and create a new one.'
+                    });
+                    return null;
+                }
 
                 const dayIndex = dailyPlans.findIndex(
                     (p) => p.day === planToShow.day

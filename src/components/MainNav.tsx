@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, Kanban, BookOpen, BarChart3 } from "lucide-react";
+import { MessageSquare, Kanban, Calendar, BookOpen, BarChart3 } from "lucide-react";
 
 export function MainNav() {
     const pathname = usePathname();
@@ -20,6 +20,12 @@ export function MainNav() {
             label: "Pipeline",
             icon: Kanban,
             isActive: safePathname.startsWith("/pipeline"),
+        },
+        {
+            href: "/prep",
+            label: "Prep",
+            icon: Calendar,
+            isActive: safePathname.startsWith("/prep"),
         },
         {
             href: "/questions",

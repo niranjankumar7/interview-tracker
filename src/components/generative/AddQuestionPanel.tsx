@@ -9,18 +9,20 @@ import { z } from "zod";
 
 // Props schema for Tambo registration
 export const addQuestionPanelSchema = z.object({
-    questionText: z
-        .string()
-        .optional()
-        .describe("The interview question text to add"),
-    company: z
-        .string()
-        .optional()
-        .describe("The company this question is associated with"),
-    category: z
-        .enum(["DSA", "SystemDesign", "Behavioral", "SQL", "Other"])
-        .optional()
-        .describe("The category of the question"),
+    questionText: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The interview question text to add")
+    ),
+    company: z.preprocess(
+        (val) => val ?? undefined,
+        z.string().optional().describe("The company this question is associated with")
+    ),
+    category: z.preprocess(
+        (val) => val ?? undefined,
+        z.enum(["DSA", "SystemDesign", "Behavioral", "SQL", "Other"])
+            .optional()
+            .describe("The category of the question")
+    ),
 });
 
 interface AddQuestionPanelProps {
