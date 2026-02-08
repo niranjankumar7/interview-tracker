@@ -24,15 +24,7 @@ const roleTypeSchema = z.enum([
     'MobileEngineer',
 ]);
 
-const interviewRoundTypeSchema = z.enum([
-    'HR',
-    'TechnicalRound1',
-    'TechnicalRound2',
-    'SystemDesign',
-    'Managerial',
-    'Assignment',
-    'Final',
-]);
+const interviewRoundTypeSchema = z.string().trim().min(1).max(120);
 
 const updateApplicationSchema = z.object({
     company: z.string().min(1).optional(),

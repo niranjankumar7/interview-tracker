@@ -5,7 +5,6 @@ import { InterviewRoundType, OfferDetails, RoleType, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
-    getAvailableRounds,
 } from "@/data/prep-templates";
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
@@ -33,8 +32,16 @@ import {
     Loader2,
     AlertTriangle,
     ExternalLink,
+    Plus,
 } from "lucide-react";
 import { getMissingPrerequisites } from "@/services/PrepValidator";
+
+type RoundDraft = {
+    roundNumber: number;
+    roundType: InterviewRoundType;
+    scheduledDate: string;
+    notes: string;
+};
 
 interface PrepDetailPanelProps {
     appId: string;
@@ -46,7 +53,11 @@ interface PrepDetailPanelProps {
 const CLOSE_ON_MISSING_APP_DELAY_MS = 200;
 
 // Used only when a role has no configured rounds (or `availableRounds[0]` is missing).
-const SELECTED_ROUND_FALLBACK: InterviewRoundType = "TechnicalRound1";
+const SELECTED_ROUND_FALLBACK: InterviewRoundType = "Round 1";
+
+function getDefaultRoundTypeForRoundNumber(roundNumber: number): InterviewRoundType {
+    return `Round ${roundNumber}`;
+}
 
 export function PrepDetailPanel({
     appId,
@@ -58,6 +69,7 @@ export function PrepDetailPanel({
     );
     const updateApplication = useStore((state) => state.updateApplication);
     const updateApplicationAPI = useStore((state) => state.updateApplicationAPI);
+    const createInterviewRoundAPI = useStore((state) => state.createInterviewRoundAPI);
     const getTopicCompletion = useStore((state) => state.getTopicCompletion);
     const sprints = useStore((state) => state.sprints);
 
@@ -156,6 +168,34 @@ export function PrepDetailPanel({
 
     // Tracks whether the current `appId` has been found in the store at least once.
     const [hadApplication, setHadApplication] = useState(false);
+
+    const [isAddRoundOpen, setIsAddRoundOpen] = useState(false);
+    const [addRoundError, setAddRoundError] = useState<string | null>(null);
+
+    const nextRoundNumber = useMemo(() => {
+        const rounds = application?.rounds ?? [];
+        if (rounds.length === 0) return 1;
+        return Math.max(...rounds.map((r) => r.roundNumber)) + 1;
+    }, [application]);
+
+    const [roundDraft, setRoundDraft] = useState<RoundDraft>({
+        roundNumber: 1,
+        roundType: getDefaultRoundTypeForRoundNumber(1),
+        scheduledDate: "",
+        notes: "",
+    });
+
+    useEffect(() => {
+        if (!isAddRoundOpen) return;
+        setAddRoundError(null);
+        setRoundDraft((prev) => ({
+            ...prev,
+            roundNumber: nextRoundNumber,
+            roundType: getDefaultRoundTypeForRoundNumber(nextRoundNumber),
+            scheduledDate: "",
+            notes: "",
+        }));
+    }, [isAddRoundOpen, nextRoundNumber]);
 
     // Scraper state
     const [scrapedContent, setScrapedContent] = useState<ScrapedInterviewData | null>(null);
@@ -313,14 +353,48 @@ export function PrepDetailPanel({
     const company = application?.company ?? null;
     const role = application?.role ?? null;
     const roleType: RoleType = application ? application.roleType || inferRoleType(application.role) : "SDE";
-
-    const availableRounds = roleType ? getAvailableRounds(roleType) : [];
-    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
     const selectedRoundFromStore = application?.currentRound;
+
+    const trackedRounds = useMemo(() => {
+        const rounds = [...(application?.rounds ?? [])]
+            .sort((a, b) => a.roundNumber - b.roundNumber)
+            .map((round) => round.roundType);
+
+        const seen = new Set<InterviewRoundType>();
+        const orderedUniqueRounds: InterviewRoundType[] = [];
+
+        for (const roundType of rounds) {
+            if (seen.has(roundType)) continue;
+            seen.add(roundType);
+            orderedUniqueRounds.push(roundType);
+        }
+
+        return orderedUniqueRounds;
+    }, [application?.rounds]);
+
+    const availableRounds = useMemo(() => {
+        if (trackedRounds.length > 0) return trackedRounds;
+        if (selectedRoundFromStore) {
+            return [selectedRoundFromStore];
+        }
+        return [];
+    }, [selectedRoundFromStore, trackedRounds]);
+
+    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
     const selectedRound =
         selectedRoundFromStore && availableRounds.includes(selectedRoundFromStore)
             ? selectedRoundFromStore
             : defaultRound;
+
+    const selectedRoundScheduledDate = useMemo(() => {
+        const roundsForSelectedType = (application?.rounds ?? [])
+            .filter((round) => round.roundType === selectedRound && Boolean(round.scheduledDate))
+            .sort((a, b) => a.roundNumber - b.roundNumber);
+
+        return roundsForSelectedType[0]?.scheduledDate;
+    }, [application?.rounds, selectedRound]);
+
+    const headlineInterviewDate = selectedRoundScheduledDate ?? application?.interviewDate;
 
     const scrapeKey = isOpen && company && role ? `${appId}|${company}|${role}|${roleType}|${selectedRound}` : null;
 
@@ -368,11 +442,15 @@ export function PrepDetailPanel({
 
     if (!isOpen || !application) return null;
 
-    const prepContent = getRoundPrepContent(roleType, selectedRound);
+    const prepContent =
+        getRoundPrepContent(roleType, selectedRound) ??
+        (selectedRound === "TechnicalRound2"
+            ? getRoundPrepContent(roleType, "TechnicalRound1")
+            : undefined);
 
     const today = startOfDay(new Date());
 
-    const interviewDate = safeParseISODate(application.interviewDate);
+    const interviewDate = safeParseISODate(headlineInterviewDate);
 
     const daysUntilInterview = interviewDate
         ? differenceInDays(startOfDay(interviewDate), today)
@@ -490,10 +568,10 @@ export function PrepDetailPanel({
                                         <Briefcase className="w-4 h-4" />
                                         {application.role}
                                     </span>
-                                    {application.interviewDate && (
+                                    {headlineInterviewDate && (
                                         <span className="flex items-center gap-1">
                                             <Calendar className="w-4 h-4" />
-                                            {format(parseISO(application.interviewDate), "MMM d, yyyy")}
+                                            {format(parseISO(headlineInterviewDate), "MMM d, yyyy")}
                                         </span>
                                     )}
                                 </div>
@@ -525,7 +603,12 @@ export function PrepDetailPanel({
                 {/* Round Selector Tabs */}
                 {application.status !== "offer" && (
                     <div className="border-b border-border bg-muted/40 px-6 py-3">
-                        <div className="flex gap-2 overflow-x-auto">
+                        <div className="flex gap-2 overflow-x-auto items-center">
+                            {availableRounds.length === 0 && (
+                                <div className="text-sm text-muted-foreground italic px-2">
+                                    No rounds added yet.
+                                </div>
+                            )}
                             {availableRounds.map((roundType) => {
                                 const roundTheme = getInterviewRoundTheme(roundType);
                                 const RoundIcon = roundTheme.icon;
@@ -545,6 +628,14 @@ export function PrepDetailPanel({
                                     </button>
                                 );
                             })}
+                            <button
+                                onClick={() => setIsAddRoundOpen(true)}
+                                className="px-3 py-2 rounded-lg bg-background border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 whitespace-nowrap text-sm ml-2"
+                                title="Add interview round"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add round
+                            </button>
                         </div>
                     </div>
                 )}
@@ -1070,6 +1161,160 @@ export function PrepDetailPanel({
                                 <p className="text-sm mt-2">Try selecting a different round type above.</p>
                             </div>
                         )
+                    )}
+                    {/* Add Round Modal */}
+                    {isAddRoundOpen && (
+                        <div
+                            className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (e.target === e.currentTarget) setIsAddRoundOpen(false);
+                            }}
+                        >
+                            <div className="bg-background rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto border border-border animate-in fade-in zoom-in-95 duration-200">
+                                <div className="sticky top-0 bg-background border-b border-border px-5 py-4 flex items-center justify-between z-10">
+                                    <h3 className="text-lg font-semibold text-foreground">
+                                        Add interview round
+                                    </h3>
+                                    <button
+                                        onClick={() => setIsAddRoundOpen(false)}
+                                        className="p-2 hover:bg-muted rounded-lg transition-colors"
+                                        aria-label="Close"
+                                        type="button"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                <div className="p-5 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-muted-foreground mb-1">
+                                                Round number
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={roundDraft.roundNumber}
+                                                readOnly
+                                                className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-muted-foreground mb-1">
+                                                Round label
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={roundDraft.roundType}
+                                                onChange={(e) =>
+                                                    setRoundDraft((prev) => ({
+                                                        ...prev,
+                                                        roundType: e.target.value,
+                                                    }))
+                                                }
+                                                placeholder="e.g., Tech Screen, Hiring Manager, HR"
+                                                className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-1">
+                                            Scheduled date (optional)
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={roundDraft.scheduledDate}
+                                            onChange={(e) =>
+                                                setRoundDraft((prev) => ({
+                                                    ...prev,
+                                                    scheduledDate: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-foreground mb-1">
+                                            Notes
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            value={roundDraft.notes}
+                                            onChange={(e) =>
+                                                setRoundDraft((prev) => ({
+                                                    ...prev,
+                                                    notes: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none bg-background"
+                                        />
+                                    </div>
+
+                                    {addRoundError && (
+                                        <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            {addRoundError}
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-end gap-2 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAddRoundOpen(false)}
+                                            className="px-3 py-2 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={async () => {
+                                                const normalizedRoundType = roundDraft.roundType.trim();
+                                                if (!normalizedRoundType) {
+                                                    setAddRoundError("Round label is required.");
+                                                    return;
+                                                }
+
+                                                const scheduledDate = roundDraft.scheduledDate || undefined;
+
+                                                const newRound = {
+                                                    roundNumber: roundDraft.roundNumber,
+                                                    roundType: normalizedRoundType,
+                                                    scheduledDate,
+                                                    notes: roundDraft.notes,
+                                                    questionsAsked: [],
+                                                };
+
+                                                try {
+                                                    await createInterviewRoundAPI(application.id, newRound);
+                                                } catch (error) {
+                                                    const errorMessage =
+                                                        error instanceof Error ? error.message : "Could not add round.";
+                                                    if (
+                                                        errorMessage.toLowerCase().includes("already exists") ||
+                                                        errorMessage.toLowerCase().includes("409")
+                                                    ) {
+                                                        setAddRoundError("Round number already exists.");
+                                                        return;
+                                                    }
+                                                    setAddRoundError("Couldn't save round right now. Please retry.");
+                                                    return;
+                                                }
+
+                                                setAddRoundError(null);
+                                                setIsAddRoundOpen(false);
+                                            }}
+
+                                            className="px-3 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                        >
+                                            Save round
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

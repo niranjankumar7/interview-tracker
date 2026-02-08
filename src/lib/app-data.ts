@@ -41,15 +41,7 @@ const questionCategorySchema = z.enum([
 const experienceLevelSchema = z.enum(["Junior", "Mid", "Senior"]);
 const themePreferenceSchema = z.enum(["light", "dark", "system"]);
 
-const interviewRoundTypeSchema = z.enum([
-  "HR",
-  "TechnicalRound1",
-  "TechnicalRound2",
-  "SystemDesign",
-  "Managerial",
-  "Assignment",
-  "Final",
-]);
+const interviewRoundTypeSchema = z.string().min(1);
 
 const interviewRoundSchema = z.object({
   roundNumber: z.number(),

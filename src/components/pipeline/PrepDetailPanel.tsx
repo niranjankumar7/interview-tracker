@@ -24,6 +24,10 @@ type RoundDraft = {
   notes: string;
 };
 
+function getDefaultRoundTypeForRoundNumber(roundNumber: number): InterviewRound["roundType"] {
+  return `Round ${roundNumber}`;
+}
+
 function linesToList(value: string): string[] {
   return value
     .split("\n")
@@ -58,7 +62,7 @@ export function PrepDetailPanel(props: {
   const application = useStore((s) =>
     applicationId ? s.applications.find((a) => a.id === applicationId) : undefined
   );
-  const addInterviewRound = useStore((s) => s.addInterviewRound);
+  const createInterviewRoundAPI = useStore((s) => s.createInterviewRoundAPI);
   const saveRoundFeedback = useStore((s) => s.saveRoundFeedback);
 
   const [feedbackRoundNumber, setFeedbackRoundNumber] = useState<number | null>(
@@ -84,7 +88,7 @@ export function PrepDetailPanel(props: {
 
   const [roundDraft, setRoundDraft] = useState<RoundDraft>({
     roundNumber: 1,
-    roundType: "TechnicalRound1",
+    roundType: getDefaultRoundTypeForRoundNumber(1),
     scheduledDate: "",
     notes: "",
   });
@@ -107,7 +111,7 @@ export function PrepDetailPanel(props: {
     setRoundDraft((prev) => ({
       ...prev,
       roundNumber: nextRoundNumber,
-      roundType: "TechnicalRound1",
+      roundType: getDefaultRoundTypeForRoundNumber(nextRoundNumber),
       scheduledDate: "",
       notes: "",
     }));
@@ -435,26 +439,20 @@ export function PrepDetailPanel(props: {
 
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-1">
-                      Round type
+                      Round label
                     </label>
-                    <select
+                    <input
+                      type="text"
                       value={roundDraft.roundType}
                       onChange={(e) =>
                         setRoundDraft((prev) => ({
                           ...prev,
-                          roundType: e.target.value as InterviewRound["roundType"],
+                          roundType: e.target.value,
                         }))
                       }
+                      placeholder="e.g., Tech Screen, Hiring Manager, HR"
                       className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                    >
-                      <option value="HR">HR</option>
-                      <option value="TechnicalRound1">Technical Round 1</option>
-                      <option value="TechnicalRound2">Technical Round 2</option>
-                      <option value="SystemDesign">System Design</option>
-                      <option value="Managerial">Managerial</option>
-                      <option value="Assignment">Assignment</option>
-                      <option value="Final">Final</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
@@ -508,22 +506,40 @@ export function PrepDetailPanel(props: {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
+                      const normalizedRoundType = roundDraft.roundType.trim();
+                      if (!normalizedRoundType) {
+                        setAddRoundError("Round label is required.");
+                        return;
+                      }
+
                       const scheduledDate = roundDraft.scheduledDate || undefined;
 
                       const newRound: InterviewRound = {
                         roundNumber: roundDraft.roundNumber,
-                        roundType: roundDraft.roundType,
+                        roundType: normalizedRoundType,
                         scheduledDate,
                         notes: roundDraft.notes,
                         questionsAsked: [],
                       };
 
-                      const didAdd = addInterviewRound(application.id, newRound);
-                      if (!didAdd) {
-                        setAddRoundError("Round number already exists.");
+                      try {
+                        await createInterviewRoundAPI(application.id, newRound);
+                      } catch (error) {
+                        const errorMessage =
+                          error instanceof Error ? error.message : "Could not add round.";
+                        if (
+                          errorMessage.toLowerCase().includes("already exists") ||
+                          errorMessage.toLowerCase().includes("409")
+                        ) {
+                          setAddRoundError("Round number already exists.");
+                          return;
+                        }
+                        setAddRoundError("Couldn't save round right now. Please retry.");
                         return;
                       }
+
+                      setAddRoundError(null);
                       setIsAddRoundOpen(false);
                     }}
 

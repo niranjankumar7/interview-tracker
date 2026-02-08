@@ -22,27 +22,27 @@ import {
   PipelineSummaryPanel,
   pipelineSummaryPanelSchema,
 } from "@/components/generative";
+import {
+  isGenericRole,
+  normalizeApplicationsForCreation,
+  normalizeRoleText,
+  rolesEquivalent,
+  sanitizeCompanyName,
+} from "@/lib/application-intake";
+import {
+  mergeNotes,
+  pickApplicationForUpsert,
+  upsertInterviewRoundsBatch,
+} from "@/lib/interview-round-upsert";
 import { useStore } from "@/lib/store";
+import {
+  normalizeRoundUpdatesInput,
+  normalizeStatusUpdatesInput,
+} from "@/lib/tool-input-normalizers";
 import { toolDescriptions, schemaDescriptions, componentDescriptions } from "@/lib/tool-descriptions";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
-
-/**
- * Clean company name by removing status suffixes, delimiters, and trimming
- */
-function sanitizeCompanyName(name: string): string {
-  if (!name) return '';
-
-  // Remove common status suffixes that might be concatenated
-  const cleaned = name
-    .split('|')[0]  // Take content before pipe
-    .split(' - ')[0] // Take content before dash separator
-    .replace(/\s*(applied|shortlisted|interview|offer|rejected|status)\s*$/i, '') // Remove status keywords
-    .trim();
-
-  return cleaned;
-}
 
 type StoreState = ReturnType<typeof useStore.getState>;
 type StoredApplication = StoreState["applications"][number];
@@ -106,6 +106,61 @@ function findApplicationsByCompany(
   return { ok: true, companyName, matches } as const;
 }
 
+const permissiveStatusUpdateInputSchema = z
+  .object({
+    updates: z.array(z.unknown()).optional(),
+    update: z.array(z.unknown()).optional(),
+    data: z.unknown().optional(),
+    applicationId: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.applicationId),
+    company: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.company),
+    newStatus: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.updateApplicationStatus.newStatus),
+    status: z.string().optional(),
+    state: z.string().optional(),
+  });
+
+const permissiveRoundUpdateInputSchema = z
+  .object({
+    updates: z.array(z.unknown()).optional(),
+    update: z.array(z.unknown()).optional(),
+    data: z.unknown().optional(),
+    applicationId: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.applicationId),
+    company: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.company),
+    role: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.role),
+    roundType: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.roundType),
+    roundNumber: z
+      .union([z.number(), z.string()])
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.roundNumber),
+    scheduledDate: z
+      .string()
+      .optional()
+      .describe(schemaDescriptions.upsertInterviewRounds.scheduledDate),
+    date: z.string().optional(),
+    interviewDate: z.string().optional(),
+    notes: z.string().optional().describe(schemaDescriptions.upsertInterviewRounds.notes),
+  });
+
 /**
  * tools
  *
@@ -137,6 +192,76 @@ export const tools: TamboTool[] = [
         interviewDate: z.string().optional(),
       })
     ),
+  },
+  {
+    name: "getApplicationStatus",
+    description: toolDescriptions.getApplicationStatus,
+    tool: ({ company }: { company: string }) => {
+      const state = useStore.getState();
+      const applications = state.applications;
+      const companyResult = findApplicationsByCompany(applications, company);
+
+      if (!companyResult.ok) {
+        return {
+          found: false,
+          message: companyResult.message,
+        };
+      }
+
+      const { companyName, matches } = companyResult;
+      if (matches.length === 0) {
+        return {
+          found: false,
+          company: companyName,
+          message: `No application found for ${companyName}.`,
+        };
+      }
+
+      const normalizedMatches = [...matches].sort((a, b) =>
+        (a.role || "").localeCompare(b.role || "")
+      );
+
+      const summary =
+        normalizedMatches.length === 1
+          ? `${companyName} is currently in ${normalizedMatches[0]?.status} status (${normalizedMatches[0]?.role}).`
+          : `${companyName} has ${normalizedMatches.length} applications with mixed statuses.`;
+
+      return {
+        found: true,
+        company: companyName,
+        summary,
+        applications: normalizedMatches.map((app) => ({
+          id: app.id,
+          company: app.company,
+          role: app.role,
+          status: app.status,
+          interviewDate: app.interviewDate,
+          notes: app.notes,
+        })),
+        message: summary,
+      };
+    },
+    inputSchema: z.object({
+      company: z.string().describe(schemaDescriptions.getApplicationStatus.company),
+    }),
+    outputSchema: z.object({
+      found: z.boolean(),
+      company: z.string().optional(),
+      summary: z.string().optional(),
+      applications: z
+        .array(
+          z.object({
+            id: z.string(),
+            company: z.string(),
+            role: z.string(),
+            status: z.enum(["applied", "shortlisted", "interview", "offer", "rejected"]),
+            interviewDate: z.string().optional(),
+            notes: z.string().optional(),
+          })
+        )
+        .optional(),
+      message: z.string(),
+    }),
   },
   {
     name: "getActiveSprints",
@@ -296,37 +421,145 @@ export const tools: TamboTool[] = [
         role?: string;
         status?: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
         notes?: string;
+        applicationDate?: string;
       }>;
     }) => {
-      const createApplicationAPI = useStore.getState().createApplicationAPI;
+      const state = useStore.getState();
+      const createApplicationAPI = state.createApplicationAPI;
+      const updateApplicationAPI = state.updateApplicationAPI;
+      let knownApplications = [...state.applications];
       const added: string[] = [];
       const failed: string[] = [];
 
-      // Handle various input formats that Tambo might send
-      const apps = input?.applications || [];
-
       console.log("addApplications input:", JSON.stringify(input, null, 2));
+      const apps = normalizeApplicationsForCreation(input?.applications || []);
+      console.log("addApplications normalized:", JSON.stringify(apps, null, 2));
 
       for (const app of apps) {
-        // Defensive: ensure we have a company name and sanitize it
-        const rawName = typeof app === 'string' ? app : (app?.company || '');
-        const companyName = sanitizeCompanyName(rawName);
+        const companyName = sanitizeCompanyName(app.company || "");
+        const incomingRole = normalizeRoleText(app.role);
+        const incomingNotes = app.notes?.trim();
+        const incomingApplicationDate = app.applicationDate;
 
         if (!companyName) {
           console.warn("Skipping application with no company name:", app);
           continue;
         }
 
+        const companyMatches = knownApplications.filter(
+          (candidate) =>
+            sanitizeCompanyName(candidate.company).toLowerCase() === companyName.toLowerCase()
+        );
+        const existing = pickApplicationForUpsert(companyMatches, incomingRole);
+
+        if (existing) {
+          const mergedNotes = mergeNotes(existing.notes, incomingNotes);
+          const updates: {
+            company?: string;
+            role?: string;
+            status?: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
+            notes?: string;
+            applicationDate?: string;
+          } = {};
+
+          if ((existing.company || "").trim() !== companyName) {
+            updates.company = companyName;
+          }
+
+          if (
+            incomingRole &&
+            (!rolesEquivalent(existing.role, incomingRole) || isGenericRole(existing.role))
+          ) {
+            updates.role = incomingRole;
+          }
+
+          if (app.status && existing.status !== app.status) {
+            updates.status = app.status;
+          }
+
+          if (mergedNotes !== existing.notes) {
+            updates.notes = mergedNotes ?? "";
+          }
+
+          if (incomingApplicationDate && incomingApplicationDate !== existing.applicationDate) {
+            updates.applicationDate = incomingApplicationDate;
+          }
+
+          try {
+            if (Object.keys(updates).length > 0) {
+              await updateApplicationAPI(existing.id, updates);
+            }
+
+            const nextApplication = {
+              ...existing,
+              ...updates,
+            };
+            knownApplications = knownApplications.map((candidate) =>
+              candidate.id === existing.id ? nextApplication : candidate
+            );
+
+            const malformedDuplicates = companyMatches.filter(
+              (candidate) =>
+                candidate.id !== existing.id &&
+                (candidate.company || "").trim() !== sanitizeCompanyName(candidate.company)
+            );
+
+            for (const duplicate of malformedDuplicates) {
+              const archivedNotes =
+                mergeNotes(
+                  duplicate.notes,
+                  "Auto-archived malformed duplicate card after normalization."
+                ) ?? "";
+
+              await updateApplicationAPI(duplicate.id, {
+                status: "rejected",
+                notes: archivedNotes,
+              });
+
+              knownApplications = knownApplications.map((candidate) =>
+                candidate.id === duplicate.id
+                  ? {
+                    ...candidate,
+                    status: "rejected",
+                    notes: archivedNotes,
+                  }
+                  : candidate
+              );
+            }
+
+            added.push(companyName);
+          } catch (error) {
+            console.error(`Failed to update application for ${companyName}:`, error);
+            failed.push(companyName);
+          }
+          continue;
+        }
+
+        if (companyMatches.length > 0) {
+          console.warn("Ambiguous duplicate applications; skipping auto-create:", {
+            companyName,
+            incomingRole,
+            matches: companyMatches.map((candidate) => ({
+              id: candidate.id,
+              company: candidate.company,
+              role: candidate.role,
+            })),
+          });
+          failed.push(companyName);
+          continue;
+        }
+
         try {
-          await createApplicationAPI({
+          const created = await createApplicationAPI({
             company: companyName,
-            role: (typeof app === 'object' ? app?.role : undefined) || "Software Engineer",
-            status: (typeof app === 'object' ? app?.status : undefined) || "applied",
-            notes: (typeof app === 'object' ? app?.notes : undefined) || "",
+            role: incomingRole || "Software Engineer",
+            status: app.status || "applied",
+            notes: incomingNotes || "",
             // Additional defaults required by API schema if not present
             roleType: undefined,
-            applicationDate: new Date().toISOString(),
+            applicationDate: incomingApplicationDate || new Date().toISOString(),
           });
+          knownApplications = [...knownApplications, created];
           added.push(companyName);
         } catch (error) {
           console.error(`Failed to create application for ${companyName}:`, error);
@@ -351,6 +584,10 @@ export const tools: TamboTool[] = [
               .optional()
               .describe(schemaDescriptions.addApplications.status),
             notes: z.string().optional().describe(schemaDescriptions.addApplications.notes),
+            applicationDate: z
+              .string()
+              .optional()
+              .describe(schemaDescriptions.addApplications.applicationDate),
           })
         )
         .describe(schemaDescriptions.addApplications.applications),
@@ -364,62 +601,95 @@ export const tools: TamboTool[] = [
   {
     name: "updateApplicationStatus",
     description: toolDescriptions.updateApplicationStatus,
-    tool: async (input: {
-      updates: Array<
-        | string
-        | {
-          company: string;
-          newStatus: "applied" | "shortlisted" | "interview" | "offer" | "rejected";
-        }
-      >;
-    }) => {
-      const state = useStore.getState();
-      const applications = state.applications;
-      const updateApplicationAPI = state.updateApplicationAPI;
+    tool: async (input: unknown) => {
       const results: Array<{ company: string; status: string; success: boolean }> = [];
 
       console.log("updateApplicationStatus input:", JSON.stringify(input, null, 2));
 
-      const updates = input?.updates || [];
+      const updates = normalizeStatusUpdatesInput(input);
+
+      if (updates.length === 0) {
+        return {
+          updated: [],
+          failed: ["invalid_input"],
+          count: 0,
+        };
+      }
 
       for (const update of updates) {
-        let companyName: string = '';
-        let newStatus: "applied" | "shortlisted" | "interview" | "offer" | "rejected" = 'applied';
+        const companyName = sanitizeCompanyName(update.company || "");
+        const applicationId = update.applicationId?.trim() || "";
+        const newStatus = update.newStatus;
 
-        if (typeof update === 'string') {
-          // Handle string format like "Google:shortlisted" or "Google|shortlisted"
-          const parts = update.split(/[:|]/);
-          companyName = sanitizeCompanyName(parts[0] || '');
-          const statusPart = parts[1]?.toLowerCase().trim();
-          if (statusPart && ['applied', 'shortlisted', 'interview', 'offer', 'rejected'].includes(statusPart)) {
-            newStatus = statusPart as typeof newStatus;
-          }
-        } else if (update && typeof update === 'object') {
-          // Handle object format {company: "Google", newStatus: "shortlisted"}
-          companyName = sanitizeCompanyName(update.company || '');
-          newStatus = update.newStatus || 'applied';
-        }
-
-        if (!companyName) {
-          results.push({ company: 'unknown', status: 'failed', success: false });
+        if (!applicationId && !companyName) {
+          results.push({ company: "unknown", status: "failed", success: false });
           continue;
         }
 
-        // Find the application by company name (case-insensitive, also sanitize stored names)
-        const app = applications.find(
-          (a) => sanitizeCompanyName(a.company).toLowerCase() === companyName.toLowerCase()
-        );
+        const resolveApp = () => {
+          const applications = useStore.getState().applications;
+
+          if (applicationId) {
+            const byId = applications.find((candidate) => candidate.id === applicationId);
+            if (byId) return byId;
+          }
+
+          if (!companyName) return undefined;
+
+          const matches = applications.filter(
+            (candidate) =>
+              sanitizeCompanyName(candidate.company).toLowerCase() ===
+              companyName.toLowerCase()
+          );
+
+          if (matches.length === 0) return undefined;
+          if (matches.length === 1) return matches[0];
+
+          const interviewingMatches = matches.filter(
+            (candidate) => candidate.status === "interview"
+          );
+          if (interviewingMatches.length === 1) return interviewingMatches[0];
+
+          return matches[0];
+        };
+
+        let app = resolveApp();
+
+        if (!app) {
+          try {
+            await useStore.getState().syncWithBackend();
+            app = resolveApp();
+          } catch (error) {
+            console.error("Status update sync retry failed:", error);
+          }
+        }
 
         if (app) {
           try {
-            await updateApplicationAPI(app.id, { status: newStatus });
-            results.push({ company: companyName, status: newStatus, success: true });
+            await useStore.getState().updateApplicationAPI(app.id, { status: newStatus });
+            results.push({
+              company:
+                sanitizeCompanyName(app.company) || companyName || applicationId || "unknown",
+              status: newStatus,
+              success: true,
+            });
           } catch (error) {
-            console.error(`Failed to update status for ${companyName}:`, error);
-            results.push({ company: companyName, status: 'error', success: false });
+            console.error(
+              `Failed to update status for ${companyName || applicationId}:`,
+              error
+            );
+            results.push({
+              company: companyName || applicationId || "unknown",
+              status: "error",
+              success: false,
+            });
           }
         } else {
-          results.push({ company: companyName, status: 'not found', success: false });
+          results.push({
+            company: companyName || applicationId || "unknown",
+            status: "not found",
+            success: false,
+          });
         }
       }
 
@@ -429,18 +699,51 @@ export const tools: TamboTool[] = [
         count: results.filter((r) => r.success).length,
       };
     },
-    inputSchema: z.object({
-      updates: z
-        .array(
-          z.object({
-            company: z.string().describe(schemaDescriptions.updateApplicationStatus.company),
-            newStatus: z
-              .enum(["applied", "shortlisted", "interview", "offer", "rejected"])
-              .describe(schemaDescriptions.updateApplicationStatus.newStatus),
-          })
-        )
-        .describe(schemaDescriptions.updateApplicationStatus.updates),
+    inputSchema: permissiveStatusUpdateInputSchema.describe(
+      schemaDescriptions.updateApplicationStatus.updates
+    ),
+    outputSchema: z.object({
+      updated: z.array(z.string()),
+      failed: z.array(z.string()),
+      count: z.number(),
     }),
+  },
+  {
+    name: "upsertInterviewRounds",
+    description: toolDescriptions.upsertInterviewRounds,
+    tool: async (input: unknown) => {
+      const updates = normalizeRoundUpdatesInput(input);
+      if (updates.length === 0) {
+        return {
+          updated: [],
+          failed: ["invalid_input"],
+          count: 0,
+        };
+      }
+
+      return upsertInterviewRoundsBatch(updates, {
+        getApplications: () => useStore.getState().applications,
+        refreshApplications: async () => {
+          await useStore.getState().syncWithBackend();
+        },
+        createRound: async (applicationId, data) => {
+          await useStore.getState().createInterviewRoundAPI(applicationId, data);
+        },
+        updateRound: async (applicationId, roundNumber, data) => {
+          await useStore.getState().updateInterviewRoundAPI(
+            applicationId,
+            roundNumber,
+            data
+          );
+        },
+        updateApplication: async (applicationId, data) => {
+          await useStore.getState().updateApplicationAPI(applicationId, data);
+        },
+      });
+    },
+    inputSchema: permissiveRoundUpdateInputSchema.describe(
+      schemaDescriptions.upsertInterviewRounds.updates
+    ),
     outputSchema: z.object({
       updated: z.array(z.string()),
       failed: z.array(z.string()),

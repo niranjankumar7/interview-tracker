@@ -4,8 +4,10 @@
 
 type ToolDescriptionKey =
   | "updateApplicationStatus"
+  | "upsertInterviewRounds"
   | "addApplications"
   | "getApplications"
+  | "getApplicationStatus"
   | "getActiveSprints"
   | "getQuestions"
   | "getUserProgress"
@@ -16,8 +18,19 @@ type ToolDescriptionKey =
 // Tools with empty or trivial input schemas don't need entries.
 type SchemaDescriptions = {
   updateApplicationStatus: {
+    applicationId: string;
     company: string;
     newStatus: string;
+    updates: string;
+  };
+  upsertInterviewRounds: {
+    applicationId: string;
+    company: string;
+    role: string;
+    roundType: string;
+    roundNumber: string;
+    scheduledDate: string;
+    notes: string;
     updates: string;
   };
   addApplications: {
@@ -25,7 +38,11 @@ type SchemaDescriptions = {
     role: string;
     status: string;
     notes: string;
+    applicationDate: string;
     applications: string;
+  };
+  getApplicationStatus: {
+    company: string;
   };
   markTopicComplete: {
     topicName: string;
@@ -48,6 +65,7 @@ export const toolDescriptions = {
 Update the status of one or more job applications.
 
 CRITICAL: Use this tool when the user mentions a status change in natural language.
+Prefer applicationId when available; use company name otherwise.
 
 ## INCOMPLETE PROMPT HANDLING (VERY IMPORTANT)
 If the user provides ONLY a status word without a company name, you MUST ask for clarification:
@@ -96,10 +114,11 @@ Handle common typos - focus on meaning, not spelling:
 - "Micrsoft" → "Microsoft"
 
 ## Extraction Rules
-1. Extract COMPANY NAME first - this is REQUIRED.
-2. Handle preposition variations: "rejected BY" and "rejected FROM" are equivalent.
-3. If a role is mentioned, ignore it for this tool call (this tool only updates status).
-4. If status is unclear, ask: "Should I mark [company] as [status]?"
+1. If applicationId is available, use it first.
+2. Otherwise extract COMPANY NAME.
+3. Handle preposition variations: "rejected BY" and "rejected FROM" are equivalent.
+4. If a role is mentioned, ignore it for this tool call (this tool only updates status).
+5. If status is unclear, ask: "Should I mark [company] as [status]?"
 
 ## Real User Examples
 - "I got rejected by Microsoft for a developer" → {company: "Microsoft", newStatus: "rejected"}
@@ -115,6 +134,28 @@ Handle common typos - focus on meaning, not spelling:
 - "got the bag from coinbase!" → {company: "Coinbase", newStatus: "offer"}
 - "lowballed by infosys" → {company: "Infosys", newStatus: "offer"}
 - "rejected by airbnb, meta and netflix all in one day" → 3 separate rejected updates
+`.trim(),
+
+  upsertInterviewRounds: `
+Add or update interview rounds on an existing application (e.g., Tech 1, Tech 2 with dates).
+
+IMPORTANT:
+- Use this for prompts like "set tech 1 on Feb 14 and tech 2 on Feb 18".
+- Prefer applicationId if known; otherwise use company/role matching.
+- Prefer updating the existing company/role application instead of creating a new card.
+- If company has multiple roles and role is not specified, ask for clarification.
+
+## Trigger Phrases
+- "Add round 2 for [company]"
+- "Set tech 1 date to [date]"
+- "Tech 2 on [date] for [company]"
+- "Add another interview round for [company]"
+- "Update interview dates for [company]"
+
+## Round Labels
+- Round names are user/company specific. Keep the label from user intent when available
+  (examples: "Tech Screen", "Manager Round", "Bar Raiser", "HR").
+- If roundType is missing but roundNumber exists, the system will use a neutral label like "Round 3".
 `.trim(),
 
   addApplications: `
@@ -147,6 +188,7 @@ If user is adding a company that already exists in the pipeline:
 
 ## Notes Handling
 If the user mentions additional context (salary expectations, HR budget, source like LinkedIn, referral), capture it in the optional "notes" field.
+If the user mentions when they applied (e.g., "yesterday", "on Jan 5"), capture that in "applicationDate" instead of burying it only in notes.
 
 Example:
 - "Applied for zee5 - sdet role - hr said 12 lpa budget"
@@ -179,6 +221,10 @@ When the user mentions multiple companies:
   getApplications: `
 Get all job applications with their details.
 
+IMPORTANT: Use this for broad, multi-company pipeline views.
+If the user asks about ONE specific company (e.g., "Where do I stand with Microsoft?"),
+use getApplicationStatus instead of this tool.
+
 ## Trigger Phrases
 - "Show my applications"
 - "What companies have I applied to?"
@@ -190,6 +236,25 @@ Get all job applications with their details.
 - "Which companies am i interviewing with?"
 - "Show me my failing apps"
 - "Who ghosted me?"
+`.trim(),
+
+  getApplicationStatus: `
+Get the current status for a single company application.
+
+IMPORTANT: Use this for company-specific questions and respond concisely.
+Do NOT open PipelineSummaryPanel for these.
+
+## Trigger Phrases
+- "Where do I stand with [company]?"
+- "What's my status with [company]?"
+- "Any update on [company]?"
+- "What happened with [company]?"
+- "Did [company] move me forward?"
+
+## Response Style
+- Return a short direct answer first (status + role).
+- If multiple roles exist at the same company, list each role + status.
+- If not found, clearly say no application exists for that company.
 `.trim(),
 
   getActiveSprints: `
@@ -274,7 +339,7 @@ Get all topics the user has marked as completed.
 export const schemaDescriptions = {
   updateApplicationStatus: {
     company: `
-Company name to update. REQUIRED field.
+Company name to update. Optional if applicationId is provided.
 
 Extract from phrases (handle preposition variations):
 - "I got rejected from Microsoft" → "Microsoft"
@@ -282,7 +347,11 @@ Extract from phrases (handle preposition variations):
 - "Microsoft SDE Cloud" → "Microsoft" (remove role suffix)
 - "rejected - [company]" → extract company after dash
 
-If company is missing, ASK: "Which company?"
+Prefer applicationId when available; use company otherwise.
+`.trim(),
+    applicationId: `
+Optional application id for precise updates when company matching is ambiguous.
+Example: "fd4338ab-688b-4351-a83e-c8d608683c64"
 `.trim(),
     newStatus: `
 The new status. Map natural language:
@@ -299,6 +368,50 @@ Real examples:
 - "rejected from softbank" → [{company: "Softbank", newStatus: "rejected"}]
 - "did bad in the interview, got rejected, Apple SD round" → [{company: "Apple", newStatus: "rejected"}]
 - "rejected by airbnb, meta and netflix" → 3 separate updates
+- "Set status to interview for application fd4338ab-688b-4351-a83e-c8d608683c64"
+  → [{applicationId:"fd4338ab-688b-4351-a83e-c8d608683c64", newStatus:"interview"}]
+`.trim(),
+  },
+
+  upsertInterviewRounds: {
+    applicationId: `
+Optional application id for exact targeting. Prefer this if known.
+Example: "fd4338ab-688b-4351-a83e-c8d608683c64"
+`.trim(),
+    company: `
+Company name whose interview round should be updated. Optional if applicationId is provided.
+Example: "Google"
+`.trim(),
+    role: `
+Optional role to disambiguate when a company has multiple applications.
+Example: "ML Engineer"
+`.trim(),
+    roundType: `
+Optional interview round type.
+Use free text from the user when possible (examples: "Tech Screen", "Manager Round", "HR").
+`.trim(),
+    roundNumber: `
+Optional round number. If provided without roundType, the round can still be tracked as "Round N".
+`.trim(),
+    scheduledDate: `
+Interview round date. Accept natural language or ISO date.
+Examples: "Feb 18, 2026", "2026-02-18", "next Wednesday"
+`.trim(),
+    notes: `
+Optional note for the round.
+Example: "Tech Round 2"
+`.trim(),
+    updates: `
+List of round updates.
+
+Examples:
+- "Google ML engineer tech 1 on Feb 14 and tech 2 on Feb 18"
+  -> [{company:"Google", role:"ML Engineer", roundNumber:1, scheduledDate:"2026-02-14"},
+      {company:"Google", role:"ML Engineer", roundNumber:2, scheduledDate:"2026-02-18"}]
+- "Add another round for Meta PM on Feb 20"
+  -> [{company:"Meta", role:"PM", scheduledDate:"2026-02-20"}]
+- "Round 1 on Feb 25 for app fd4338ab-688b-4351-a83e-c8d608683c64"
+  -> [{applicationId:"fd4338ab-688b-4351-a83e-c8d608683c64", roundNumber:1, scheduledDate:"2026-02-25"}]
 `.trim(),
   },
 
@@ -316,6 +429,8 @@ Job role/title. Common formats:
 - "SDE", "SDET", "Software Engineer", "ML Engineer"
 - "Head of Engineer", "Sr. Developer", "L4", "W24 Batch"
 
+IMPORTANT: If a role applies to multiple companies, include it here for EACH company.
+
 Handle typos:
 - "develoer" → "Developer"
 - "SDT" → "SDE"
@@ -329,8 +444,19 @@ Examples:
 - "Applied via LinkedIn"
 - "Referral"
 `.trim(),
+    applicationDate: `
+Optional application date. Use this when the user specifies when they applied.
+
+Examples:
+- "I applied yesterday" → "yesterday"
+- "applied on 2026-02-07" → "2026-02-07"
+- "submitted my resume on next friday" → "next friday"
+`.trim(),
     applications: `
 List of applications to add.
+
+## CRITICAL: SHARED ROLES
+If the user specifies a single role for multiple companies (e.g., "applied to X, Y, Z for ML Engineer"), you MUST generate an object for EACH company and include the "role": "ML Engineer" in EVERY object. Do NOT leave the role empty.
 
 Real examples:
 - "I applied for Xenon, X, Y, AI, AABC company for the role ML engineer"
@@ -339,6 +465,8 @@ Real examples:
   → [{company: "Softbank", role: "Head of Engineer"}]
 - "referral for google L4" → [{company: "Google", role: "L4", notes: "Referral"}]
 - "applied via linkedin to grab, gojek" → 2 apps with notes "Applied via LinkedIn"
+- "I applied for google , microsfot, openai, anthropic for ml engineer role"
+  → [{company: "Google", role: "ML Engineer"}, {company: "Microsoft", role: "ML Engineer"}, {company: "OpenAI", role: "ML Engineer"}, {company: "Anthropic", role: "ML Engineer"}]
 `.trim(),
   },
 
@@ -353,6 +481,16 @@ Match what the user says to the closest topic name.
 
   getQuestions: {
     company: `Optional company name to filter questions by.`.trim(),
+  },
+  getApplicationStatus: {
+    company: `
+Company name to check status for.
+
+Examples:
+- "Where do I stand with Microsoft?" → "Microsoft"
+- "Any updates on OpenAI?" → "OpenAI"
+- "status for google" → "Google"
+`.trim(),
   },
 } satisfies SchemaDescriptions;
 
@@ -434,12 +572,18 @@ Auto-detects category: DSA, System Design, Behavioral, SQL.
   PipelineSummaryPanel: `
 Summarizes the user's job application pipeline by status.
 
+IMPORTANT: Use only for explicit pipeline-summary requests.
+Do NOT use for single-company status questions like:
+- "Where do I stand with Microsoft?"
+- "What's my status with Google?"
+
 ## Trigger Phrases
 - "Show my pipeline"
-- "Where do I stand?"
 - "Show my interviews"
 - "Pipeline summary"
 - "Application overview"
+- "Show full pipeline table"
+- "Give me the full status breakdown"
 
 Highlights upcoming interviews with a countdown.
 `.trim(),

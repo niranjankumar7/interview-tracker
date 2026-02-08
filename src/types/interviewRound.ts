@@ -8,8 +8,12 @@ export const interviewRoundTypes = [
     'Final',
 ] as const;
 
-export type InterviewRoundType = (typeof interviewRoundTypes)[number];
+export type KnownInterviewRoundType = (typeof interviewRoundTypes)[number];
+export type InterviewRoundType = string;
 
-export function isInterviewRoundType(value: string): value is InterviewRoundType {
+export function isKnownInterviewRoundType(value: string): value is KnownInterviewRoundType {
     return (interviewRoundTypes as readonly string[]).includes(value);
 }
+
+// Backward-compatible alias for existing imports.
+export const isInterviewRoundType = isKnownInterviewRoundType;
