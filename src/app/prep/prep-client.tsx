@@ -1,7 +1,7 @@
 "use client";
 
 import { TodaysPlanPanel } from "@/components/generative/TodaysPlanPanel";
-import Link from "next/link";
+import { AppHeader } from "@/components/layout/AppHeader";
 
 export function PrepClient({
   focusApplicationId,
@@ -9,30 +9,24 @@ export function PrepClient({
   focusApplicationId?: string;
 }) {
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Fixed Header */}
-      <header className="flex-none bg-background border-b border-border px-6 py-4 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Prep Plan</h1>
-            <p className="text-sm text-muted-foreground">Today&apos;s tasks across your active sprints</p>
-          </div>
-          <Link
-            href="/chat"
-            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-          >
-            Back to app
-          </Link>
-        </div>
-      </header>
+    <div className="flex flex-1 min-h-0 flex-col bg-background">
+      <AppHeader />
 
-      {/* Scrollable Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto p-6 pb-8">
-          <TodaysPlanPanel
-            showAll={!focusApplicationId}
-            focusApplicationId={focusApplicationId}
-          />
+      <main className="flex-1 min-h-0 overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 pb-20 md:px-6">
+          <div className="mx-auto mb-6 w-full max-w-4xl">
+            <h1 className="text-2xl font-bold text-foreground">Prep Plan</h1>
+            <p className="text-sm text-muted-foreground">
+              Today&apos;s tasks across your active sprints
+            </p>
+          </div>
+
+          <div className="flex justify-center">
+            <TodaysPlanPanel
+              showAll={!focusApplicationId}
+              focusApplicationId={focusApplicationId}
+            />
+          </div>
         </div>
       </main>
     </div>

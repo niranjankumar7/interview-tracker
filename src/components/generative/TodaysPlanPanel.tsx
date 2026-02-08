@@ -90,7 +90,7 @@ export function TodaysPlanPanel({
     const sprintsToShow = showAll ? orderedSprints : [orderedSprints[0]].filter(Boolean);
 
     return (
-        <div className="space-y-6 max-w-lg">
+        <div className="w-full max-w-4xl space-y-6">
             {/* Streak Banner */}
             {progress.currentStreak > 0 && (
                 <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl p-4 flex items-center justify-between shadow-lg">
