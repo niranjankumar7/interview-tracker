@@ -72,14 +72,14 @@ export function TodaysPlanPanel({
 
     if (activeSprints.length === 0) {
         return (
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 text-center max-w-md border border-gray-200">
-                <div className="p-4 bg-gray-200 rounded-full w-fit mx-auto mb-4">
-                    <Calendar className="w-8 h-8 text-gray-500" />
+            <div className="bg-gradient-to-br from-muted/50 to-muted rounded-xl p-8 text-center max-w-md border border-border">
+                <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <h3 className="font-semibold text-lg text-gray-700 mb-2">
+                <h3 className="font-semibold text-lg text-foreground mb-2">
                     No Active Sprints
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                     Create an interview sprint to get started! Try saying: &ldquo;I have an
                     interview at Google next Thursday for SDE&rdquo;
                 </p>

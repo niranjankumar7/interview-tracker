@@ -195,6 +195,21 @@ export const userApi = {
             body: JSON.stringify(data),
         });
     },
+
+    /**
+     * Update user progress
+     */
+    async updateProgress(data: {
+        currentStreak?: number;
+        longestStreak?: number;
+        lastActiveDate?: string;
+        totalTasksCompleted?: number;
+    }): Promise<any> {
+        return apiRequest<any>('/api/user/progress', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
 };
 
 // ============================================
@@ -307,6 +322,13 @@ export const sprintsApi = {
     },
 
     /**
+     * Get single sprint
+     */
+    async getById(id: string): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}`);
+    },
+
+    /**
      * Create new sprint
      */
     async create(data: {
@@ -319,6 +341,31 @@ export const sprintsApi = {
         return apiRequest<any>('/api/sprints', {
             method: 'POST',
             body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Update sprint
+     */
+    async update(id: string, data: {
+        status?: 'active' | 'completed' | 'expired';
+        dailyPlans?: any;
+        interviewDate?: string;
+        roleType?: string;
+        totalDays?: number;
+    }): Promise<any> {
+        return apiRequest<any>(`/api/sprints/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+
+    /**
+     * Delete sprint
+     */
+    async delete(id: string): Promise<void> {
+        await apiRequest(`/api/sprints/${id}`, {
+            method: 'DELETE',
         });
     },
 };

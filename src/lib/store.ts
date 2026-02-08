@@ -589,7 +589,7 @@ export const useStore = create<AppState>()(
                     }),
                 })),
 
-            completeTask: (sprintId, dayIndex, blockIndex, taskIndex) => {
+            completeTask: async (sprintId, dayIndex, blockIndex, taskIndex) => {
                 const existingTask =
                     get()
                         .sprints.find((sprint) => sprint.id === sprintId)
@@ -597,6 +597,7 @@ export const useStore = create<AppState>()(
 
                 if (!existingTask || existingTask.completed) return;
 
+                // Update local state first (optimistic update)
                 set((state) => {
                     const sprints = state.sprints.map(sprint => {
                         if (sprint.id !== sprintId) return sprint;
@@ -657,6 +658,34 @@ export const useStore = create<AppState>()(
                         }
                     };
                 });
+
+                // Save to database
+                try {
+                    const updatedSprint = get().sprints.find(s => s.id === sprintId);
+                    const currentProgress = get().progress;
+
+                    if (updatedSprint) {
+                        // Update sprint in database
+                        await api.sprints.update(sprintId, {
+                            dailyPlans: updatedSprint.dailyPlans,
+                            status: updatedSprint.status,
+                        });
+
+                        // Update user progress in database
+                        await api.user.updateProgress({
+                            currentStreak: currentProgress.currentStreak,
+                            longestStreak: currentProgress.longestStreak,
+                            lastActiveDate: currentProgress.lastActiveDate,
+                            totalTasksCompleted: currentProgress.totalTasksCompleted,
+                        });
+
+                        console.log('✅ Task completion saved to database');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to save task completion to database:', error);
+                    // Note: Local state is already updated (optimistic update)
+                    // You might want to show a notification to the user here
+                }
             },
 
             updateProgress: (updates) =>
