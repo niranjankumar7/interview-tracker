@@ -161,8 +161,24 @@ function parseInterviewRoundType(value: string | undefined): InterviewRoundType 
   if (!normalized) return undefined;
 
   const compact = normalized.toLowerCase().replace(/[\s_-]+/g, "");
+  const firstRoundAliases = new Set([
+    "first",
+    "firstround",
+    "round1",
+    "1st",
+    "1stround",
+  ]);
+  const secondRoundAliases = new Set([
+    "second",
+    "secondround",
+    "round2",
+    "2nd",
+    "2ndround",
+  ]);
 
   if (compact === "hr" || compact.includes("humanresources")) return "HR";
+  if (firstRoundAliases.has(compact)) return "TechnicalRound1";
+  if (secondRoundAliases.has(compact)) return "TechnicalRound2";
   if (
     compact.includes("technicalround1") ||
     compact.includes("techround1") ||
@@ -199,6 +215,8 @@ function parseInterviewRoundType(value: string | undefined): InterviewRoundType 
 }
 
 function inferRoundTypeFromNumber(roundNumber: number): InterviewRoundType {
+  if (roundNumber === 1) return "TechnicalRound1";
+  if (roundNumber === 2) return "TechnicalRound2";
   return `Round ${roundNumber}`;
 }
 

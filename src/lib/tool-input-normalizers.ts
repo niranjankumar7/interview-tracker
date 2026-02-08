@@ -145,9 +145,29 @@ function normalizeRoundType(raw: unknown): string | undefined {
   if (!normalized) return undefined;
 
   const compact = normalized.toLowerCase().replace(/[\s_-]+/g, "");
+  const firstRoundAliases = new Set([
+    "first",
+    "firstround",
+    "round1",
+    "1st",
+    "1stround",
+  ]);
+  const secondRoundAliases = new Set([
+    "second",
+    "secondround",
+    "round2",
+    "2nd",
+    "2ndround",
+  ]);
 
   if (compact === "hr" || compact.includes("humanresources")) {
     return "HR";
+  }
+  if (firstRoundAliases.has(compact)) {
+    return "TechnicalRound1";
+  }
+  if (secondRoundAliases.has(compact)) {
+    return "TechnicalRound2";
   }
   if (
     compact.includes("technicalround1") ||

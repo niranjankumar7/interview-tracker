@@ -90,6 +90,25 @@ export async function POST(
                 { status: 404 }
             );
         }
+        if (
+            error instanceof Prisma.PrismaClientKnownRequestError &&
+            error.code === "P2004"
+        ) {
+            const constraint = String(error.meta?.constraint ?? "");
+            if (constraint === "InterviewRound_roundType_check") {
+                return NextResponse.json(
+                    {
+                        error:
+                            "Invalid roundType for current database schema. Run the latest Prisma migration to support flexible round names.",
+                    },
+                    { status: 400 }
+                );
+            }
+            return NextResponse.json(
+                { error: "Database constraint violation" },
+                { status: 400 }
+            );
+        }
 
         console.error("Create interview round error:", error);
         return NextResponse.json(
