@@ -572,20 +572,21 @@ export function KanbanBoard() {
                                                     const RoundIcon = roundTheme.icon;
                                                     roundBadge = (
                                                         <div
-                                                            className={`mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${roundTheme.badgeClassName}`}
+                                                            className={`mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 truncate max-w-full ${roundTheme.badgeClassName}`}
+                                                            title={roundTheme.label}
                                                         >
-                                                            <RoundIcon className="w-3.5 h-3.5" />
-                                                            {roundTheme.label}
+                                                            <RoundIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="truncate">{roundTheme.label}</span>
                                                         </div>
                                                     );
                                                 } else {
                                                     roundBadge = (
                                                         <div
-                                                            className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-muted text-muted-foreground"
-                                                            title="Unknown interview round"
+                                                            className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-muted text-muted-foreground truncate max-w-full"
+                                                            title={`Unknown: ${app.currentRound}`}
                                                         >
-                                                            <AlertTriangle className="w-3.5 h-3.5" />
-                                                            Unknown: {app.currentRound}
+                                                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                                                            <span className="truncate">Unknown: {app.currentRound}</span>
                                                         </div>
                                                     );
                                                 }
@@ -593,7 +594,7 @@ export function KanbanBoard() {
 
                                             const roundCountBadge =
                                                 roundCount > 0 ? (
-                                                    <div className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700">
+                                                    <div className="mt-2 text-xs px-2 py-1 rounded inline-flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-900/40 dark:text-slate-200 dark:border-slate-700 truncate max-w-full">
                                                         {roundCount} round{roundCount === 1 ? "" : "s"}
                                                     </div>
                                                 ) : null;
@@ -605,7 +606,7 @@ export function KanbanBoard() {
                                                     onDragStart={(e) => handleDragStart(e, app.id)}
                                                     onMouseDown={handleMouseDown}
                                                     onClick={(e) => handleCardClick(app.id, e)}
-                                                    className={`bg-card rounded-lg shadow-sm border p-4 cursor-pointer hover:shadow-lg transition-all group relative ${isUrgent
+                                                    className={`bg-card rounded-lg shadow-sm border p-3 cursor-pointer hover:shadow-lg transition-all group relative max-h-[200px] flex flex-col ${isUrgent
                                                         ? "border-orange-300 ring-2 ring-orange-100 dark:border-orange-900 dark:ring-orange-950/40"
                                                         : "border-border hover:border-indigo-300"
                                                         }`}
@@ -616,13 +617,16 @@ export function KanbanBoard() {
                                                     </div>
 
                                                     {/* Card Header */}
-                                                    <div className="flex items-start justify-between mb-3">
-                                                        <div className="flex items-center gap-2">
-                                                            <GripVertical className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground/70 cursor-grab active:cursor-grabbing" />
-                                                            <div>
-                                                                <h4 className="font-semibold text-foreground flex items-center gap-2">
-                                                                    <Building2 className="w-4 h-4 text-muted-foreground" />
-                                                                    {app.company}
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                            <GripVertical className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground/70 cursor-grab active:cursor-grabbing flex-shrink-0" />
+                                                            <div className="min-w-0 flex-1">
+                                                                <h4
+                                                                    className="font-semibold text-foreground flex items-center gap-2 truncate"
+                                                                    title={app.company}
+                                                                >
+                                                                    <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                                                    <span className="truncate">{app.company}</span>
                                                                 </h4>
                                                             </div>
                                                         </div>
@@ -631,7 +635,7 @@ export function KanbanBoard() {
                                                                 e.stopPropagation();
                                                                 setDeleteCandidate(app);
                                                             }}
-                                                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1"
+                                                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all p-1 flex-shrink-0"
                                                             title="Delete application"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -639,9 +643,12 @@ export function KanbanBoard() {
                                                     </div>
 
                                                     {/* Role */}
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                                        <Briefcase className="w-3.5 h-3.5" />
-                                                        {app.role}
+                                                    <div
+                                                        className="flex items-center gap-2 text-sm text-muted-foreground mb-2 min-w-0"
+                                                        title={app.role}
+                                                    >
+                                                        <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
+                                                        <span className="truncate">{app.role}</span>
                                                     </div>
 
                                                     {app.status === "offer" && (offerTotalLabel || app.offerDetails?.workMode) && (
@@ -665,12 +672,12 @@ export function KanbanBoard() {
                                                             ? "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-200"
                                                             : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-200"
                                                             }`}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Calendar className="w-3.5 h-3.5" />
-                                                                {format(parsedInterviewDate, "MMM d")}
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                                                                <span className="truncate">{format(parsedInterviewDate, "MMM d")}</span>
                                                             </div>
                                                             {daysUntil !== null && daysUntil >= 0 && (
-                                                                <span className="font-medium">
+                                                                <span className="font-medium flex-shrink-0">
                                                                     {daysUntil === 0
                                                                         ? "Today!"
                                                                         : `${daysUntil}d left`}
