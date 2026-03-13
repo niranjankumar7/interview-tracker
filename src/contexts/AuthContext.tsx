@@ -1,11 +1,13 @@
 /**
  * Authentication Context and Provider
  * Manages user authentication state across the application
+ * Supports both credentials-based auth and OAuth (Google)
  */
 
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
 import { api, type UserProfile } from '@/lib/api-client';
 
 interface AuthContextType {
@@ -22,16 +24,56 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const { data: session, status: sessionStatus } = useSession();
     const [user, setUser] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const logoutInProgressRef = useRef(false);
 
-    // Load user profile on mount
+    // Load user profile on mount and when session changes
     useEffect(() => {
+        // If Next-Auth session is still loading, wait
+        if (sessionStatus === 'loading') {
+            return;
+        }
+
+        // If there's a Next-Auth session (Google OAuth), use that user data
+        if (session?.user) {
+            // Map Next-Auth session user to UserProfile format
+            const mappedUser: UserProfile = {
+                id: session.user.id || '',
+                email: session.user.email || '',
+                name: session.user.name || null,
+                targetRole: null,
+                experienceLevel: null,
+                createdAt: new Date().toISOString(),
+                progress: {
+                    userId: session.user.id || '',
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    lastActiveDate: null,
+                    totalTasksCompleted: 0,
+                    updatedAt: new Date().toISOString(),
+                },
+                preferences: {
+                    userId: session.user.id || '',
+                    theme: 'system',
+                    studyRemindersEnabled: false,
+                    calendarAutoSyncEnabled: false,
+                    leetcodeAutoSyncEnabled: false,
+                    updatedAt: new Date().toISOString(),
+                },
+                leetcode: null,
+            };
+            setUser(mappedUser);
+            setIsLoading(false);
+            return;
+        }
+
+        // Otherwise, try to load from credentials-based auth
         loadUser();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [session, sessionStatus]);
 
     const loadUser = useCallback(async () => {
         try {
@@ -91,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /**
      * Log out the current user.
      * Uses a ref to prevent concurrent logout requests.
+     * Handles both credentials-based and OAuth logout.
      */
     const logout = useCallback(async () => {
         // Prevent concurrent logout requests
@@ -101,6 +144,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoggingOut(true);
 
         try {
+            // If there's a Next-Auth session (OAuth), sign out from Next-Auth
+            if (session) {
+                await nextAuthSignOut({ redirect: false });
+            }
+            
+            // Also clear credentials-based auth
             await api.auth.logout();
             setUser(null);
         } catch (error) {
@@ -112,9 +161,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsLoggingOut(false);
             logoutInProgressRef.current = false;
         }
-    }, []);
+    }, [session]);
 
     const refreshProfile = useCallback(async () => {
+        // If using Next-Auth, we don't need to refresh (session is server-side)
+        if (session?.user) {
+            return;
+        }
+
         if (!api.auth.isAuthenticated()) return;
 
         try {
@@ -123,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error('Failed to refresh profile:', error);
         }
-    }, []);
+    }, [session]);
 
     const value: AuthContextType = {
         user,

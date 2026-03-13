@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { TamboProviderWrapper } from "@/components/providers/tambo-provider-wrapper";
 import { LeetCodeSyncGate } from "@/components/leetcode";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NextAuthProvider } from "@/components/providers/NextAuthProvider";
 import { DataSyncProvider } from "@/components/providers/DataSyncProvider";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 
@@ -36,19 +37,21 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <Suspense fallback={null}>
-              <AuthGuard>
-                <DataSyncProvider>
-                  <TamboProviderWrapper>
-                    <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                      {children}
-                    </main>
-                  </TamboProviderWrapper>
-                </DataSyncProvider>
-              </AuthGuard>
-            </Suspense>
-          </AuthProvider>
+          <NextAuthProvider>
+            <AuthProvider>
+              <Suspense fallback={null}>
+                <AuthGuard>
+                  <DataSyncProvider>
+                    <TamboProviderWrapper>
+                      <main id="main-content" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                        {children}
+                      </main>
+                    </TamboProviderWrapper>
+                  </DataSyncProvider>
+                </AuthGuard>
+              </Suspense>
+            </AuthProvider>
+          </NextAuthProvider>
         </ThemeProvider>
         <Footer />
         <LeetCodeSyncGate />
