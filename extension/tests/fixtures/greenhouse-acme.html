@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Senior Software Engineer at Acme Inc</title>
+  <meta property="og:title" content="Senior Software Engineer">
+  <meta property="og:site_name" content="Acme Inc">
+  <meta property="og:description" content="Join our engineering team to build the future">
+  
+  <!-- Greenhouse Standard Structure -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": "Senior Software Engineer",
+    "description": "We are looking for a Senior Software Engineer to join our growing team...",
+    "identifier": {
+      "@type": "PropertyValue",
+      "name": "Acme Inc",
+      "value": "1234567"
+    },
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": "Acme Inc",
+      "sameAs": "https://acme.io"
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "San Francisco",
+        "addressRegion": "CA",
+        "addressCountry": "US"
+      }
+    },
+    "employmentType": "FULL_TIME"
+  }
+  </script>
+</head>
+<body>
+  <div id="wrapper">
+    <div id="header">
+      <h1 class="app-title">Senior Software Engineer</h1>
+    </div>
+    
+    <div class="posting">
+      <div class="posting-headline">
+        <h2>Senior Software Engineer</h2>
+      </div>
+      
+      <div class="posting-categories">
+        <span class="location">San Francisco, CA</span>
+        <span class="department">Engineering</span>
+      </div>
+      
+      <div class="posting-apply" data-magnetic-apply-button>
+        <a href="#application" class="apply-button">Apply for this job</a>
+      </div>
+      
+      <div class="posting-description" id="content">
+        <h3>About the Role</h3>
+        <p>We are looking for a Senior Software Engineer to join our growing team. You will be responsible for building scalable systems and mentoring junior engineers.</p>
+        
+        <h3>Requirements</h3>
+        <ul>
+          <li>5+ years of experience with modern JavaScript frameworks</li>
+          <li>Strong understanding of distributed systems</li>
+          <li>Experience with cloud platforms (AWS/GCP)</li>
+        </ul>
+        
+        <h3>Benefits</h3>
+        <ul>
+          <li>Competitive salary ($150k-$200k)</li>
+          <li>Health, dental, and vision insurance</li>
+          <li>Flexible PTO</li>
+        </ul>
+      </div>
+      
+      <div class="application" id="application">
+        <h3>Application</h3>
+        <form>
+          <input type="text" placeholder="Full Name" name="name">
+          <input type="email" placeholder="Email" name="email">
+          <button type="submit">Submit Application</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+<!--
+METADATA:
+  source: greenhouse
+  company: Acme Inc
+  role: Senior Software Engineer
+  location: San Francisco, CA
+  jobId: 1234567
+  confidence: 0.92
+  adapter: GreenhouseAdapter
+  
+EXPECTED_EXTRACTION:
+  company: "Acme Inc"
+  role: "Senior Software Engineer"
+  location: "San Francisco, CA"
+  externalJobId: "1234567"
+  confidence: "> 0.9"
+  metadata.source: "greenhouse"
+  metadata.department: "Engineering"
+-->

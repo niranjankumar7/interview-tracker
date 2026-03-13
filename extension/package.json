@@ -1,0 +1,24 @@
+{
+  "name": "interview-tracker-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension for saving job applications to Interview Tracker",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:watch": "vite build --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4",
+    "vite-plugin-web-extension": "^4.1.1",
+    "vitest": "^1.3.1"
+  },
+  "dependencies": {}
+}

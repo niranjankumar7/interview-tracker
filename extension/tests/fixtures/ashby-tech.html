@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Machine Learning Engineer - Anthropic</title>
+  <meta property="og:title" content="Machine Learning Engineer">
+  <meta property="og:site_name" content="Anthropic">
+  <meta property="og:description" content="Join us in building safe, capable AI systems">
+  
+  <!-- Ashby typically has rich JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": "Machine Learning Engineer",
+    "description": "We're looking for ML Engineers to help us build and improve Claude...",
+    "datePosted": "2026-03-01",
+    "validThrough": "2026-06-01",
+    "employmentType": "FULL_TIME",
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": "Anthropic",
+      "sameAs": "https://www.anthropic.com",
+      "logo": "https://www.anthropic.com/images/anthropic-logo.png"
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "548 Market St",
+        "addressLocality": "San Francisco",
+        "addressRegion": "CA",
+        "postalCode": "94104",
+        "addressCountry": "US"
+      }
+    },
+    "baseSalary": {
+      "@type": "MonetaryAmount",
+      "currency": "USD",
+      "value": {
+        "@type": "QuantitativeValue",
+        "minValue": 250000,
+        "maxValue": 400000,
+        "unitText": "YEAR"
+      }
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="__next">
+    <main data-testid="job-page">
+      <header class="ashby-header">
+        <div class="company-info">
+          <h1 class="org-name" data-testid="company-name">Anthropic</h1>
+        </div>
+      </header>
+      
+      <article class="job-details">
+        <header class="job-header">
+          <h1 data-testid="job-title">Machine Learning Engineer</h1>
+          
+          <div class="job-meta">
+            <span class="location" data-testid="job-location">San Francisco, CA</span>
+            <span class="department">Research & Engineering</span>
+            <span class="job-type">Full-time</span>
+          </div>
+        </header>
+        
+        <div class="apply-section">
+          <button data-testid="apply-button" class="ashby-apply-btn">
+            Apply Now
+          </button>
+        </div>
+        
+        <section class="job-description" data-testid="job-description">
+          <h2>About the Role</h2>
+          <p>We're looking for Machine Learning Engineers to help us build and improve Claude, our AI assistant. You'll work on cutting-edge research and production systems.</p>
+          
+          <h2>Responsibilities</h2>
+          <ul>
+            <li>Design and implement novel ML architectures</li>
+            <li>Train and fine-tune large language models</li>
+            <li>Build evaluation frameworks and safety measures</li>
+            <li>Collaborate with researchers on papers and publications</li>
+          </ul>
+          
+          <h2>Requirements</h2>
+          <ul>
+            <li>PhD or equivalent experience in ML/AI</li>
+            <li>Strong programming skills (Python, PyTorch/JAX)</li>
+            <li>Experience with large-scale distributed training</li>
+            <li>Publications at top-tier ML venues (NeurIPS, ICML, etc.)</li>
+          </ul>
+          
+          <h2>Compensation</h2>
+          <p>The expected salary range for this position is $250K - $400K USD.</p>
+        </section>
+        
+        <section class="application-form" id="application">
+          <h2>Apply for this position</h2>
+          <form data-testid="application-form">
+            <div class="form-field">
+              <label>Full Name</label>
+              <input type="text" name="fullName" required>
+            </div>
+            <div class="form-field">
+              <label>Email</label>
+              <input type="email" name="email" required>
+            </div>
+            <div class="form-field">
+              <label>Resume/CV</label>
+              <input type="file" name="resume" accept=".pdf,.doc,.docx">
+            </div>
+            <button type="submit">Submit Application</button>
+          </form>
+        </section>
+      </article>
+    </main>
+  </div>
+  
+  <!-- Ashby sometimes exposes data via global -->
+  <script>
+    window.__ASHBY__ = {
+      job: {
+        id: "d290f1ee-6c54-4b01-90e6-d701748f0851",
+        title: "Machine Learning Engineer",
+        organization: {
+          name: "Anthropic"
+        },
+        location: "San Francisco, CA",
+        locationName: "San Francisco, CA",
+        department: "Research & Engineering",
+        description: "We're looking for Machine Learning Engineers...",
+        descriptionHtml: "<p>We're looking for Machine Learning Engineers...</p>"
+      }
+    };
+  </script>
+</body>
+</html>
+
+<!--
+METADATA:
+  source: ashby
+  company: Anthropic
+  role: Machine Learning Engineer
+  location: San Francisco, CA
+  jobId: d290f1ee-6c54-4b01-90e6-d701748f0851
+  confidence: 0.95
+  adapter: AshbyAdapter
+  
+EXPECTED_EXTRACTION:
+  company: "Anthropic"
+  role: "Machine Learning Engineer"
+  location: "San Francisco, CA"
+  externalJobId: "d290f1ee-6c54-4b01-90e6-d701748f0851"
+  confidence: "> 0.9"
+  metadata.source: "ashby"
+  metadata.department: "Research & Engineering"
+  
+EXTRACTION_METHODS:
+  - Primary: window.__ASHBY__ global object
+  - Fallback: JSON-LD structured data
+  - Fallback: data-testid selectors
+-->

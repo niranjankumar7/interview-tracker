@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Full Stack Engineer - TechStartup</title>
+  <meta property="og:title" content="Full Stack Engineer">
+  <meta property="og:site_name" content="TechStartup">
+  <meta property="og:description" content="Join our fast-growing startup">
+</head>
+<body>
+  <!-- Lever Standard Structure -->
+  <div class="lever-jobs-page">
+    <header class="main-header">
+      <div class="company-name">TechStartup</div>
+    </header>
+    
+    <main>
+      <div class="posting">
+        <div class="posting-header">
+          <h1 data-qa="posting-name">Full Stack Engineer</h1>
+          
+          <div class="posting-categories">
+            <span class="sort-by-time posting-category medium-category">Engineering</span>
+            <span class="sort-by-team posting-category medium-category">Remote (US)</span>
+            <span class="sort-by-location posting-category medium-category">Full-time</span>
+          </div>
+        </div>
+        
+        <div class="posting-apply" data-qa="apply-button">
+          <a href="#application-form" class="postings-btn template-btn-submit">Apply for this job</a>
+        </div>
+        
+        <div class="posting-description" data-qa="job-description">
+          <h3>About TechStartup</h3>
+          <p>We're a Series B startup building the future of work. Join our distributed team of passionate engineers.</p>
+          
+          <h3>What You'll Do</h3>
+          <ul>
+            <li>Build full-stack features using React and Node.js</li>
+            <li>Collaborate with product and design teams</li>
+            <li>Help scale our platform to millions of users</li>
+          </ul>
+          
+          <h3>What We're Looking For</h3>
+          <ul>
+            <li>3+ years of full-stack development experience</li>
+            <li>Proficiency in React, TypeScript, and Node.js</li>
+            <li>Experience with PostgreSQL or similar databases</li>
+          </ul>
+          
+          <h3>Compensation</h3>
+          <p>Salary: $130,000 - $180,000 DOE</p>
+          <p>Equity: 0.1% - 0.5%</p>
+        </div>
+        
+        <div class="posting-apply bottom-apply" data-qa="apply-button-bottom">
+          <a href="#application-form" class="postings-btn template-btn-submit">Apply for this job</a>
+        </div>
+        
+        <div id="application-form" class="application-form">
+          <h2>Apply for this job</h2>
+          <form>
+            <input type="text" name="name" placeholder="Full Name" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="file" name="resume" accept=".pdf,.doc,.docx">
+            <button type="submit">Submit Application</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <!-- Lever embeds job data in script tags -->
+  <script type="application/json" data-lever-job-data>
+  {
+    "id": "abcdef12-3456-7890-abcd-ef1234567890",
+    "title": "Full Stack Engineer",
+    "team": "Engineering",
+    "location": "Remote (US)",
+    "workplaceType": "remote",
+    "commitment": "Full-time",
+    "company": "TechStartup"
+  }
+  </script>
+</body>
+</html>
+
+<!--
+METADATA:
+  source: lever
+  company: TechStartup
+  role: Full Stack Engineer
+  location: Remote (US)
+  jobId: abcdef12-3456-7890-abcd-ef1234567890
+  confidence: 0.91
+  adapter: LeverAdapter
+  
+EXPECTED_EXTRACTION:
+  company: "TechStartup"
+  role: "Full Stack Engineer"
+  location: "Remote (US)"
+  externalJobId: "abcdef12-3456-7890-abcd-ef1234567890"
+  confidence: "> 0.9"
+  metadata.source: "lever"
+  metadata.team: "Engineering"
+  metadata.workplaceType: "remote"
+-->

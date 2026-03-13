@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Senior Product Manager | Google | LinkedIn</title>
+  <meta property="og:title" content="Senior Product Manager at Google">
+  <meta property="og:site_name" content="LinkedIn">
+  <meta property="og:description" content="Google is hiring a Senior Product Manager. Apply now!">
+  
+  <!-- LinkedIn has minimal structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    "title": "Senior Product Manager",
+    "description": "Lead product development for Google Cloud...",
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": "Google"
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Mountain View",
+        "addressRegion": "CA"
+      }
+    }
+  }
+  </script>
+</head>
+<body class="jobs-page">
+  <div id="ember-app">
+    <!-- LinkedIn Header -->
+    <header class="global-nav">
+      <nav class="nav__base">
+        <div class="nav__logo">LinkedIn</div>
+      </nav>
+    </header>
+    
+    <main class="scaffold-layout">
+      <!-- Left sidebar - usually job search results -->
+      <aside class="scaffold-layout__aside"></aside>
+      
+      <!-- Main content area -->
+      <section class="scaffold-layout__main">
+        <div class="jobs-details">
+          <!-- Job Card -->
+          <div class="job-details-jobs-unified-top-card">
+            <div class="job-details-jobs-unified-top-card__content">
+              <!-- Job Title -->
+              <h1 class="job-details-jobs-unified-top-card__job-title">
+                <span>Senior Product Manager</span>
+              </h1>
+              
+              <!-- Company Name -->
+              <div class="job-details-jobs-unified-top-card__company-name">
+                <a href="/company/google/" class="app-aware-link">
+                  <span>Google</span>
+                </a>
+              </div>
+              
+              <!-- Primary Info (Location, Posted Date, Applicants) -->
+              <div class="job-details-jobs-unified-top-card__primary-description-container">
+                <span>Mountain View, CA</span>
+                <span class="tvm__text tvm__text--low-emphasis">·</span>
+                <span>2 days ago</span>
+                <span class="tvm__text tvm__text--low-emphasis">·</span>
+                <span>Over 200 applicants</span>
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="jobs-details-top-card__actions">
+                <button class="jobs-apply-button" data-control-name="jobs_apply_button">
+                  <span>Easy Apply</span>
+                </button>
+                <button class="jobs-save-button" data-control-name="jobs_save_button">
+                  <span>Save</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Job Insights -->
+            <div class="job-details-jobs-unified-top-card__job-insight">
+              <div class="job-details-jobs-unified-top-card__job-insight-text">
+                <span>Matches your job preferences, workplace type is Hybrid.</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Job Description -->
+          <div class="jobs-description__content">
+            <section class="jobs-description__details">
+              <h2>About the job</h2>
+              <div class="jobs-box__html-content">
+                <p><strong>Minimum qualifications:</strong></p>
+                <ul>
+                  <li>Bachelor's degree or equivalent practical experience.</li>
+                  <li>6 years of experience in product management or related technical role.</li>
+                  <li>2 years of experience building and shipping technical products.</li>
+                </ul>
+                
+                <p><strong>Preferred qualifications:</strong></p>
+                <ul>
+                  <li>Master's degree in a technology or business related field.</li>
+                  <li>Experience developing/launching products/technologies within Cloud, SaaS, or enterprise infrastructure.</li>
+                  <li>Experience driving product vision and strategy.</li>
+                </ul>
+                
+                <p><strong>About the job</strong></p>
+                <p>At Google, we put our users first. The world is always changing, so we need Product Managers who are continuously adapting and excited to work on products that affect millions of people every day.</p>
+                
+                <p>In this role, you will work cross-functionally to guide products from conception to launch by connecting the technical and business worlds. You can break down complex problems into steps that drive product development.</p>
+              </div>
+            </section>
+          </div>
+          
+          <!-- About Company -->
+          <div class="jobs-company">
+            <div class="jobs-company__box">
+              <h2 class="jobs-company__name">About Google</h2>
+              <p class="jobs-company__description">
+                A problem isn't truly solved until it's solved for all. Googlers build products that help create opportunities for everyone, whether down the street or across the globe.
+              </p>
+            </div>
+          </div>
+          
+          <!-- Similar Jobs -->
+          <div class="jobs-similar-jobs"></div>
+        </div>
+      </section>
+      
+      <!-- Right sidebar -->
+      <aside class="scaffold-layout__rail"></aside>
+    </main>
+  </div>
+  
+  <!-- LinkedIn job data is often embedded in this format -->
+  <code id="jobs-detail-json" style="display:none">
+  {
+    "jobPosting": {
+      "companyName": "Google",
+      "title": "Senior Product Manager",
+      "location": "Mountain View, CA",
+      "jobPostingId": "3948576120",
+      "formattedLocation": "Mountain View, CA"
+    }
+  }
+  </code>
+</body>
+</html>
+
+<!--
+METADATA:
+  source: linkedin
+  company: Google
+  role: Senior Product Manager
+  location: Mountain View, CA
+  jobId: 3948576120
+  confidence: 0.85
+  adapter: LinkedInAdapter
+  
+EXPECTED_EXTRACTION:
+  company: "Google"
+  role: "Senior Product Manager"
+  location: "Mountain View, CA"
+  externalJobId: "3948576120"
+  confidence: "> 0.8"
+  metadata.source: "linkedin"
+  metadata.workplaceType: "Hybrid"
+  
+EXTRACTION_METHODS:
+  - Primary: DOM selectors (.job-details-jobs-unified-top-card__company-name a)
+  - Fallback: JSON-LD structured data
+  - Fallback: Embedded jobs-detail-json
+  
+NOTES:
+  - LinkedIn has dynamic content that loads asynchronously
+  - Selectors may change without notice
+  - High false-positive risk due to dynamic content
+-->

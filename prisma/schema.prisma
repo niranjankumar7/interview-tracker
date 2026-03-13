@@ -82,6 +82,12 @@ model VerificationToken {
 // JOB APPLICATIONS
 // ============================================
 
+enum ApplicationSource {
+  web
+  extension
+  import
+}
+
 model Application {
   id                String    @id @default(uuid())
   userId            String
@@ -96,6 +102,12 @@ model Application {
   notes             String    @default("")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
+
+  // Extension capture fields
+  source            ApplicationSource @default(web)
+  externalJobId     String?           // Job ID from ATS (LinkedIn, Greenhouse, etc.)
+  captureMetadata   Json?             // Extension audit data (confidence, rawHtml, etc.)
+  fingerprint       String?           // Hash for deduplication
 
   // Offer details (JSON)
   offerBaseSalary   Float?
@@ -119,6 +131,8 @@ model Application {
   @@index([userId])
   @@index([status])
   @@index([interviewDate])
+  @@index([fingerprint])
+  @@index([source])
 }
 
 // ============================================
