@@ -274,7 +274,7 @@ export function SprintSetupCard({
     const applications = useStore((s) => s.applications);
 
     // Determine default round type based on existing application or prediction
-    const getDefaultRoundTypeForApp = (companyName: string, roleType: RoleType): InterviewRoundType => {
+    const getDefaultRoundTypeForApp = (companyName: string, roleType: string): InterviewRoundType => {
         const app = findMatchingApplication({
             applications,
             company: companyName,
@@ -289,7 +289,7 @@ export function SprintSetupCard({
     };
 
     const hydratedCompany = initialCompany || "";
-    const hydratedRole: RoleType = initialRole ?? "SDE";
+    const hydratedRole: string = initialRole ?? "SDE";
     const hydratedInterviewDate = normalizeDateInputValue(
         initialDate || getDefaultDate()
     );
@@ -606,17 +606,21 @@ export function SprintSetupCard({
                         <Briefcase className="w-4 h-4" />
                         Role Type
                     </label>
-                    <select
+                    <input
+                        type="text"
+                        list="sprint-role-suggestions"
                         value={state.role}
                         onChange={(e) =>
                             setState({
                                 ...state,
-                                role: e.target.value as RoleType,
+                                role: e.target.value,
                                 formError: undefined,
                             })
                         }
+                        placeholder="e.g., SDE, Frontend, DevOps, or custom..."
                         className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
+                    />
+                    <datalist id="sprint-role-suggestions">
                         <option value="SDE">Software Development Engineer</option>
                         <option value="SDET">Software Dev Engineer in Test</option>
                         <option value="ML">Machine Learning Engineer</option>
@@ -627,7 +631,10 @@ export function SprintSetupCard({
                         <option value="Data">Data Engineer / Analyst</option>
                         <option value="PM">Product Manager</option>
                         <option value="MobileEngineer">Mobile Engineer</option>
-                    </select>
+                    </datalist>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        You can type a custom role or select from suggestions
+                    </p>
                 </div>
 
                 <div>
