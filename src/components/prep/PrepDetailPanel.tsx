@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { InterviewRoundType, OfferDetails, RoleType, Sprint } from "@/types";
+import { InterviewRoundType, OfferDetails, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
@@ -352,7 +352,7 @@ export function PrepDetailPanel({
 
     const company = application?.company ?? null;
     const role = application?.role ?? null;
-    const roleType: RoleType = application ? application.roleType || inferRoleType(application.role) : "SDE";
+    const roleType: string = application ? application.roleType || inferRoleType(application.role) : "SDE";
     const selectedRoundFromStore = application?.currentRound;
 
     const trackedRounds = useMemo(() => {
@@ -1335,7 +1335,7 @@ function normalizeNotesForSave(value: string): string {
 }
 
 // Helper function to infer role type from role string
-function inferRoleType(role: string): RoleType {
+function inferRoleType(role: string): string {
     const roleLower = role.toLowerCase();
 
     if (roleLower.includes('sdet') || roleLower.includes('test') || roleLower.includes('qa')) {

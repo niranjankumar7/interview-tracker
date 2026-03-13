@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
 import { tryParseDateInput } from "@/lib/date-parsing";
 import { isGenericRole, rolesEquivalent, sanitizeCompanyName } from "@/lib/application-intake";
-import { RoleType, Application, InterviewRound, InterviewRoundType, interviewRoundTypes } from "@/types";
+import { Application, InterviewRound, InterviewRoundType, interviewRoundTypes } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
 import { Calendar, Briefcase, Building2, CheckCircle2, Target } from "lucide-react";
@@ -19,9 +19,9 @@ export const sprintSetupCardSchema = z.object({
     ),
     role: z.preprocess(
         (val) => val ?? undefined,
-        z.enum(["SDE", "SDET", "ML", "DevOps", "Frontend", "Backend", "FullStack", "Data", "PM", "MobileEngineer"])
+        z.string()
             .optional()
-            .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer)")
+            .describe("The role type being interviewed for (SDE=Software Dev, SDET=Test Engineer, ML=Machine Learning, DevOps, Frontend, Backend, FullStack, Data=Data Engineer/Analyst, PM=Product Manager, MobileEngineer) or any custom role")
     ),
     interviewDate: z.preprocess(
         (val) => val ?? undefined,
@@ -41,7 +41,7 @@ export const sprintSetupCardSchema = z.object({
 
 interface SprintSetupCardProps {
     company?: string;
-    role?: RoleType;
+    role?: string;
     interviewDate?: string;
     roundType?: InterviewRoundType;
     panelId?: string;
@@ -49,7 +49,7 @@ interface SprintSetupCardProps {
 
 interface SprintSetupState {
     company: string;
-    role: RoleType;
+    role: string;
     interviewDate: string;
     roundType: InterviewRoundType;
     isSubmitted: boolean;
@@ -59,7 +59,7 @@ interface SprintSetupState {
     formError?: string;
     hydrated?: {
         company: string;
-        role: RoleType;
+        role: string;
         interviewDate: string;
         roundType: InterviewRoundType;
     };
@@ -67,12 +67,12 @@ interface SprintSetupState {
 
 type HydratedSprintSetupState = {
     company: string;
-    role: RoleType;
+    role: string;
     interviewDate: string;
     roundType: InterviewRoundType;
 };
 
-const ROLE_LABELS: Record<RoleType, string> = {
+const ROLE_LABELS: Record<string, string> = {
     SDE: "Software Engineer",
     SDET: "Software Development Engineer in Test",
     ML: "ML Engineer",
@@ -107,7 +107,7 @@ function getRoundTypeLabel(roundType: InterviewRoundType): string {
     return INTERVIEW_ROUND_TYPE_LABELS[roundType as (typeof interviewRoundTypes)[number]] ?? roundType;
 }
 
-function roleLabelForType(roleType: RoleType): string {
+function roleLabelForType(roleType: string): string {
     return ROLE_LABELS[roleType];
 }
 
@@ -145,7 +145,7 @@ function getNextRoundNumber(rounds: InterviewRound[]): number {
 function findMatchingApplication(args: {
     applications: Application[];
     company: string;
-    roleType: RoleType;
+    roleType: string;
 }): Application | undefined {
     const normalizedCompany = sanitizeCompanyName(args.company).toLowerCase();
     const roleLabel = roleLabelForType(args.roleType);
@@ -163,10 +163,10 @@ function findMatchingApplication(args: {
 
     if (candidates.length === 0) return undefined;
 
-    const exactRoleType = candidates.find(
+    const exactstring = candidates.find(
         (candidate) => candidate.roleType === args.roleType
     );
-    if (exactRoleType) return exactRoleType;
+    if (exactstring) return exactstring;
 
     const exactRole = candidates.find((candidate) =>
         rolesEquivalent(candidate.role, roleLabel)
@@ -482,7 +482,7 @@ export function SprintSetupCard({
             const shouldUpdateRole =
                 isGenericRole(latestApplication.role) ||
                 !rolesEquivalent(latestApplication.role, roleLabel);
-            const shouldUpdateRoleType = latestApplication.roleType !== state.role;
+            const shouldUpdatestring = latestApplication.roleType !== state.role;
             const shouldNormalizeCompany =
                 sanitizeCompanyName(latestApplication.company) !== companyName;
 
@@ -492,7 +492,7 @@ export function SprintSetupCard({
                 currentRound: targetRound.roundType,
                 ...(shouldNormalizeCompany ? { company: companyName } : {}),
                 ...(shouldUpdateRole ? { role: roleLabel } : {}),
-                ...(shouldUpdateRoleType ? { roleType: state.role } : {}),
+                ...(shouldUpdatestring ? { roleType: state.role } : {}),
             });
 
             const hasSprintForDate = useStore.getState().sprints.some(

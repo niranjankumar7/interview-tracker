@@ -1,10 +1,10 @@
-import { Sprint, DailyPlan, Block, Task, RoleType, FocusArea } from '@/types';
+import { Sprint, DailyPlan, Block, Task, FocusArea } from '@/types';
 import { addDays, differenceInDays, startOfDay } from 'date-fns';
 
 export function generateSprint(
     applicationId: string,
     interviewDate: Date,
-    roleType: RoleType
+    roleType: string
 ): Sprint {
     const today = startOfDay(new Date());
     const interviewDay = startOfDay(interviewDate);

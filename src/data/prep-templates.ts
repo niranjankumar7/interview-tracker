@@ -3,10 +3,10 @@
  * Contains first-round specific prep content, HR templates, and key topics
  */
 
-import { RoleType, InterviewRoundType } from '@/types';
+import { InterviewRoundType } from '@/types';
 
 export interface PrepTemplate {
-    roleType: RoleType;
+    roleType: string;  // Now accepts any string, not just predefined RoleType
     displayName: string;
     description: string;
     rounds: RoundPrepContent[];
@@ -669,28 +669,40 @@ export const PREP_TEMPLATES: PrepTemplate[] = [
     }
 ];
 
-// Helper function to get template by role
-export function getPrepTemplateByRole(roleType: RoleType): PrepTemplate | undefined {
-    return PREP_TEMPLATES.find(t => t.roleType === roleType);
+// Helper function to get template by role (now accepts any string)
+export function getPrepTemplateByRole(roleType: string): PrepTemplate | undefined {
+    // Try exact match first
+    let template = PREP_TEMPLATES.find(t => t.roleType === roleType);
+    if (template) return template;
+    
+    // Try case-insensitive match
+    const normalizedRole = roleType.toLowerCase().replace(/[^a-z0-9]/g, '');
+    template = PREP_TEMPLATES.find(t => 
+        t.roleType.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedRole
+    );
+    if (template) return template;
+    
+    // Return SDE as default for unknown roles
+    return PREP_TEMPLATES.find(t => t.roleType === 'SDE');
 }
 
-// Helper function to get round content
-export function getRoundPrepContent(roleType: RoleType, round: InterviewRoundType): RoundPrepContent | undefined {
+// Helper function to get round content (now accepts any string)
+export function getRoundPrepContent(roleType: string, round: InterviewRoundType): RoundPrepContent | undefined {
     const template = getPrepTemplateByRole(roleType);
     if (!template) return undefined;
     return template.rounds.find(r => r.round === round);
 }
 
 // Get all available roles for dropdown
-export function getAllRoleOptions(): { value: RoleType; label: string }[] {
+export function getAllRoleOptions(): { value: string; label: string }[] {
     return PREP_TEMPLATES.map(t => ({
         value: t.roleType,
         label: t.displayName
     }));
 }
 
-// Get available rounds for a role
-export function getAvailableRounds(roleType: RoleType): InterviewRoundType[] {
+// Get available rounds for a role (now accepts any string)
+export function getAvailableRounds(roleType: string): InterviewRoundType[] {
     const template = getPrepTemplateByRole(roleType);
     if (!template) return [];
     return template.rounds.map((r) => r.round);

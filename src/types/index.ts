@@ -10,7 +10,8 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
-// Extended to 10 role types for comprehensive prep templates
+// RoleType is now dynamic - any string is accepted
+// Predefined role types are available as constants for convenience
 export const ROLE_TYPES = [
     'SDE',
     'SDET',
@@ -24,7 +25,7 @@ export const ROLE_TYPES = [
     'MobileEngineer',
 ] as const;
 
-export type RoleType = (typeof ROLE_TYPES)[number];
+export type RoleType = string;
 
 // Interview round types for round-specific prep
 export { interviewRoundTypes, isInterviewRoundType } from './interviewRound';
@@ -73,7 +74,7 @@ export interface Application {
     company: string;
     role: string;
     jobDescriptionUrl?: string | null;
-    roleType?: RoleType; // Structured role type for prep templates
+    roleType?: string; // Dynamic role type for prep templates - any string is accepted
     status: ApplicationStatus;
     applicationDate: string; // ISO date string
     interviewDate?: string; // ISO date string
@@ -103,7 +104,7 @@ export interface Sprint {
     id: string;
     applicationId: string;
     interviewDate: string; // ISO date string
-    roleType: RoleType;
+    roleType: string;      // Dynamic role type - any string is accepted
     totalDays: number;
     dailyPlans: DailyPlan[];
     status: SprintStatus;
