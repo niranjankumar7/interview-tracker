@@ -4,9 +4,10 @@ import { PREP_TOPICS } from "@/lib/sprintGenerator";
 import { useStore } from "@/lib/store";
 import type { InterviewRound } from "@/types";
 import { format, isAfter, parseISO, startOfDay } from "date-fns";
-import { Calendar, Check, MessageSquareText, Star, Tag, X } from "lucide-react";
+import { Calendar, Check, MessageSquareText, Sparkles, Star, Tag, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { RoundSpecificPrepPanel } from "./RoundSpecificPrepPanel";
 
 type FeedbackDraft = {
   rating: number;
@@ -69,6 +70,7 @@ export function PrepDetailPanel(props: {
     null
   );
   const [isAddRoundOpen, setIsAddRoundOpen] = useState(false);
+  const [isSmartPrepOpen, setIsSmartPrepOpen] = useState(false);
   const [addRoundError, setAddRoundError] = useState<string | null>(null);
 
   const [feedbackDraft, setFeedbackDraft] = useState<FeedbackDraft>({
@@ -97,6 +99,7 @@ export function PrepDetailPanel(props: {
     if (!isOpen) {
       setFeedbackRoundNumber(null);
       setIsAddRoundOpen(false);
+      setIsSmartPrepOpen(false);
     }
   }, [isOpen]);
 
@@ -118,7 +121,11 @@ export function PrepDetailPanel(props: {
   }, [isAddRoundOpen, nextRoundNumber]);
 
   const closeTopmostOverlay = useCallback(() => {
-    // Close priority: feedback modal > add round modal > panel.
+    // Close priority: smart prep > feedback modal > add round modal > panel.
+    if (isSmartPrepOpen) {
+      setIsSmartPrepOpen(false);
+      return;
+    }
     if (feedbackRoundNumber !== null) {
       setFeedbackRoundNumber(null);
       return;
@@ -128,7 +135,7 @@ export function PrepDetailPanel(props: {
       return;
     }
     onClose();
-  }, [feedbackRoundNumber, isAddRoundOpen, onClose]);
+  }, [isSmartPrepOpen, feedbackRoundNumber, isAddRoundOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -208,13 +215,23 @@ export function PrepDetailPanel(props: {
         <div className="p-5 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-foreground">Interview rounds</h3>
-            <button
-              onClick={() => setIsAddRoundOpen(true)}
-              className="text-sm px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              type="button"
-            >
-              Add round
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsSmartPrepOpen(true)}
+                className="text-sm px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors flex items-center gap-2"
+                type="button"
+              >
+                <Sparkles className="w-4 h-4" />
+                Smart Prep
+              </button>
+              <button
+                onClick={() => setIsAddRoundOpen(true)}
+                className="text-sm px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                type="button"
+              >
+                Add round
+              </button>
+            </div>
           </div>
 
           {rounds.length === 0 ? (
@@ -775,7 +792,22 @@ export function PrepDetailPanel(props: {
     </div>
   );
 
+  // Smart Prep Panel (shown as overlay)
+  const smartPrepPanel = isSmartPrepOpen && (
+    <RoundSpecificPrepPanel
+      applicationId={applicationId}
+      isOpen={isSmartPrepOpen}
+      onClose={() => setIsSmartPrepOpen(false)}
+    />
+  );
+
   if (!portalTarget) return null;
 
-  return createPortal(modalContent, portalTarget);
+  return createPortal(
+    <>
+      {modalContent}
+      {smartPrepPanel}
+    </>,
+    portalTarget
+  );
 }
