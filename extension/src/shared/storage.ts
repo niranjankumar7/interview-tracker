@@ -8,7 +8,7 @@ const STORAGE_PREFIX = 'interview_tracker_';
 /**
  * Get value from storage
  */
-export async function get(key) {
+export async function get<T>(key: string): Promise<T | null> {
   try {
     const fullKey = STORAGE_PREFIX + key;
     const result = await chrome.storage.local.get(fullKey);
@@ -22,7 +22,7 @@ export async function get(key) {
 /**
  * Set value in storage
  */
-export async function set(key, value) {
+export async function set<T>(key: string, value: T): Promise<boolean> {
   try {
     const fullKey = STORAGE_PREFIX + key;
     await chrome.storage.local.set({ [fullKey]: value });
@@ -36,7 +36,7 @@ export async function set(key, value) {
 /**
  * Remove value from storage
  */
-export async function remove(key) {
+export async function remove(key: string): Promise<boolean> {
   try {
     const fullKey = STORAGE_PREFIX + key;
     await chrome.storage.local.remove(fullKey);
@@ -50,7 +50,7 @@ export async function remove(key) {
 /**
  * Clear all extension data from storage
  */
-export async function clear() {
+export async function clear(): Promise<boolean> {
   try {
     const allKeys = await chrome.storage.local.get(null);
     const keysToRemove = Object.keys(allKeys).filter(key => 
@@ -67,7 +67,7 @@ export async function clear() {
 /**
  * Get all keys in storage
  */
-export async function keys() {
+export async function keys(): Promise<string[]> {
   try {
     const allKeys = await chrome.storage.local.get(null);
     return Object.keys(allKeys)
@@ -82,7 +82,7 @@ export async function keys() {
 /**
  * Get storage usage
  */
-export async function getUsage() {
+export async function getUsage(): Promise<{ used: number; available: number }> {
   try {
     const bytes = await chrome.storage.local.getBytesInUse(null);
     // chrome.storage.local typically has 5MB limit

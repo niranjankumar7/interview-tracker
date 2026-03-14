@@ -172,23 +172,7 @@ export interface ExtractionResult {
 // Extended Message Types
 export type ExtendedMessageType = 
   | MessageType
-  | 'EXTRACT_JOB'
-  | 'EXTRACTION_RESULT';
-
-export interface ExtractJobMessage {
-  type: 'EXTRACT_JOB';
-}
-
-export interface ExtractJobResponse {
-  type: 'EXTRACTION_RESULT';
-  result: ExtractionResult | null;
-  error?: string;
-}
-
-export interface ExtensionMessage {
-  type: ExtendedMessageType;
-  payload?: unknown;
-}
+  | 'EXTRACT_JOB';
 
 // Extension Message Types for Content Script Communication
 export interface ExtractJobMessage {
@@ -207,6 +191,11 @@ export interface ExtractJobResponse {
     confidence: number;
   };
   error?: string;
+}
+
+export interface ExtensionMessageBase {
+  type: ExtendedMessageType;
+  payload?: unknown;
 }
 
 export type ExtensionMessage = 

@@ -13,7 +13,7 @@ const REFRESH_TOKEN_KEY = 'refreshToken';
 const TOKEN_EXPIRES_KEY = 'tokenExpires';
 
 // API base URL from environment
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = 'http://localhost:3000';
 
 /**
  * Get the API base URL

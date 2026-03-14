@@ -101,7 +101,7 @@ export class GenericAdapter implements SiteAdapter {
     }
 
     // Calculate final confidence
-    confidence = this.calculateConfidence({ company, role, location, jobDescription, jsonLd: metadata.jsonLd });
+    confidence = this.calculateConfidence({ company, role, location, jobDescription, jsonLd: !!metadata.jsonLd });
 
     // Try to extract job ID from URL
     if (!externalJobId) {

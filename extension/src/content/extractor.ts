@@ -3,8 +3,50 @@
  * Runs on all job posting pages
  */
 
-import { extractJobData, isJobPostingPage } from './extractor';
+import { findAdapter } from './adapters/index';
 import { ExtractJobMessage, ExtractJobResponse, ExtensionMessage } from '../shared/types';
+
+/**
+ * Check if current page looks like a job posting
+ */
+function isJobPostingPage(): boolean {
+  const url = window.location.href;
+  const title = document.title.toLowerCase();
+  
+  // URL patterns
+  const jobPatterns = [
+    /\/job\//i,
+    /\/jobs\//i,
+    /\/careers\//i,
+    /\/position\//i,
+    /\/opening/i,
+    /greenhouse\.io/i,
+    /lever\.co/i,
+    /ashbyhq\.com/i,
+    /smartrecruiters\.com/i,
+  ];
+  
+  const hasJobUrl = jobPatterns.some(pattern => pattern.test(url));
+  
+  // Title keywords
+  const titleKeywords = ['job', 'career', 'position', 'opening', 'engineer', 'developer', 'manager'];
+  const hasJobTitle = titleKeywords.some(keyword => title.includes(keyword));
+  
+  return hasJobUrl || hasJobTitle;
+}
+
+/**
+ * Extract job data from current page
+ */
+function extractJobData() {
+  const adapter = findAdapter(window.location.href);
+  
+  if (!adapter) {
+    return null;
+  }
+  
+  return adapter.extract(document);
+}
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((
@@ -17,8 +59,7 @@ chrome.runtime.onMessage.addListener((
       // Check if this looks like a job page
       if (!isJobPostingPage()) {
         sendResponse({
-          type: 'EXTRACTION_RESULT',
-          result: null,
+          success: false,
           error: 'This does not appear to be a job posting page.',
         });
         return true;
@@ -27,15 +68,29 @@ chrome.runtime.onMessage.addListener((
       // Extract job data
       const result = extractJobData();
       
+      if (!result) {
+        sendResponse({
+          success: false,
+          error: 'Could not extract job data from this page.',
+        });
+        return true;
+      }
+      
       sendResponse({
-        type: 'EXTRACTION_RESULT',
-        result,
+        success: true,
+        data: {
+          company: result.company,
+          role: result.role,
+          location: result.location,
+          jobUrl: result.jobUrl,
+          jobDescription: result.jobDescription,
+          confidence: result.confidence,
+        },
       });
     } catch (error) {
       console.error('Extraction error:', error);
       sendResponse({
-        type: 'EXTRACTION_RESULT',
-        result: null,
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown extraction error',
       });
     }

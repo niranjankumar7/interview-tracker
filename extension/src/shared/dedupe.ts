@@ -8,6 +8,7 @@ export interface JobData {
   company: string;
   role: string;
   jobDescriptionUrl: string;
+  externalJobId?: string;
   timestamp?: number;
 }
 

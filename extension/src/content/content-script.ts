@@ -5,7 +5,7 @@
  */
 
 import { findAdapter } from './adapters/index';
-import { generateFingerprint, isLikelyDuplicate } from '../shared/dedupe.js';
+import { generateFingerprint, isDuplicate } from '../shared/dedupe.js';
 import {
   startExtractionTracking,
   trackSave,
@@ -155,7 +155,7 @@ async function extractJobData(): Promise<{
     ];
 
     // Generate fingerprint for deduplication
-    const fingerprint = generateFingerprint({
+    const fingerprint = await generateFingerprint({
       jobDescriptionUrl: extractedData.jobUrl,
       company: extractedData.company,
       role: extractedData.role,

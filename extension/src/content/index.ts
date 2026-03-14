@@ -6,7 +6,7 @@
  */
 
 // Configuration
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = 'http://localhost:3000';
 
 /**
  * Check if current page is the Interview Tracker auth page
@@ -84,7 +84,7 @@ async function sendAuthToBackground(data: { token: string; user: { id: string; e
 /**
  * Show a visual notification that auth was successful
  */
-function showAuthSuccessNotification(user: { name: string | null; email: string }): Promise<void> {
+async function showAuthSuccessNotification(user: { name: string | null; email: string }): Promise<void> {
   // Create notification element
   const notification = document.createElement('div');
   notification.id = 'interview-tracker-auth-notification';

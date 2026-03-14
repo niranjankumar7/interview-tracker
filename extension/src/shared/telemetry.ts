@@ -78,7 +78,7 @@ function generateSessionId(): string {
  * Get or create session ID
  */
 async function getSessionId(): Promise<string> {
-  let sessionId = await storage.get(TELEMETRY_SESSION_KEY);
+  let sessionId = await storage.get<string>(TELEMETRY_SESSION_KEY);
   if (!sessionId) {
     sessionId = generateSessionId();
     await storage.set(TELEMETRY_SESSION_KEY, sessionId);
@@ -90,12 +90,12 @@ async function getSessionId(): Promise<string> {
  * Get telemetry settings
  */
 export async function getTelemetrySettings(): Promise<TelemetrySettings> {
-  const settings = await storage.get(TELEMETRY_SETTINGS_KEY);
+  const settings = await storage.get<Partial<TelemetrySettings>>(TELEMETRY_SETTINGS_KEY);
   return {
     enabled: true,
     include_debug_info: false,
     sync_interval_hours: DEFAULT_SYNC_INTERVAL_HOURS,
-    ...settings
+    ...(settings || {})
   };
 }
 

@@ -1,5 +1,5 @@
 import type { Application, Question, Sprint, ThemePreference } from '@/types';
-import type { RawSprint } from '@/types/api';
+import type { RawSprint, CompanyQuestionsResponse, AllCompaniesResponse, StruggledTopicsResponse } from '@/types/api';
 
 /**
  * API Client for Interview Tracker Backend
@@ -365,6 +365,27 @@ export const questionsApi = {
     },
 
     /**
+     * Get questions by company (with aggregation)
+     * 
+     * Without company param: Returns summary of all companies with question counts
+     * With company param: Returns detailed questions for that company with stats
+     */
+    async getByCompany(params?: {
+        company?: string;
+        category?: 'DSA' | 'SystemDesign' | 'Behavioral' | 'SQL' | 'Other';
+        includeStats?: boolean;
+        limit?: number;
+    }): Promise<CompanyQuestionsResponse | AllCompaniesResponse> {
+        const query = new URLSearchParams();
+        if (params?.company) query.append('company', params.company);
+        if (params?.category) query.append('category', params.category);
+        if (params?.includeStats !== undefined) query.append('includeStats', String(params.includeStats));
+        if (params?.limit) query.append('limit', String(params.limit));
+
+        return apiRequest(`/api/questions/by-company?${query.toString()}`);
+    },
+
+    /**
      * Create new question
      */
     async create(data: {
@@ -462,6 +483,32 @@ export const sprintsApi = {
 };
 
 // ============================================
+// INSIGHTS API
+// ============================================
+
+export const insightsApi = {
+    /**
+     * Get struggled topics analysis
+     * 
+     * Helps identify weak areas to focus on for prep
+     */
+    async getStruggledTopics(params?: {
+        company?: string;
+        status?: 'applied' | 'shortlisted' | 'interview' | 'offer' | 'rejected';
+        roleType?: string;
+        recommendations?: boolean;
+    }): Promise<StruggledTopicsResponse & { recommendations?: { focusAreas: string[]; recommendedResources: Array<{ topic: string; reason: string; priority: 'high' | 'medium' | 'low'; }>; }; filters?: Record<string, string | undefined>; }> {
+        const query = new URLSearchParams();
+        if (params?.company) query.append('company', params.company);
+        if (params?.status) query.append('status', params.status);
+        if (params?.roleType) query.append('roleType', params.roleType);
+        if (params?.recommendations) query.append('recommendations', 'true');
+
+        return apiRequest(`/api/insights/struggled-topics?${query.toString()}`);
+    },
+};
+
+// ============================================
 // EXPORT ALL
 // ============================================
 
@@ -471,6 +518,7 @@ export const api = {
     applications: applicationsApi,
     questions: questionsApi,
     sprints: sprintsApi,
+    insights: insightsApi,
 };
 
 export default api;
