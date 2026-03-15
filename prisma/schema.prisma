@@ -32,6 +32,9 @@ model User {
   progress         UserProgress?
   preferences      UserPreferences?
   leetcode         LeetCodeConnection?
+  subscription     Subscription?
+  usageLimit       UsageLimit?
+  webhooks         Webhook[]
   
   @@index([email])
 }
@@ -214,7 +217,7 @@ model LeetCodeConnection {
   connectedAt     DateTime @default(now())
   lastSyncAt      DateTime?
   readOnly        Boolean  @default(true)
-  
+
   // Stats (cached from LeetCode)
   currentStreak   Int?
   longestStreak   Int?
@@ -223,9 +226,110 @@ model LeetCodeConnection {
   easySolved      Int?
   mediumSolved    Int?
   hardSolved      Int?
-  
+
   updatedAt       DateTime @default(now()) @updatedAt
 
   // Relations
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// SUBSCRIPTIONS & BILLING
+// ============================================
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  past_due
+}
+
+enum SubscriptionPlan {
+  free
+  pro
+  premium
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  status                SubscriptionStatus @default(active)
+  plan                  SubscriptionPlan   @default(free)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  razorpaySubscriptionId String?           // Razorpay integration placeholder
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @default(now()) @updatedAt
+
+  // Relations
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([plan])
+}
+
+model UsageLimit {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  applicationsCount   Int      @default(0)
+  messagesCount       Int      @default(0)
+  resetDate           DateTime // When the counters reset (monthly)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+
+  // Relations
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([resetDate])
+}
+
+// ============================================
+// WEBHOOKS
+// ============================================
+
+model Webhook {
+  id          String   @id @default(uuid())
+  userId      String
+  url         String
+  events      String[] // Array of event types e.g., ["application.created", "application.updated"]
+  secret      String   // For signature verification
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([userId])
+  @@index([active])
+}
+
+enum WebhookDeliveryStatus {
+  pending
+  success
+  failed
+  retrying
+}
+
+model WebhookDelivery {
+  id          String                @id @default(uuid())
+  webhookId   String
+  event       String                // Event type that triggered this delivery
+  payload     Json                  // The webhook payload
+  status      WebhookDeliveryStatus @default(pending)
+  response    String?               // HTTP response body
+  responseCode Int?                 // HTTP status code
+  attempts    Int                   @default(0)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @default(now()) @updatedAt
+  deliveredAt DateTime?             // When successfully delivered
+
+  // Relations
+  webhook     Webhook               @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
 }

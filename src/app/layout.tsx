@@ -9,6 +9,7 @@ import { LeetCodeSyncGate } from "@/components/leetcode";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataSyncProvider } from "@/components/providers/DataSyncProvider";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { FloatingChatBot } from "@/components/chat/FloatingChatBot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
         <Footer />
         <LeetCodeSyncGate />
         <NotificationRoot />
+        <FloatingChatBot />
       </body>
     </html>
   );
