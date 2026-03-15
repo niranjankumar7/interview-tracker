@@ -32,6 +32,9 @@ model User {
   progress         UserProgress?
   preferences      UserPreferences?
   leetcode         LeetCodeConnection?
+  subscription     Subscription?
+  usageLimit       UsageLimit?
+  webhooks         Webhook[]
   
   @@index([email])
 }
@@ -228,4 +231,84 @@ model LeetCodeConnection {
 
   // Relations
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// SUBSCRIPTIONS & BILLING
+// ============================================
+
+model Subscription {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  plan                  String   @default("free") // free, pro, premium
+  status                String   @default("active") // active, cancelled, past_due, pending
+  currentPeriodStart    DateTime @default(now())
+  currentPeriodEnd      DateTime?
+  razorpayOrderId       String?
+  razorpayPaymentId     String?
+  razorpaySubscriptionId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now()) @updatedAt
+
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model UsageLimit {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  applicationsCount Int      @default(0)
+  messagesCount     Int      @default(0)
+  resetDate         DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================
+// WEBHOOKS
+// ============================================
+
+model Webhook {
+  id          String   @id @default(uuid())
+  userId      String
+  url         String
+  events      String[] // e.g., ["application.created", "status.changed"]
+  secret      String   @default("")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([userId])
+  @@index([active])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(uuid())
+  webhookId   String
+  event       String
+  payload     Json
+  status      String   @default("pending") // pending, delivered, failed
+  response    String?
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  deliveredAt DateTime?
+
+  // Relations
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
 }
