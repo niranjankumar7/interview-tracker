@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { AppHeader } from "@/components/layout/AppHeader";
 
+// Production guard - only allow in development
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 interface TestResult {
   prompt: string;
   success: boolean;
@@ -78,6 +81,23 @@ export default function MultiCardTestPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<TestResult[]>([]);
   const [runningAll, setRunningAll] = useState(false);
+
+  // Production guard
+  if (!isDevelopment) {
+    return (
+      <div className="flex flex-1 min-h-0 flex-col bg-background">
+        <AppHeader />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center p-8">
+            <h1 className="text-2xl font-bold mb-4">Not Available</h1>
+            <p className="text-muted-foreground">
+              This test page is only available in development mode.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const sendPrompt = async (prompt: string): Promise<TestResult> => {
     try {

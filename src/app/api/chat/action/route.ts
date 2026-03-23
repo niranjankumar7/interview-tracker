@@ -34,7 +34,19 @@ interface ExtractedApplication {
 interface CreationCounters {
   promptsSent: number;
   kanbanCardsCreated: number;
-  remainingLimit: number;
+  remainingLimit: number | null; // null means unlimited (paid tiers)
+}
+
+// Result types for better type safety
+interface CreationResult {
+  success: boolean;
+  company?: string;
+  role?: string;
+  id?: string;
+  type?: string;
+  newStatus?: string;
+  roundNumber?: number;
+  error?: string;
 }
 
 // Types of actions
@@ -82,7 +94,7 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
       const company = m[2]?.trim().replace(/,\s*$/g, '').replace(/\s+and\s*$/i, '');
       if (role && company && !seenCompanies.has(company.toLowerCase())) {
         seenCompanies.add(company.toLowerCase());
-        applications.push({ company, role, notes: message });
+        applications.push({ company, role, notes: '' });
       }
     }
     if (applications.length > 0) return applications;
@@ -96,7 +108,7 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
       const role = m[2]?.trim();
       if (company && role && !seenCompanies.has(company.toLowerCase())) {
         seenCompanies.add(company.toLowerCase());
-        applications.push({ company, role, notes: message });
+        applications.push({ company, role, notes: '' });
       }
     }
     if (applications.length > 0) return applications;
@@ -121,7 +133,7 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
         applications.push({ 
           company: cleanCompany, 
           role: sharedRole || 'Software Engineer', // Default role
-          notes: message 
+          notes: '' 
         });
       }
     }
@@ -137,7 +149,14 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
     const items = listStr
       .split(/,\s+|\s+and\s+/)
       .map(item => item.trim())
-      .filter(item => item.length > 1 && !['applied', 'to', 'at'].includes(item.toLowerCase()));
+      .filter(item => {
+        if (item.length <= 1) return false;
+        if (['applied', 'to', 'at'].includes(item.toLowerCase())) return false;
+        // Filter out time-related words that might be at the end of a sentence
+        const cleanItem = item.toLowerCase().replace(/[.!,;]+$/, '');
+        if (['yesterday', 'today', 'tomorrow', 'also', 'just', 'recently', 'already'].includes(cleanItem)) return false;
+        return true;
+      });
     
     for (const item of items.slice(0, MAX_CARDS_PER_PROMPT)) {
       const cleanCompany = item.replace(/[,.\s]+$/g, '').trim();
@@ -146,7 +165,7 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
         applications.push({ 
           company: cleanCompany, 
           role: sharedRole, 
-          notes: message 
+          notes: ''
         });
       }
     }
@@ -166,7 +185,7 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
       const role = m[1].trim();
       const company = m[2].trim();
       if (!seenCompanies.has(company.toLowerCase())) {
-        applications.push({ company, role, notes: message });
+        applications.push({ company, role, notes: '' });
       }
       break;
     }
@@ -221,9 +240,15 @@ function parseMessageForMultiAction(message: string): MultiCardAction {
   }
   
   // Check for interview scheduling
+  // Pattern: "interview scheduled with [Company] on [Date]" or "interview at [Company] on [Date]"
+  // We extract company first, then look for date separately in the full message
   const interviewPatterns = [
-    /interview\s+(?:scheduled|at|on)\s+(.+?)\s+(?:at|with)\s+(.+?)(?:\.\s*|$|,|;)/i,
-    /have\s+(?:an\s+)?interview\s+(?:at|with)\s+(.+?)\s+(?:on|at)\s+(.+?)(?:\.\s*|$|,|;)/i,
+    // "interview scheduled with Google on 03/25" - company is after "with" or "at"
+    /interview\s+(?:scheduled|at)\s+(?:with\s+)?(.+?)(?:\s+on\s+|\s+at\s+)(.+?)(?:\.\s*|$|,|;)/i,
+    // "have an interview with Google on 03/25" - company after "with"
+    /have\s+(?:an\s+)?interview\s+(?:with|at)\s+(.+?)(?:\s+on\s+|\s+at\s+)(.+?)(?:\.\s*|$|,|;)/i,
+    // "interview on 03/25 with Google" - date first, company after "with"
+    /interview\s+(?:on\s+)?(.+?)\s+(?:with|at)\s+(.+?)(?:\.\s*|$|,|;)/i,
   ];
   
   for (const pattern of interviewPatterns) {
@@ -231,13 +256,21 @@ function parseMessageForMultiAction(message: string): MultiCardAction {
     if (match) {
       const dateMatch = message.match(/\b\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}\b/);
       const date = dateMatch ? dateMatch[0] : 'pending';
-      const company = match[1]?.trim() || match[2]?.trim();
+      // Company is always the last capture group (the entity name, not the date)
+      // We try match[2] first (usually company), fallback to match[1]
+      const candidate1 = match[1]?.trim();
+      const candidate2 = match[2]?.trim();
+      // Choose the one that looks more like a company name (not a date)
+      const looksLikeDate = (s: string) => /^\d{1,2}[\/\.-]\d{1,2}/.test(s);
+      const company = looksLikeDate(candidate1) ? candidate2 : candidate1 || candidate2;
       
-      return {
-        type: 'schedule_interview',
-        applications: [],
-        interviewSchedule: { company, date },
-      };
+      if (company && !looksLikeDate(company)) {
+        return {
+          type: 'schedule_interview',
+          applications: [],
+          interviewSchedule: { company, date },
+        };
+      }
     }
   }
   
@@ -246,6 +279,7 @@ function parseMessageForMultiAction(message: string): MultiCardAction {
 
 /**
  * Get current counters for user
+ * Returns null for remainingLimit when unlimited (paid tiers) to avoid Infinity JSON serialization issues
  */
 async function getUserCounters(userId: string): Promise<CreationCounters> {
   const [usageLimit, subscription] = await Promise.all([
@@ -262,10 +296,18 @@ async function getUserCounters(userId: string): Promise<CreationCounters> {
   
   const planLimits = limits[plan as keyof typeof limits] || limits.free;
   
+  const usedApplications = usageLimit?.applicationsCount || 0;
+  const remaining = planLimits.applications - usedApplications;
+  
+  // Use null for unlimited plans to avoid Infinity serialization issues
+  const remainingLimit = planLimits.applications === Infinity 
+    ? null 
+    : Math.max(0, remaining);
+  
   return {
     promptsSent: usageLimit?.messagesCount || 0,
-    kanbanCardsCreated: usageLimit?.applicationsCount || 0,
-    remainingLimit: Math.max(0, planLimits.applications - (usageLimit?.applicationsCount || 0)),
+    kanbanCardsCreated: usedApplications,
+    remainingLimit,
   };
 }
 
@@ -311,7 +353,7 @@ export async function POST(req: NextRequest) {
 
     // Parse the message for actions
     const action = parseMessageForMultiAction(message);
-    const results: any[] = [];
+    const results: CreationResult[] = [];
     let cardsCreated = 0;
     let limitExceeded = false;
     let truncated = false;
@@ -325,14 +367,19 @@ export async function POST(req: NextRequest) {
         truncated = true;
       }
 
-      // Check if user has enough quota for all cards
-      const remainingQuota = countersBefore.remainingLimit;
-      if (remainingQuota < appsToCreate.length) {
-        appsToCreate = appsToCreate.slice(0, remainingQuota);
-        limitExceeded = true;
-      }
-
+      // Check usage limit for each card atomically to prevent race conditions
       for (const app of appsToCreate) {
+        const usageCheck = await checkUsageLimit(user.userId, 'application');
+        if (!usageCheck.allowed) {
+          limitExceeded = true;
+          results.push({
+            success: false,
+            company: app.company,
+            error: usageCheck.reason || 'Usage limit exceeded',
+          });
+          continue;
+        }
+
         try {
           const application = await prisma.application.create({
             data: {
@@ -341,7 +388,7 @@ export async function POST(req: NextRequest) {
               role: app.role,
               status: 'applied',
               applicationDate: new Date(),
-              notes: app.notes || '',
+              notes: '', // Don't store full message to avoid bloat
             },
           });
 
@@ -469,15 +516,17 @@ export async function POST(req: NextRequest) {
     if (action.type === 'general_chat') {
       responseMessage = "I'm here to help you track your job applications! 💼\n\n**You can create up to 5 cards in one message.** Try saying:\n\n• \"Applied to Google, Amazon, and Microsoft as SDE\"\n• \"Applied for SWE at Meta, PM at Netflix, and Data at Uber\"\n• \"Just applied to Flipkart, Swiggy, Zomato, Ola, and Razorpay\"\n\nI'll automatically create kanban cards for each one!";
     } else if (action.type === 'create_applications') {
-      const successCount = results.filter(r => r.success).length;
+      const successfulResults = results.filter(r => r.success);
+      const successCount = successfulResults.length;
       const failCount = results.filter(r => !r.success).length;
       
       if (successCount === 0) {
         responseMessage = "⚠️ I couldn't create any applications. You may have reached your limit or there was an error.";
       } else if (successCount === 1) {
-        responseMessage = `✅ Created 1 application: **${results[0].role}** at **${results[0].company}**`;
+        const success = successfulResults[0];
+        responseMessage = `✅ Created 1 application: **${success.role}** at **${success.company}**`;
       } else {
-        const companies = results.filter(r => r.success).map(r => r.company).join(', ');
+        const companies = successfulResults.map(r => r.company).join(', ');
         responseMessage = `✅ Created **${successCount} applications**!\n\nCompanies: ${companies}`;
         
         if (truncated) {
@@ -511,7 +560,7 @@ export async function POST(req: NextRequest) {
         promptsSent: promptsSentAfter,
         kanbanCardsCreated: countersAfter.kanbanCardsCreated,
         cardsCreatedThisPrompt: cardsCreated,
-        remainingApplications: countersAfter.remainingLimit,
+        remainingApplications: countersAfter.remainingLimit === null ? -1 : countersAfter.remainingLimit, // -1 means unlimited
       },
       limits: {
         maxCardsPerPrompt: MAX_CARDS_PER_PROMPT,
