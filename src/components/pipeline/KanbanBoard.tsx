@@ -1,11 +1,12 @@
 "use client";
 
 import { PrepDetailPanel } from "@/components/prep";
+import { getRoleTypeOptions, resolveRoleTypeForTemplate } from "@/lib/role-types";
 import { useStore } from "@/lib/store";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import { formatOfferTotalCTC } from "@/lib/offer-details";
 import { generateSprint } from "@/lib/sprintGenerator";
-import { Application, ApplicationStatus, RoleType, Sprint } from "@/types";
+import { Application, ApplicationStatus, Sprint } from "@/types";
 import { addDays, differenceInDays, format, parseISO, startOfDay } from "date-fns";
 import {
     AlertTriangle,
@@ -35,32 +36,6 @@ const statusColumns: { status: ApplicationStatus; label: string; color: string }
 const SEARCH_DEBOUNCE_MS = 250;
 const DRAG_DATA_KEY = "applicationId";
 const DEFAULT_INTERVIEW_OFFSET_DAYS = 7;
-
-const ROLE_TYPE_LABELS: Record<RoleType, string> = {
-    SDE: "Software Development Engineer",
-    SDET: "Software Dev Engineer in Test",
-    ML: "Machine Learning Engineer",
-    DevOps: "DevOps / SRE",
-    Frontend: "Frontend Developer",
-    Backend: "Backend Developer",
-    FullStack: "Full Stack Developer",
-    Data: "Data Engineer / Analyst",
-    PM: "Product Manager",
-    MobileEngineer: "Mobile Engineer",
-};
-
-const ROLE_TYPE_ORDER: RoleType[] = [
-    "SDE",
-    "SDET",
-    "ML",
-    "DevOps",
-    "Frontend",
-    "Backend",
-    "FullStack",
-    "Data",
-    "PM",
-    "MobileEngineer",
-];
 
 const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_DATE_TIME_PREFIX_RE = /^\d{4}-\d{2}-\d{2}T/;
@@ -120,7 +95,7 @@ export function KanbanBoard() {
     const [interviewSetup, setInterviewSetup] = useState<{
         applicationId: string;
         interviewDate: string;
-        roleType: RoleType;
+        roleType: string;
         previousStatus: ApplicationStatus;
         statusPersisted: boolean;
     } | null>(null);
@@ -175,6 +150,10 @@ export function KanbanBoard() {
 
     const normalizedQuery = debouncedSearchQuery.trim().toLowerCase();
     const isSearching = normalizedQuery !== "";
+    const interviewRoleTypeOptions = useMemo(
+        () => getRoleTypeOptions(interviewSetup?.roleType),
+        [interviewSetup?.roleType]
+    );
 
     const indexedApplications = useMemo(
         () =>
@@ -249,7 +228,7 @@ export function KanbanBoard() {
     const ensureSprintForInterview = (
         applicationId: string,
         interviewDate: Date,
-        roleType: RoleType
+        roleType: string
     ) => {
         const relatedSprints = sprints.filter(
             (sprint) => sprint.applicationId === applicationId
@@ -378,7 +357,9 @@ export function KanbanBoard() {
                                 addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
                                 "yyyy-MM-dd"
                             ),
-                        roleType: roleType ?? "SDE",
+                        roleType:
+                            roleType?.trim() ||
+                            resolveRoleTypeForTemplate(undefined, app.role),
                         previousStatus,
                         statusPersisted,
                     });
@@ -416,7 +397,9 @@ export function KanbanBoard() {
                             addDays(new Date(), DEFAULT_INTERVIEW_OFFSET_DAYS),
                             "yyyy-MM-dd"
                         ),
-                        roleType: roleType ?? "SDE",
+                        roleType:
+                            roleType?.trim() ||
+                            resolveRoleTypeForTemplate(undefined, app.role),
                         previousStatus,
                         statusPersisted,
                     });
@@ -796,7 +779,9 @@ export function KanbanBoard() {
                                 <label className="block text-sm font-medium text-foreground mb-1">
                                     Role type
                                 </label>
-                                <select
+                                <input
+                                    type="text"
+                                    list="interview-role-type-options"
                                     value={interviewSetup.roleType}
                                     onChange={(e) => {
                                         setInterviewSetupError(null);
@@ -804,19 +789,24 @@ export function KanbanBoard() {
                                             prev
                                                 ? {
                                                     ...prev,
-                                                    roleType: e.target.value as RoleType,
+                                                    roleType: e.target.value,
                                                 }
                                                 : prev
                                         );
                                     }}
+                                    placeholder="e.g., SDE, Backend, Platform Engineer"
                                     className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-background"
-                                >
-                                    {ROLE_TYPE_ORDER.map((role) => (
-                                        <option key={role} value={role}>
-                                            {ROLE_TYPE_LABELS[role]}
+                                />
+                                <datalist id="interview-role-type-options">
+                                    {interviewRoleTypeOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
                                         </option>
                                     ))}
-                                </select>
+                                </datalist>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Pick a suggested role type or type a custom one.
+                                </p>
                             </div>
 
                             {interviewSetupError && (

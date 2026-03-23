@@ -10,6 +10,14 @@ export interface UsageCheckResult {
   reason?: string;
 }
 
+export interface UsageCounters {
+  promptsSent: number;
+  kanbanCardsCreated: number;
+  remainingLimit: number | null;
+}
+
+const FREE_APPLICATION_LIMIT = 5;
+
 /**
  * Check if user has exceeded their usage limit for a specific action
  */
@@ -17,17 +25,42 @@ export async function checkUsageLimit(
   userId: string,
   action: 'message' | 'application'
 ): Promise<UsageCheckResult> {
-  // For now, always allow - full implementation in PR #55
+  if (action === 'application') {
+    const applicationsCount = await prisma.application.count({
+      where: { userId },
+    });
+
+    if (applicationsCount >= FREE_APPLICATION_LIMIT) {
+      return {
+        allowed: false,
+        reason: `Free plan limit reached (${FREE_APPLICATION_LIMIT} applications).`,
+      };
+    }
+  }
+
   return { allowed: true };
+}
+
+export async function getUsageCounters(userId: string): Promise<UsageCounters> {
+  const applicationsCount = await prisma.application.count({
+    where: { userId },
+  });
+
+  return {
+    promptsSent: 0,
+    kanbanCardsCreated: applicationsCount,
+    remainingLimit: Math.max(0, FREE_APPLICATION_LIMIT - applicationsCount),
+  };
 }
 
 /**
  * Track usage for a specific action
  */
 export async function trackUsage(
-  userId: string,
-  action: 'message' | 'application'
+  _userId: string,
+  _action: 'message' | 'application'
 ): Promise<void> {
-  // Stub - full implementation in PR #55
-  console.log(`Tracking ${action} usage for user ${userId}`);
+  void _userId;
+  void _action;
+  // Intentionally a no-op until dedicated usage tables land.
 }

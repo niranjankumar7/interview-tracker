@@ -11,18 +11,7 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 import { Prisma } from '@prisma/client';
 
-const roleTypeSchema = z.enum([
-    'SDE',
-    'SDET',
-    'ML',
-    'DevOps',
-    'Frontend',
-    'Backend',
-    'FullStack',
-    'Data',
-    'PM',
-    'MobileEngineer',
-]);
+const roleTypeSchema = z.string().trim().min(1);
 
 const interviewRoundTypeSchema = z.string().trim().min(1).max(120);
 
@@ -131,7 +120,7 @@ export async function PUT(
         if (data.company) updateData.company = data.company;
         if (data.role) updateData.role = data.role;
         if (data.jobDescriptionUrl !== undefined) updateData.jobDescriptionUrl = data.jobDescriptionUrl;
-        if (data.roleType) updateData.roleType = data.roleType;
+        if (data.roleType !== undefined) updateData.roleType = data.roleType;
         if (data.status) updateData.status = data.status;
         if (data.applicationDate) updateData.applicationDate = new Date(data.applicationDate);
         if (data.interviewDate !== undefined) {

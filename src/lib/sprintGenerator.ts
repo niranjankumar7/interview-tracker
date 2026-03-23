@@ -1,3 +1,4 @@
+import { resolveRoleTypeForTemplate } from '@/lib/role-types';
 import { Sprint, DailyPlan, Block, Task, FocusArea } from '@/types';
 import { addDays, differenceInDays, startOfDay } from 'date-fns';
 
@@ -9,8 +10,9 @@ export function generateSprint(
     const today = startOfDay(new Date());
     const interviewDay = startOfDay(interviewDate);
     const daysRemaining = Math.max(1, differenceInDays(interviewDay, today));
+    const templateRoleType = resolveRoleTypeForTemplate(roleType, roleType);
 
-    const dailyPlans = generateDailyPlans(daysRemaining, roleType, today);
+    const dailyPlans = generateDailyPlans(daysRemaining, templateRoleType, today);
 
     return {
         id: Date.now().toString(),
@@ -26,7 +28,7 @@ export function generateSprint(
 
 function generateDailyPlans(
     daysRemaining: number,
-    roleType: RoleType,
+    roleType: string,
     startDate: Date
 ): DailyPlan[] {
     const template = getSprintTemplate(roleType, daysRemaining);
@@ -63,7 +65,7 @@ interface DayTemplate {
     topics: string[];
 }
 
-function getSprintTemplate(roleType: RoleType, days: number): DayTemplate[] {
+function getSprintTemplate(roleType: string, days: number): DayTemplate[] {
     if (roleType === 'SDE') {
         if (days >= 7) {
             return [

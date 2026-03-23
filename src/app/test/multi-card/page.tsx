@@ -27,6 +27,29 @@ interface TestResult {
   limitExceeded?: boolean;
 }
 
+interface MultiCardActionResult {
+  success: boolean;
+  company?: string;
+}
+
+interface MultiCardResponse {
+  message?: string;
+  error?: string;
+  action?: {
+    results?: MultiCardActionResult[];
+  };
+  counters?: {
+    promptsSent: number;
+    kanbanCardsCreated: number;
+    cardsCreatedThisPrompt: number;
+    remainingApplications: number;
+  };
+  limits?: {
+    truncated?: boolean;
+    limitExceeded?: boolean;
+  };
+}
+
 const TEST_PROMPTS = [
   {
     name: "Single Application",
@@ -107,7 +130,7 @@ export default function MultiCardTestPage() {
         body: JSON.stringify({ message: prompt }),
       });
 
-      const data = await response.json();
+      const data: MultiCardResponse = await response.json();
 
       if (!response.ok) {
         return {
@@ -119,10 +142,13 @@ export default function MultiCardTestPage() {
         };
       }
 
-      const successCount = data.action?.results?.filter((r: any) => r.success).length || 0;
+      const successfulResults =
+        data.action?.results?.filter((result) => result.success) ?? [];
+      const successCount = successfulResults.length;
       const companies = data.action?.results
-        ?.filter((r: any) => r.success)
-        .map((r: any) => r.company);
+        ?.filter((result) => result.success)
+        .map((result) => result.company)
+        .filter((company): company is string => Boolean(company));
 
       return {
         prompt,
@@ -130,7 +156,7 @@ export default function MultiCardTestPage() {
         cardsCreated: successCount,
         counters: data.counters,
         companies,
-        message: data.message,
+        message: data.message ?? "Request completed",
         truncated: data.limits?.truncated,
         limitExceeded: data.limits?.limitExceeded,
       };

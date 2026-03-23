@@ -1,4 +1,4 @@
-import type { Application, Question, Sprint, ThemePreference } from '@/types';
+import type { Application, InterviewRound, Question, Sprint, ThemePreference } from '@/types';
 import type { RawSprint } from '@/types/api';
 
 /**
@@ -83,6 +83,8 @@ export interface UserProgressRecord {
     totalTasksCompleted: number;
     updatedAt: string;
 }
+
+type SprintWritePayload = Sprint['dailyPlans'];
 
 /**
  * Get auth token from localStorage
@@ -311,8 +313,8 @@ export const applicationsApi = {
         scheduledDate?: string;
         notes?: string;
         questionsAsked?: string[];
-    }): Promise<any> {
-        return apiRequest<any>(`/api/applications/${id}/rounds`, {
+    }): Promise<InterviewRound> {
+        return apiRequest<InterviewRound>(`/api/applications/${id}/rounds`, {
             method: 'POST',
             body: JSON.stringify(data),
         });
@@ -330,8 +332,8 @@ export const applicationsApi = {
             notes?: string;
             questionsAsked?: string[];
         }
-    ): Promise<any> {
-        return apiRequest<any>(`/api/applications/${id}/rounds/${roundNumber}`, {
+    ): Promise<InterviewRound> {
+        return apiRequest<InterviewRound>(`/api/applications/${id}/rounds/${roundNumber}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
@@ -400,8 +402,8 @@ export const sprintsApi = {
     /**
      * Get single sprint
      */
-    async getById(id: string): Promise<any> {
-        return apiRequest<any>(`/api/sprints/${id}`);
+    async getById(id: string): Promise<RawSprint> {
+        return apiRequest<RawSprint>(`/api/sprints/${id}`);
     },
 
     /**
@@ -425,12 +427,12 @@ export const sprintsApi = {
      */
     async update(id: string, data: {
         status?: 'active' | 'completed' | 'expired';
-        dailyPlans?: any;
+        dailyPlans?: SprintWritePayload;
         interviewDate?: string;
         roleType?: string;
         totalDays?: number;
-    }): Promise<any> {
-        return apiRequest<any>(`/api/sprints/${id}`, {
+    }): Promise<RawSprint> {
+        return apiRequest<RawSprint>(`/api/sprints/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
@@ -444,8 +446,8 @@ export const sprintsApi = {
         blockIndex: number;
         taskIndex: number;
         completed: boolean;
-    }): Promise<any> {
-        return apiRequest<any>(`/api/sprints/${id}/tasks/complete`, {
+    }): Promise<RawSprint> {
+        return apiRequest<RawSprint>(`/api/sprints/${id}/tasks/complete`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
