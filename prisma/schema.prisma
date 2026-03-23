@@ -238,20 +238,20 @@ model LeetCodeConnection {
 // ============================================
 
 model Subscription {
-  id                    String   @id @default(uuid())
-  userId                String   @unique
-  plan                  String   @default("free") // free, pro, premium
-  status                String   @default("active") // active, cancelled, past_due, pending
-  currentPeriodStart    DateTime @default(now())
+  id                    String           @id @default(uuid())
+  userId                String           @unique
+  plan                  SubscriptionPlan @default(free)
+  status                SubscriptionStatus @default(active)
+  currentPeriodStart    DateTime         @default(now())
   currentPeriodEnd      DateTime?
   razorpayOrderId       String?
   razorpayPaymentId     String?
   razorpaySubscriptionId String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @default(now()) @updatedAt
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @default(now()) @updatedAt
 
   // Relations
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -287,7 +287,7 @@ model Webhook {
   updatedAt   DateTime @default(now()) @updatedAt
 
   // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries  WebhookDelivery[]
 
   @@index([userId])
@@ -295,20 +295,43 @@ model Webhook {
 }
 
 model WebhookDelivery {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   webhookId   String
   event       String
   payload     Json
-  status      String   @default("pending") // pending, delivered, failed
+  status      WebhookStatus    @default(pending)
   response    String?
-  attempts    Int      @default(0)
-  createdAt   DateTime @default(now())
+  attempts    Int              @default(0)
+  createdAt   DateTime         @default(now())
   deliveredAt DateTime?
 
   // Relations
-  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhook     Webhook          @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum SubscriptionPlan {
+  free
+  pro
+  premium
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  past_due
+  pending
+}
+
+enum WebhookStatus {
+  pending
+  delivered
+  failed
 }

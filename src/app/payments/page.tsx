@@ -95,12 +95,48 @@ export default function PricingPage() {
 
       const data = await response.json();
 
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      } else {
-        console.error("Failed to create subscription");
+      if (!response.ok || !data.orderId) {
+        console.error("Failed to create subscription:", data.error);
         setIsLoading(null);
+        return;
       }
+
+      // Load Razorpay Checkout
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+
+      script.onload = () => {
+        const options = {
+          key: data.key,
+          amount: data.amount,
+          currency: data.currency,
+          name: data.name,
+          description: data.description,
+          order_id: data.orderId,
+          prefill: data.prefill,
+          notes: data.notes,
+          handler: function (response: any) {
+            // Payment successful
+            window.location.href = "/pipeline?payment=success";
+          },
+          modal: {
+            ondismiss: function() {
+              setIsLoading(null);
+            }
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      };
+
+      script.onerror = () => {
+        console.error("Failed to load Razorpay checkout");
+        setIsLoading(null);
+      };
+
     } catch (error) {
       console.error("Error:", error);
       setIsLoading(null);

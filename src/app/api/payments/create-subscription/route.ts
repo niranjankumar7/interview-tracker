@@ -3,8 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID!;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET!;
+// Validate environment variables at startup
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+  console.error("Missing required Razorpay environment variables");
+}
 
 const PLAN_CONFIG = {
   pro: {
@@ -37,6 +42,14 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Check if env vars are configured
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return NextResponse.json(
+        { error: "Payment service not configured" },
+        { status: 503 }
+      );
     }
 
     const config = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
@@ -91,9 +104,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Return checkout configuration
-    const checkoutUrl = `https://checkout.razorpay.com/v1/checkout.js`;
-    
+    // Return checkout configuration for client-side Razorpay
     return NextResponse.json({
       orderId: order.id,
       amount: config.amount,

@@ -63,55 +63,21 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/subscription - Create/upgrade subscription
+// ⚠️ SECURITY: This endpoint no longer allows direct plan upgrades without payment.
+// Use /api/payments/create-subscription and webhook verification instead.
 export async function POST(req: NextRequest) {
   try {
     const user = await requireAuth(req);
-    const body = await req.json();
-    const validation = createSubscriptionSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Invalid input', issues: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const { plan } = validation.data;
-
-    // Get or create current subscription
-    const currentSubscription = await getOrCreateSubscription(user.userId);
-
-    // Calculate new period dates
-    const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-    // Update subscription
-    // Note: This is a placeholder. In production, integrate with Razorpay
-    // to create a subscription and get a razorpaySubscriptionId
-    const updatedSubscription = await prisma.subscription.update({
-      where: { userId: user.userId },
-      data: {
-        plan: plan as SubscriptionPlan,
-        status: SubscriptionStatus.active,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-        // razorpaySubscriptionId: 'razorpay_sub_id_placeholder',
+    
+    // Reject direct upgrades - payment must go through Razorpay flow
+    return NextResponse.json(
+      { 
+        error: 'Direct subscription upgrades are not allowed',
+        message: 'Please use the payment flow to upgrade your subscription',
+        code: 'PAYMENT_REQUIRED'
       },
-    });
-
-    return NextResponse.json({
-      success: true,
-      subscription: {
-        id: updatedSubscription.id,
-        plan: updatedSubscription.plan,
-        status: updatedSubscription.status,
-        currentPeriodStart: updatedSubscription.currentPeriodStart,
-        currentPeriodEnd: updatedSubscription.currentPeriodEnd,
-      },
-      message: `Successfully upgraded to ${plan} plan`,
-      note: 'Razorpay integration pending - no actual payment processed',
-    });
+      { status: 403 }
+    );
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

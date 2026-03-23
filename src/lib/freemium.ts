@@ -6,7 +6,7 @@
 import { prisma } from '@/lib/db';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
-// Plan limits
+// Plan limits - using large numbers instead of Infinity to avoid JSON serialization issues
 export const PLAN_LIMITS = {
   free: {
     applicationsPerMonth: 5,
@@ -17,8 +17,8 @@ export const PLAN_LIMITS = {
     messagesPerMonth: 500,
   },
   premium: {
-    applicationsPerMonth: Infinity,
-    messagesPerMonth: Infinity,
+    applicationsPerMonth: 999999, // "Unlimited" but serializable
+    messagesPerMonth: 999999,
   },
 };
 
@@ -119,6 +119,7 @@ export async function checkUsageLimit(
   const usageLimit = await getOrCreateUsageLimit(userId);
 
   const limits = PLAN_LIMITS[subscription.plan];
+  const planName = subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1);
 
   let allowed = true;
   let reason: string | undefined;
@@ -126,12 +127,12 @@ export async function checkUsageLimit(
   if (action === 'application') {
     if (usageLimit.applicationsCount >= limits.applicationsPerMonth) {
       allowed = false;
-      reason = `Free plan limit: ${limits.applicationsPerMonth} applications per month. Upgrade to add more.`;
+      reason = `${planName} plan limit: ${limits.applicationsPerMonth} applications per month. Upgrade to add more.`;
     }
   } else if (action === 'message') {
     if (usageLimit.messagesCount >= limits.messagesPerMonth) {
       allowed = false;
-      reason = `Free plan limit: ${limits.messagesPerMonth} messages per month. Upgrade to continue chatting.`;
+      reason = `${planName} plan limit: ${limits.messagesPerMonth} messages per month. Upgrade to continue chatting.`;
     }
   }
 

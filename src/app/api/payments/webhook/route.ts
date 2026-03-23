@@ -13,13 +13,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     }
 
-    // Verify webhook signature
+    // Verify webhook signature using constant-time comparison
     const expectedSignature = crypto
       .createHmac("sha256", WEBHOOK_SECRET)
       .update(body)
       .digest("hex");
 
-    if (signature !== expectedSignature) {
+    // Use timingSafeEqual to prevent timing attacks
+    const sigBuffer = Buffer.from(signature, 'utf8');
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    
+    if (sigBuffer.length !== expectedBuffer.length || 
+        !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
@@ -62,10 +67,21 @@ async function handlePaymentCaptured(payment: any) {
     return;
   }
 
-  // Update subscription to active
-  await prisma.subscription.update({
+  // Idempotent upsert: create or update subscription
+  // This handles cases where the subscription row doesn't exist yet
+  await prisma.subscription.upsert({
     where: { userId },
-    data: {
+    update: {
+      status: "active",
+      plan: plan, // Persist the paid plan from payment notes
+      razorpayPaymentId: payment.id,
+      razorpayOrderId: order_id,
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+    create: {
+      userId,
+      plan: plan,
       status: "active",
       razorpayPaymentId: payment.id,
       razorpayOrderId: order_id,
@@ -97,9 +113,17 @@ async function handleSubscriptionCharged(subscription: any) {
   const userId = subscription.notes?.userId;
   if (!userId) return;
 
-  await prisma.subscription.update({
+  // Use upsert for idempotency
+  await prisma.subscription.upsert({
     where: { userId },
-    data: {
+    update: {
+      status: "active",
+      currentPeriodStart: new Date(subscription.current_start * 1000),
+      currentPeriodEnd: new Date(subscription.current_end * 1000),
+    },
+    create: {
+      userId,
+      plan: "pro", // Default, should be from subscription notes if available
       status: "active",
       currentPeriodStart: new Date(subscription.current_start * 1000),
       currentPeriodEnd: new Date(subscription.current_end * 1000),
@@ -113,9 +137,15 @@ async function handleSubscriptionCancelled(subscription: any) {
   const userId = subscription.notes?.userId;
   if (!userId) return;
 
-  await prisma.subscription.update({
+  // Use upsert for idempotency
+  await prisma.subscription.upsert({
     where: { userId },
-    data: {
+    update: {
+      status: "cancelled",
+    },
+    create: {
+      userId,
+      plan: "free",
       status: "cancelled",
     },
   });
