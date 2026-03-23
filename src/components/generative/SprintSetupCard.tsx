@@ -163,10 +163,10 @@ function findMatchingApplication(args: {
 
     if (candidates.length === 0) return undefined;
 
-    const exactstring = candidates.find(
+    const exactRoleType = candidates.find(
         (candidate) => candidate.roleType === args.roleType
     );
-    if (exactstring) return exactstring;
+    if (exactRoleType) return exactRoleType;
 
     const exactRole = candidates.find((candidate) =>
         rolesEquivalent(candidate.role, roleLabel)
@@ -482,7 +482,7 @@ export function SprintSetupCard({
             const shouldUpdateRole =
                 isGenericRole(latestApplication.role) ||
                 !rolesEquivalent(latestApplication.role, roleLabel);
-            const shouldUpdatestring = latestApplication.roleType !== state.role;
+            const shouldUpdateRoleType = latestApplication.roleType !== state.role;
             const shouldNormalizeCompany =
                 sanitizeCompanyName(latestApplication.company) !== companyName;
 
@@ -492,7 +492,7 @@ export function SprintSetupCard({
                 currentRound: targetRound.roundType,
                 ...(shouldNormalizeCompany ? { company: companyName } : {}),
                 ...(shouldUpdateRole ? { role: roleLabel } : {}),
-                ...(shouldUpdatestring ? { roleType: state.role } : {}),
+                ...(shouldUpdateRoleType ? { roleType: state.role } : {}),
             });
 
             const hasSprintForDate = useStore.getState().sprints.some(
