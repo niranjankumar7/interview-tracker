@@ -9,18 +9,7 @@ const applicationStatusSchema = z.enum([
   "rejected",
 ]);
 
-const roleTypeSchema = z.enum([
-  "SDE",
-  "SDET",
-  "ML",
-  "DevOps",
-  "Frontend",
-  "Backend",
-  "FullStack",
-  "Data",
-  "PM",
-  "MobileEngineer",
-]);
+const roleTypeSchema = z.string().trim().min(1);
 
 const focusAreaSchema = z.enum([
   "DSA",

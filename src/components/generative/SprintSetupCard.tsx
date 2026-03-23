@@ -4,6 +4,11 @@ import { useStore } from "@/lib/store";
 import { generateSprint } from "@/lib/sprintGenerator";
 import { tryParseDateInput } from "@/lib/date-parsing";
 import { isGenericRole, rolesEquivalent, sanitizeCompanyName } from "@/lib/application-intake";
+import {
+    areRoleTypesEquivalent,
+    getRoleTypeLabel,
+    getRoleTypeOptions,
+} from "@/lib/role-types";
 import { Application, InterviewRound, InterviewRoundType, interviewRoundTypes } from "@/types";
 import { format, addDays } from "date-fns";
 import { useTamboComponentState } from "@tambo-ai/react";
@@ -72,19 +77,6 @@ type HydratedSprintSetupState = {
     roundType: InterviewRoundType;
 };
 
-const ROLE_LABELS: Record<string, string> = {
-    SDE: "Software Engineer",
-    SDET: "Software Development Engineer in Test",
-    ML: "ML Engineer",
-    DevOps: "DevOps Engineer",
-    Frontend: "Frontend Developer",
-    Backend: "Backend Developer",
-    FullStack: "Full Stack Developer",
-    Data: "Data Engineer",
-    PM: "Product Manager",
-    MobileEngineer: "Mobile Engineer",
-};
-
 const INTERVIEW_ROUND_TYPE_LABELS: Record<(typeof interviewRoundTypes)[number], string> = {
     HR: "HR Round",
     TechnicalRound1: "Technical Round 1",
@@ -108,7 +100,7 @@ function getRoundTypeLabel(roundType: InterviewRoundType): string {
 }
 
 function roleLabelForType(roleType: string): string {
-    return ROLE_LABELS[roleType];
+    return getRoleTypeLabel(roleType);
 }
 
 function getNextRoundType(rounds: InterviewRound[]): InterviewRoundType {
@@ -164,7 +156,7 @@ function findMatchingApplication(args: {
     if (candidates.length === 0) return undefined;
 
     const exactRoleType = candidates.find(
-        (candidate) => candidate.roleType === args.roleType
+        (candidate) => areRoleTypesEquivalent(candidate.roleType, args.roleType)
     );
     if (exactRoleType) return exactRoleType;
 
@@ -274,7 +266,7 @@ export function SprintSetupCard({
     const applications = useStore((s) => s.applications);
 
     // Determine default round type based on existing application or prediction
-    const getDefaultRoundTypeForApp = (companyName: string, roleType: RoleType): InterviewRoundType => {
+    const getDefaultRoundTypeForApp = (companyName: string, roleType: string): InterviewRoundType => {
         const app = findMatchingApplication({
             applications,
             company: companyName,
@@ -289,7 +281,7 @@ export function SprintSetupCard({
     };
 
     const hydratedCompany = initialCompany || "";
-    const hydratedRole: RoleType = initialRole ?? "SDE";
+    const hydratedRole = initialRole ?? "SDE";
     const hydratedInterviewDate = normalizeDateInputValue(
         initialDate || getDefaultDate()
     );
@@ -350,6 +342,12 @@ export function SprintSetupCard({
         state,
         setState
     );
+
+    const roleTypeOptions = useMemo(
+        () => getRoleTypeOptions(state?.role),
+        [state?.role]
+    );
+    const roleTypeSuggestionsId = `${componentId}-role-types`;
 
     // Handle loading state
     if (!state) {
@@ -482,7 +480,10 @@ export function SprintSetupCard({
             const shouldUpdateRole =
                 isGenericRole(latestApplication.role) ||
                 !rolesEquivalent(latestApplication.role, roleLabel);
-            const shouldUpdateRoleType = latestApplication.roleType !== state.role;
+            const shouldUpdateRoleType = !areRoleTypesEquivalent(
+                latestApplication.roleType,
+                state.role
+            );
             const shouldNormalizeCompany =
                 sanitizeCompanyName(latestApplication.company) !== companyName;
 
@@ -606,28 +607,30 @@ export function SprintSetupCard({
                         <Briefcase className="w-4 h-4" />
                         Role Type
                     </label>
-                    <select
+                    <input
+                        type="text"
+                        list={roleTypeSuggestionsId}
                         value={state.role}
                         onChange={(e) =>
                             setState({
                                 ...state,
-                                role: e.target.value as RoleType,
+                                role: e.target.value,
                                 formError: undefined,
                             })
                         }
+                        placeholder="e.g., SDE, Backend, Platform Engineer"
                         className="w-full px-4 py-2.5 border border-border bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    >
-                        <option value="SDE">Software Development Engineer</option>
-                        <option value="SDET">Software Dev Engineer in Test</option>
-                        <option value="ML">Machine Learning Engineer</option>
-                        <option value="DevOps">DevOps / SRE</option>
-                        <option value="Frontend">Frontend Developer</option>
-                        <option value="Backend">Backend Developer</option>
-                        <option value="FullStack">Full Stack Developer</option>
-                        <option value="Data">Data Engineer / Analyst</option>
-                        <option value="PM">Product Manager</option>
-                        <option value="MobileEngineer">Mobile Engineer</option>
-                    </select>
+                    />
+                    <datalist id={roleTypeSuggestionsId}>
+                        {roleTypeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </datalist>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Pick a suggested role type or type a custom one.
+                    </p>
                 </div>
 
                 <div>

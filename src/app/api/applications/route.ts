@@ -10,7 +10,7 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 
 // RoleType is now dynamic - any string is accepted
-const roleTypeSchema = z.string().optional();
+const roleTypeSchema = z.string().trim().min(1).optional();
 
 const createApplicationSchema = z.object({
     company: z.string().min(1),

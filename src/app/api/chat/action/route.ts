@@ -9,7 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/db';
-import { checkUsageLimit, trackUsage } from '@/lib/freemium';
+import { sanitizeCompanyName } from '@/lib/application-intake';
+import { tryParseDateInput } from '@/lib/date-parsing';
+import { checkUsageLimit, getUsageCounters, trackUsage } from '@/lib/freemium';
 
 const MAX_CARDS_PER_PROMPT = 5;
 
@@ -28,13 +30,6 @@ interface ExtractedApplication {
   company: string;
   role: string;
   notes?: string;
-}
-
-// Counters for tracking
-interface CreationCounters {
-  promptsSent: number;
-  kanbanCardsCreated: number;
-  remainingLimit: number | null; // null means unlimited (paid tiers)
 }
 
 // Result types for better type safety
@@ -83,8 +78,6 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
   // Pattern 4: Numbered or bulleted (from pasted list)
   // Example: "1. Google - SWE\n2. Amazon - PM"
   const numberedPattern = /(?:\d+[.\)]\s*|[•\-\*]\s*)([A-Za-z][A-Za-z\s]*?)(?:\s*[-:]\s*|\s+as\s+)(.+?)(?=\n|$)/gi;
-  
-  let match;
   
   // Try Pattern 1: Role at Company, Role at Company
   const roleMatches = Array.from(message.matchAll(roleAtCompanyPattern));
@@ -198,8 +191,6 @@ function extractMultipleApplications(message: string): ExtractedApplication[] {
  * Parse message for multi-card actions
  */
 function parseMessageForMultiAction(message: string): MultiCardAction {
-  const lowerMessage = message.toLowerCase();
-  
   // Check for application creation patterns
   const hasApplicationKeyword = /\b(applied|application|submitted|applied to|applied for)\b/i.test(message);
   
@@ -277,38 +268,28 @@ function parseMessageForMultiAction(message: string): MultiCardAction {
   return { type: 'general_chat', applications: [] };
 }
 
-/**
- * Get current counters for user
- * Returns null for remainingLimit when unlimited (paid tiers) to avoid Infinity JSON serialization issues
- */
-async function getUserCounters(userId: string): Promise<CreationCounters> {
-  const [usageLimit, subscription] = await Promise.all([
-    prisma.usageLimit.findUnique({ where: { userId } }),
-    prisma.subscription.findUnique({ where: { userId } }),
-  ]);
-  
-  const plan = subscription?.plan || 'free';
-  const limits = {
-    free: { applications: 5, messages: 50 },
-    pro: { applications: Infinity, messages: Infinity },
-    premium: { applications: Infinity, messages: Infinity },
-  };
-  
-  const planLimits = limits[plan as keyof typeof limits] || limits.free;
-  
-  const usedApplications = usageLimit?.applicationsCount || 0;
-  const remaining = planLimits.applications - usedApplications;
-  
-  // Use null for unlimited plans to avoid Infinity serialization issues
-  const remainingLimit = planLimits.applications === Infinity 
-    ? null 
-    : Math.max(0, remaining);
-  
-  return {
-    promptsSent: usageLimit?.messagesCount || 0,
-    kanbanCardsCreated: usedApplications,
-    remainingLimit,
-  };
+function normalizeRole(role: string | undefined): string {
+  return role?.trim().replace(/\s+/g, ' ') || 'Software Engineer';
+}
+
+function getRoundTypeForNumber(roundNumber: number): string {
+  if (roundNumber === 1) return 'TechnicalRound1';
+  if (roundNumber === 2) return 'TechnicalRound2';
+  return `Round ${roundNumber}`;
+}
+
+function parseScheduledInterviewDate(value: string): Date | null {
+  if (!value || value === 'pending') return null;
+
+  const parsed = tryParseDateInput(value);
+  if (parsed) return parsed;
+
+  const nativeParsed = new Date(value);
+  if (Number.isNaN(nativeParsed.getTime())) {
+    return null;
+  }
+
+  return nativeParsed;
 }
 
 // POST /api/chat/action - Process chat message with multi-card support
@@ -328,7 +309,7 @@ export async function POST(req: NextRequest) {
     const { message } = validation.data;
 
     // Get current counters BEFORE processing
-    const countersBefore = await getUserCounters(user.userId);
+    const countersBefore = await getUsageCounters(user.userId);
 
     // Check message usage limit
     const usageCheck = await checkUsageLimit(user.userId, 'message');
@@ -381,11 +362,24 @@ export async function POST(req: NextRequest) {
         }
 
         try {
+          const company = sanitizeCompanyName(app.company);
+          const role = normalizeRole(app.role);
+
+          if (!company) {
+            results.push({
+              success: false,
+              company: app.company,
+              error: 'Missing company name',
+            });
+            continue;
+          }
+
           const application = await prisma.application.create({
             data: {
               userId: user.userId,
-              company: app.company,
-              role: app.role,
+              company,
+              role,
+              roleType: role,
               status: 'applied',
               applicationDate: new Date(),
               notes: '', // Don't store full message to avoid bloat
@@ -445,6 +439,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } catch (error) {
+        console.error('Failed to update application status from chat action:', error);
         results.push({
           success: false,
           error: 'Failed to update status',
@@ -472,20 +467,28 @@ export async function POST(req: NextRequest) {
 
           const nextRoundNumber = (lastRound?.roundNumber || 0) + 1;
 
+          const roundType = getRoundTypeForNumber(nextRoundNumber);
+          const scheduledDate = parseScheduledInterviewDate(
+            action.interviewSchedule.date
+          );
+
           const round = await prisma.interviewRound.create({
             data: {
               applicationId: application.id,
               roundNumber: nextRoundNumber,
-              roundType: 'technical',
+              roundType,
+              scheduledDate,
             },
           });
 
-          if (application.status === 'applied') {
-            await prisma.application.update({
-              where: { id: application.id },
-              data: { status: 'interview' },
-            });
-          }
+          await prisma.application.update({
+            where: { id: application.id },
+            data: {
+              status: 'interview',
+              currentRound: roundType,
+              ...(scheduledDate ? { interviewDate: scheduledDate } : {}),
+            },
+          });
 
           results.push({
             success: true,
@@ -500,6 +503,7 @@ export async function POST(req: NextRequest) {
           });
         }
       } catch (error) {
+        console.error('Failed to schedule interview from chat action:', error);
         results.push({
           success: false,
           error: 'Failed to schedule interview',
@@ -508,7 +512,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get updated counters AFTER processing
-    const countersAfter = await getUserCounters(user.userId);
+    const countersAfter = await getUsageCounters(user.userId);
 
     // Generate response message
     let responseMessage: string;

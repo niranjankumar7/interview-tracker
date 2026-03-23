@@ -5,7 +5,13 @@ import { InterviewRoundType, OfferDetails, Sprint } from "@/types";
 import { getInterviewRoundTheme } from "@/lib/interviewRoundRegistry";
 import {
     getRoundPrepContent,
+    getAvailableRounds as getTemplateRounds,
 } from "@/data/prep-templates";
+import {
+    inferRoleTypeFromText,
+    normalizeRoleTypeInput,
+    resolveRoleTypeForTemplate,
+} from "@/lib/role-types";
 import { getCompanyPrepData, ScrapedInterviewData } from "@/services/scraper";
 import { useStore } from "@/lib/store";
 import {
@@ -53,7 +59,7 @@ interface PrepDetailPanelProps {
 const CLOSE_ON_MISSING_APP_DELAY_MS = 200;
 
 // Used only when a role has no configured rounds (or `availableRounds[0]` is missing).
-const SELECTED_ROUND_FALLBACK: InterviewRoundType = "Round 1";
+const SELECTED_ROUND_FALLBACK: InterviewRoundType = "TechnicalRound1";
 
 function getDefaultRoundTypeForRoundNumber(roundNumber: number): InterviewRoundType {
     return `Round ${roundNumber}`;
@@ -352,7 +358,9 @@ export function PrepDetailPanel({
 
     const company = application?.company ?? null;
     const role = application?.role ?? null;
-    const roleType: string = application ? application.roleType || inferRoleType(application.role) : "SDE";
+    const storedRoleType = normalizeRoleTypeInput(application?.roleType);
+    const roleType = storedRoleType || inferRoleTypeFromText(role);
+    const prepRoleType = resolveRoleTypeForTemplate(storedRoleType, role);
     const selectedRoundFromStore = application?.currentRound;
 
     const trackedRounds = useMemo(() => {
@@ -372,17 +380,42 @@ export function PrepDetailPanel({
         return orderedUniqueRounds;
     }, [application?.rounds]);
 
+    const templateRounds = useMemo(
+        () => getTemplateRounds(prepRoleType),
+        [prepRoleType]
+    );
+
     const availableRounds = useMemo(() => {
         if (trackedRounds.length > 0) return trackedRounds;
-        if (selectedRoundFromStore) {
-            return [selectedRoundFromStore];
-        }
-        return [];
-    }, [selectedRoundFromStore, trackedRounds]);
 
-    const defaultRound = availableRounds[0] ?? SELECTED_ROUND_FALLBACK;
+        const fallbackRounds: InterviewRoundType[] = [];
+
+        if (selectedRoundFromStore && templateRounds.includes(selectedRoundFromStore)) {
+            fallbackRounds.push(selectedRoundFromStore);
+        }
+
+        for (const roundType of templateRounds) {
+            if (!fallbackRounds.includes(roundType)) {
+                fallbackRounds.push(roundType);
+            }
+        }
+
+        if (fallbackRounds.length > 0) {
+            return fallbackRounds;
+        }
+
+        return [SELECTED_ROUND_FALLBACK];
+    }, [selectedRoundFromStore, templateRounds, trackedRounds]);
+
+    const defaultRound =
+        trackedRounds[0] ??
+        templateRounds[0] ??
+        availableRounds[0] ??
+        SELECTED_ROUND_FALLBACK;
     const selectedRound =
-        selectedRoundFromStore && availableRounds.includes(selectedRoundFromStore)
+        selectedRoundFromStore &&
+        (trackedRounds.includes(selectedRoundFromStore) ||
+            templateRounds.includes(selectedRoundFromStore))
             ? selectedRoundFromStore
             : defaultRound;
 
@@ -443,9 +476,9 @@ export function PrepDetailPanel({
     if (!isOpen || !application) return null;
 
     const prepContent =
-        getRoundPrepContent(roleType, selectedRound) ??
+        getRoundPrepContent(prepRoleType, selectedRound) ??
         (selectedRound === "TechnicalRound2"
-            ? getRoundPrepContent(roleType, "TechnicalRound1")
+            ? getRoundPrepContent(prepRoleType, "TechnicalRound1")
             : undefined);
 
     const today = startOfDay(new Date());
@@ -1332,40 +1365,4 @@ function normalizeNotesForSave(value: string): string {
     // Preserve leading whitespace and internal formatting (e.g., indentation),
     // but trim trailing spaces/tabs at the end of the note to avoid noisy diffs and unnecessary saves.
     return value.replace(/[ \t]+$/u, "");
-}
-
-// Helper function to infer role type from role string
-function inferRoleType(role: string): string {
-    const roleLower = role.toLowerCase();
-
-    if (roleLower.includes('sdet') || roleLower.includes('test') || roleLower.includes('qa')) {
-        return 'SDET';
-    }
-    if (roleLower.includes('ml') || roleLower.includes('machine learning') || roleLower.includes('ai')) {
-        return 'ML';
-    }
-    if (roleLower.includes('devops') || roleLower.includes('sre') || roleLower.includes('infrastructure')) {
-        return 'DevOps';
-    }
-    if (roleLower.includes('frontend') || roleLower.includes('front-end') || roleLower.includes('ui')) {
-        return 'Frontend';
-    }
-    if (roleLower.includes('backend') || roleLower.includes('back-end') || roleLower.includes('server')) {
-        return 'Backend';
-    }
-    if (roleLower.includes('fullstack') || roleLower.includes('full-stack') || roleLower.includes('full stack')) {
-        return 'FullStack';
-    }
-    if (roleLower.includes('data engineer') || roleLower.includes('data analyst') || roleLower.includes('analytics')) {
-        return 'Data';
-    }
-    if (roleLower.includes('product') || roleLower.includes('pm')) {
-        return 'PM';
-    }
-    if (roleLower.includes('mobile') || roleLower.includes('ios') || roleLower.includes('android') || roleLower.includes('react native')) {
-        return 'MobileEngineer';
-    }
-
-    // Default to SDE for general software roles
-    return 'SDE';
 }

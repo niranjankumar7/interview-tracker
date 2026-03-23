@@ -11,18 +11,7 @@ import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 import { Prisma } from '@prisma/client';
 
-const roleTypeSchema = z.enum([
-    'SDE',
-    'SDET',
-    'ML',
-    'DevOps',
-    'Frontend',
-    'Backend',
-    'FullStack',
-    'Data',
-    'PM',
-    'MobileEngineer',
-]);
+const roleTypeSchema = z.string().trim().min(1);
 
 // Schema for individual task in a daily plan
 const taskSchema = z.object({

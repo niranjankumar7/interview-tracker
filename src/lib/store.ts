@@ -929,9 +929,11 @@ export const useStore = create<AppState>()(
                         id: '1',
                         company: 'Google',
                         role: 'SDE - Backend',
+                        roleType: 'SDE',
                         status: 'interview',
                         applicationDate: addDays(today, -14),
                         interviewDate: addDays(today, 5),
+                        currentRound: 'TechnicalRound1',
                         rounds: [],
                         notes: 'Referred by John',
                         createdAt: addDays(today, -14),
@@ -940,8 +942,10 @@ export const useStore = create<AppState>()(
                         id: '2',
                         company: 'Amazon',
                         role: 'SDE - Full Stack',
+                        roleType: 'SDE',
                         status: 'shortlisted',
                         applicationDate: addDays(today, -10),
+                        currentRound: 'TechnicalRound1',
                         rounds: [],
                         notes: '',
                         createdAt: addDays(today, -10),
@@ -950,8 +954,10 @@ export const useStore = create<AppState>()(
                         id: '3',
                         company: 'Microsoft',
                         role: 'SDE - Cloud',
+                        roleType: 'SDE',
                         status: 'applied',
                         applicationDate: addDays(today, -5),
+                        currentRound: 'TechnicalRound1',
                         rounds: [],
                         notes: 'Applied through careers portal',
                         createdAt: addDays(today, -5),
@@ -1129,7 +1135,7 @@ export const useStore = create<AppState>()(
                 try {
                     const round = await api.applications.createRound(applicationId, data);
                     const normalizedRound = normalizeInterviewRoundFromApi(
-                        round as Record<string, unknown>
+                        round as unknown as Record<string, unknown>
                     );
                     if (!normalizedRound) {
                         throw new Error('Invalid interview round payload returned by API');
@@ -1158,7 +1164,7 @@ export const useStore = create<AppState>()(
                         data
                     );
                     const normalizedRound = normalizeInterviewRoundFromApi(
-                        round as Record<string, unknown>
+                        round as unknown as Record<string, unknown>
                     );
                     if (!normalizedRound) {
                         throw new Error('Invalid interview round payload returned by API');
