@@ -3,7 +3,7 @@
  * Fetches company-specific interview insights using DuckDuckGo search
  */
 
-import { RoleType, InterviewRoundType } from '@/types';
+import { InterviewRoundType } from '@/types';
 import { getScraperCache, setScraperCache } from './scraper-cache';
 
 export interface ScrapedInterviewData {
@@ -36,7 +36,7 @@ interface DDGSearchResult {
 export async function fetchCompanyInterviewData(
     company: string,
     role: string,
-    roleType: RoleType,
+    roleType: string,
     round?: InterviewRoundType
 ): Promise<ScrapedInterviewData | null> {
     // Check cache first
@@ -89,7 +89,7 @@ export async function fetchCompanyInterviewData(
  */
 export async function fetchViaWebSearch(
     company: string,
-    roleType: RoleType
+    roleType: string
 ): Promise<ScrapedInterviewData | null> {
     const cacheKey = `web_${company.toLowerCase()}_${roleType}`;
     const cached = getScraperCache(cacheKey);
@@ -286,7 +286,7 @@ function getDefaultCompanyTips(company: string): string[] {
 export async function getCompanyPrepData(
     company: string,
     role: string,
-    roleType: RoleType,
+    roleType: string,
     round?: InterviewRoundType
 ): Promise<ScrapedInterviewData> {
     // Try DuckDuckGo API first

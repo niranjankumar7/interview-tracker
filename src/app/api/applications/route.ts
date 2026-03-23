@@ -9,18 +9,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 
-const roleTypeSchema = z.enum([
-    'SDE',
-    'SDET',
-    'ML',
-    'DevOps',
-    'Frontend',
-    'Backend',
-    'FullStack',
-    'Data',
-    'PM',
-    'MobileEngineer',
-]);
+// RoleType is now dynamic - any string is accepted
+const roleTypeSchema = z.string().optional();
 
 const createApplicationSchema = z.object({
     company: z.string().min(1),

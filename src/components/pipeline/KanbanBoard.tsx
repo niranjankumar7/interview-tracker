@@ -691,7 +691,7 @@ export function KanbanBoard() {
                                                     {roundCountBadge}
 
                                                     {/* Click to view prep hint */}
-                                                    <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors">
+                                                    <div className="mt-3 text-xs text-muted-foreground group-hover:text-indigo-500 transition-colors truncate">
                                                         Click to view prep →
                                                     </div>
 
@@ -703,10 +703,11 @@ export function KanbanBoard() {
                                                                 e.stopPropagation();
                                                                 setFeedbackApplicationId(app.id);
                                                             }}
-                                                            className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2"
+                                                            className="mt-2 w-full text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2 truncate"
+                                                            title="Round feedback"
                                                         >
-                                                            <PanelRight className="w-4 h-4" />
-                                                            Round feedback
+                                                            <PanelRight className="w-4 h-4 flex-shrink-0" />
+                                                            <span className="truncate">Round feedback</span>
                                                         </button>
                                                     )}
                                                 </div>
